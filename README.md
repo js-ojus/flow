@@ -1,2 +1,2 @@
-# flow
-A tiny workflow engine written in Go (golang)
+## flow
+A tiny workflow engine written in Go (golang).

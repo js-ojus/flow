@@ -1,24 +1,46 @@
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
-*.a
+*.lo
+*.slo
 *.so
 
-# Folders
+*.a
+*.la
+*.lai
+
+*.dylib
+
+*.exe
+*.dll
+
+# Directories
 _obj
 _test
 
+/bin/
+/pkg/
+
 # Architecture specific extensions/prefixes
-*.[568vq]
+*.[568vqo]
 [568vq].out
 
-*.cgo1.go
-*.cgo2.c
+*.cgo*.go
+*.cgo*.c
 _cgo_defun.c
 _cgo_gotypes.go
 _cgo_export.*
+_cgo_*
 
 _testmain.go
-
-*.exe
 *.test
 *.prof
+
+# Backup files, etc.
+*~
+.*.swp
+*.orig
+core
+
+# Take care of MacOS weirdness; for potential contributors using it
+.DS_Store
+._*
