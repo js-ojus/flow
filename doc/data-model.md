@@ -89,7 +89,7 @@ A privilege represents an authorisation to perform a specific action on a specif
 ```go
 type Privilege struct {
     privs    []PrivilegeType
-    resource string
+    resource *Resource
     doc      *Document // only if not on a resource
 }
 ```
@@ -175,7 +175,7 @@ type DocEvent struct {
 ```
 
 ### DocState
-A document's state is one of a set of enumerated types, but as defined by the consuming application.  `flow`, therefore, does not assume anything about the specifics of any state.  Instead, it treats document states as plain, but controlled, text.
+A document's state is one of a set of enumerated types, but as defined by the consuming application.  `flow`, therefore, does not assume anything about the specifics of any state.
 
 Each defined document state has a specified set of valid succeeding states.  A document in the current state, upon the occurrence of a transition event, can switch into one of only the specified successor states.
 
