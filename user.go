@@ -1,11 +1,9 @@
 package flow
 
-import (
-	"fmt"
-)
+import "fmt"
 
-// User represents any kind of a user invoking or other participating
-// in a defined workflow in the system.
+// User represents any kind of a user invoking or otherwise
+// participating in a defined workflow in the system.
 //
 // User details are expected to be provided by an external identity
 // provider application or directory.  `flow` neither defines nor
