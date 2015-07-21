@@ -25,7 +25,10 @@ func NewUser(id uint64, name string) (*User, error) {
 		return nil, fmt.Errorf("invalid user data -- id: %d, name: %s", id, name)
 	}
 
-	return &User{id: id, name: name}, nil
+	u := &User{id: id, name: name}
+	u.roles = make([]*Role, 1)
+	u.groups = make([]*Group, 1)
+	return u, nil
 }
 
 // ID answers this user's ID.

@@ -101,14 +101,14 @@ Privileges are an enumerated set, and apply to resources and documents.  They cl
 type PrivilegeType string
 
 const (
-    PrivList     PrivilegeType = "LIST"
-    PrivCreate                 = "CREATE"
-    PrivRead                   = "READ"
-    PrivUpdate                 = "UPDATE"
-    PrivDelete                 = "DELETE"
-    PrivUndelete               = "UNDELETE"
-    PrivArchive                = "ARCHIVE"
-    PrivRestore                = "RESTORE"
+	PrivList PrivilegeType = iota + 1
+	PrivCreate
+	PrivRead
+	PrivUpdate
+	PrivDelete
+	PrivUndelete
+	PrivArchive
+	PrivRestore
 )
 ```
 

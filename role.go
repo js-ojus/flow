@@ -21,7 +21,9 @@ func NewRole(id uint16, name string) (*Role, error) {
 		return nil, fmt.Errorf("invalid role data -- id: %d, name: %s", id, name)
 	}
 
-	return &Role{id: id, name: name}, nil
+	r := &Role{id: id, name: name}
+	r.privs = make([]*Privilege, 1)
+	return r, nil
 }
 
 // AddPrivilege includes the given privilege in the set of privileges

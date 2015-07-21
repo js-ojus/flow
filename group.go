@@ -22,7 +22,9 @@ func NewGroup(id uint16, name string) (*Group, error) {
 		return nil, fmt.Errorf("invalid group data -- id: %d, name: %s", id, name)
 	}
 
-	return &Group{id: id, name: name}, nil
+	g := &Group{id: id, name: name}
+	g.privs = make([]*Privilege, 1)
+	return g, nil
 }
 
 // AddPrivilege includes the given privilege in the set of privileges
@@ -38,8 +40,8 @@ func (g *Group) AddPrivilege(p *Privilege) bool {
 	return true
 }
 
-// RemovePrivilegesOn removes the privileges that this group has on the
-// given target.
+// RemovePrivilegesOn removes the privileges that this group has on
+// the given target.
 func (g *Group) RemovePrivilegesOn(res *Resource, doc *Document) bool {
 	found := false
 	idx := -1
