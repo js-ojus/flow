@@ -29,3 +29,105 @@ func NewUser(id uint64, name string) (*User, error) {
 
 	return &User{id: id, name: name}, nil
 }
+
+// ID answers this user's ID.
+func (u *User) ID() uint64 {
+	return u.id
+}
+
+// Name answers this user's name.
+func (u *User) Name() string {
+	return u.name
+}
+
+// Active answers if this user's account is enabled.
+func (u *User) Active() bool {
+	return u.active
+}
+
+// SetStatus can be used to enable or disable a user account
+// dynamically.
+func (u *User) SetStatus(active bool) {
+	u.active = active
+}
+
+// AssignRole adds the given role to this user, if it is not assigned
+// already.
+func (u *User) AssignRole(r *Role) bool {
+	for _, el := range u.roles {
+		if el.id == r.id {
+			return false
+		}
+	}
+
+	u.roles = append(u.roles, r)
+	return true
+}
+
+// UnassignRole removes the given role from this user, if it is
+// assigned currently.
+func (u *User) UnassignRole(r *Role) bool {
+	found := false
+	idx := -1
+	for i, el := range u.roles {
+		if el.id == r.id {
+			found = true
+			idx = i
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+
+	u.roles = append(u.roles[:idx], u.roles[idx+1:]...)
+	return true
+}
+
+// Roles answers a copy of the roles currently assigned to this user.
+func (u *User) Roles() []*Role {
+	rs := make([]*Role, len(u.roles))
+	copy(rs, u.roles)
+	return rs
+}
+
+// AddToGroup records that this user participates in the given group,
+// if (s)he does not already.
+func (u *User) AddToGroup(g *Group) bool {
+	for _, el := range u.groups {
+		if el.id == g.id {
+			return false
+		}
+	}
+
+	u.groups = append(u.groups, g)
+	return true
+}
+
+// RemoveFromGroup records that this user no longer participates in
+// the given group, if (s)he does currently.
+func (u *User) RemoveFromGroup(g *Group) bool {
+	found := false
+	idx := -1
+	for i, el := range u.groups {
+		if el.id == g.id {
+			found = true
+			idx = i
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+
+	u.groups = append(u.groups[:idx], u.groups[idx+1:]...)
+	return true
+}
+
+// Groups answers a copy of the groups to which this user currently
+// belongs.
+func (u *User) Groups() []*Group {
+	gs := make([]*Group, len(u.groups))
+	copy(gs, u.groups)
+	return gs
+}
