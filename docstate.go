@@ -8,5 +8,5 @@ package flow
 type DocState struct {
 	dtype      DocType // for namespace purposes
 	name       string
-	successors []*DocState
+	successors []*DocState // possible next states
 }
