@@ -39,6 +39,7 @@ func NewDocument(id uint64, dtype DocType, title string, author *User) (*Documen
 	d := &Document{id: id, dtype: dtype, title: title, author: author}
 	d.ctime = time.Now().UTC()
 	d.events = make([]*DocEvent, 1)
+	d.revision = 1
 	return d, nil
 }
 
@@ -59,6 +60,12 @@ func (d *Document) Title() string {
 
 // SetText sets the primary content of this document.
 func (d *Document) SetText(t string) error {
+	if d.revision > 1 {
+		return fmt.Errorf("document revision > 1 : %d", d.revision)
+	}
+	if d.text != "" {
+		return fmt.Errorf("document text already set")
+	}
 	if t == "" {
 		return fmt.Errorf("empty content given")
 	}
