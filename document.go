@@ -16,6 +16,7 @@ package flow
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -28,15 +29,18 @@ import (
 // its modifications.  The life cycle typically involves several state
 // transitions, whose details are also tracked.
 //
-// Applications are expected to embed `Document` in their document
-// structures.
+// Most applications should embed `Document` in their document
+// structures rather than use this directly.
 type Document struct {
-	id       uint64 // globally-unique
-	dtype    DocType
-	title    string
-	text     string // primary content
-	author   *User  // creator of the document
-	ctime    time.Time
+	id     uint64 // globally-unique
+	dtype  DocType
+	title  string
+	text   string // primary content
+	author *User  // creator of the document
+	ctime  time.Time
+
+	mutex    sync.Mutex
+	state    *DocState   // current state
 	events   []*DocEvent // state transitions so far, tracked in order
 	revision uint16
 }
@@ -45,17 +49,20 @@ type Document struct {
 //
 // The document created through this method has a life cycle that is
 // associated with it through a particular workflow.
-func NewDocument(id uint64, dtype DocType, title string, author *User) (*Document, error) {
+func NewDocument(id uint64, dtype DocType, title string, author *User, instate *DocState) (*Document, error) {
 	if id == 0 || string(dtype) == "" || title == "" || author == nil {
 		return nil, fmt.Errorf("invalid initialisation data -- id: %d, dtype: %s, title: %s, author: %s", id, dtype, title, author.Name())
 	}
 
 	d := &Document{id: id, dtype: dtype, title: title, author: author}
 	d.ctime = time.Now().UTC()
+	d.state = instate
 	d.events = make([]*DocEvent, 1)
 	d.revision = 1
 	return d, nil
 }
+
+// TODO(js): OpenDocument()
 
 // ID answers this document's globally-unique ID.
 func (d *Document) ID() uint64 {
@@ -84,6 +91,9 @@ func (d *Document) SetText(t string) error {
 		return fmt.Errorf("empty content given")
 	}
 
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	d.text = t
 	return nil
 }
@@ -93,7 +103,64 @@ func (d *Document) Text() string {
 	return d.text
 }
 
+// Author answers the user who created this document.
+func (d *Document) Author() *User {
+	return d.author
+}
+
+// Ctime answers the creation time of this document.
+func (d *Document) Ctime() time.Time {
+	return d.ctime
+}
+
+// State answer this document's current state.
+func (d *Document) State() *DocState {
+	return d.state
+}
+
+// Mtime answers the time when this document was most-recently
+// modified.  It answers the creation time, if it has not been updated
+// since.
+func (d *Document) Mtime() time.Time {
+	l := len(d.events)
+	if l == 0 {
+		return d.ctime
+	}
+
+	return d.events[l-1].mtime
+}
+
 // Revision answers the current revision number of this document.
 func (d *Document) Revision() uint16 {
 	return d.revision
+}
+
+// Events answers a copy of the sequence of events that has
+// transformed this document so far.
+func (d *Document) Events() []*DocEvent {
+	es := make([]*DocEvent, len(d.events))
+	copy(es, d.events)
+	return es
+}
+
+// applyEvent transitions this document into a new state as per the
+// applied event.
+//
+// We perform as many validations as possible when constructing the
+// event, so that we spend a minimum amount of time in this
+// synchronised method.
+func (d *Document) applyEvent(e *DocEvent) error {
+	if e.doc.id != d.id {
+		return fmt.Errorf("mismatched document IDs -- current: %d, event's: %d", d.id, e.doc.id)
+	}
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	e.mtime = time.Now().UTC()
+	d.revision++
+	e.revision = d.revision
+	d.state = e.state
+	d.events = append(d.events, e)
+	return nil
 }
