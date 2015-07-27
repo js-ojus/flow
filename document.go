@@ -138,6 +138,10 @@ func (d *Document) Revision() uint16 {
 // Events answers a copy of the sequence of events that has
 // transformed this document so far.
 func (d *Document) Events() []*DocEvent {
+	// Synchronised because events are dynamic.
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	es := make([]*DocEvent, len(d.events))
 	copy(es, d.events)
 	return es
