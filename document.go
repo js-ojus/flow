@@ -161,6 +161,10 @@ func (d *Document) applyEvent(e *DocEvent) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
+	if !e.mtime.IsZero() {
+		return fmt.Errorf("event already applied")
+	}
+
 	e.mtime = time.Now().UTC()
 	d.revision++
 	e.revision = d.revision
