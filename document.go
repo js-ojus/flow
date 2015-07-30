@@ -164,10 +164,13 @@ func (d *Document) applyEvent(e *DocEvent) error {
 	if !e.mtime.IsZero() {
 		return fmt.Errorf("event already applied")
 	}
+	if e.oldRev != d.revision {
+		return fmt.Errorf("revision mismatch -- document rev: %d, event rev: %d", d.revision, e.oldRev)
+	}
 
 	e.mtime = time.Now().UTC()
 	d.revision++
-	e.revision = d.revision
+	e.newRev = d.revision
 	d.state = e.state
 	d.events = append(d.events, e)
 	return nil

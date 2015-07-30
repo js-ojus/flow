@@ -170,12 +170,13 @@ Together with documents, events are central to the workflow engine in `flow`.  E
 
 ```go
 type DocEvent struct {
-	doc      *Document
-	user     *User // user causing this modification
-	mtime    time.Time
-	text     string    // comment or other content
-	state    *DocState // result of the modification
-	revision uint16    // serves as a cross-check
+	doc    *Document
+	user   *User // user causing this modification
+	mtime  time.Time
+	text   string    // comment or other content
+	state  *DocState // result of the modification
+	oldRev uint16    // serves as a cross-check
+	newRev uint16    // assigned by the document after applying this event
 }
 ```
 

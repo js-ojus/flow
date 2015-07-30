@@ -27,12 +27,13 @@ import (
 // another, usually in response to user actions.  They also carry
 // information of the modification to the document.
 type DocEvent struct {
-	doc      *Document
-	user     *User // user causing this modification
-	mtime    time.Time
-	text     string    // comment or other content
-	state    *DocState // result of the modification
-	revision uint16    // serves as a cross-check
+	doc    *Document
+	user   *User // user causing this modification
+	mtime  time.Time
+	text   string    // comment or other content
+	state  *DocState // result of the modification
+	oldRev uint16    // serves as a cross-check
+	newRev uint16    // assigned by the document after applying this event
 }
 
 // NewDocEvent creates and initialises an event that transforms the
@@ -84,9 +85,15 @@ func (e *DocEvent) State() *DocState {
 	return e.state
 }
 
-// Revision answers the revision number of the referred document after
-// this event affected it.  If this event has not been applied to the
-// document yet, the answered revision number is zero.
-func (e *DocEvent) Revision() uint16 {
-	return e.revision
+// OldRevision answers the revision number of the referred document
+// before this event affected it.
+func (e *DocEvent) OldRevision() uint16 {
+	return e.oldRev
+}
+
+// NewRevision answers the revision number of the referred document
+// after this event affected it.  If this event has not been applied
+// to the document yet, the answered revision number is zero.
+func (e *DocEvent) NewRevision() uint16 {
+	return e.newRev
 }
