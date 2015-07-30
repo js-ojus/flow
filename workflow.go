@@ -13,3 +13,24 @@
 // limitations under the License.
 
 package flow
+
+import "sync"
+
+// Workflow represents the entire life cycle of a single document.
+//
+// A workflow begins with the creation of a document, and drives its
+// life cycle through a sequence of responses to user actions or other
+// external events.
+//
+// The engine in `flow` is visible primarily through workflows,
+// documents and their behaviour.
+type Workflow struct {
+	id   uint64 // globally-unique workflow instance ID
+	name string // for display purposes only
+
+	mutex     sync.Mutex
+	node      *Node   // current node in the workflow
+	path      []*Node // flow so far, tracked in order
+	completed bool
+	err       error // reason for failure, if aborted
+}
