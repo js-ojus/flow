@@ -18,7 +18,9 @@
 **This document is intended only to serve as a guide during the design phase.  Once the design stabilizes, it is likely to diverge from reality, and be marked as deprecated or defunct; it may get deleted as well!**
 
 ## Database
-`flow` maintains its state in an RDBMS of user's choice, as long as a `database/sql`-compliant driver is available for it.  [_Currently, MySQL, PostgreSQL and SQLite3 appear to be best supported._]  Development is being done against MySQL currently.  Out-of-the-box support for more databases may arrive in time.
+`flow` maintains its state in an RDBMS of user's choice, as long as a `database/sql`-compliant driver is available for it.  Development is being done against MySQL currently.  Out-of-the-box support for more databases may arrive in time.
+
+This could change should a convincing need arise for using a NoSQL database.
 
 ## Entities
 The core entity types in the system are:
@@ -47,11 +49,11 @@ For its own purposes, though, `flow` keeps track of the following details of eac
 
 ```go
 type User struct {
-    id     uint64 // must be globally-unique
-    name   string // for display purposes only
-    active bool
-    roles  []*Role
-    groups []*Group
+	id     uint64   // must be globally-unique
+	name   string   // for display purposes only
+	active bool     // status of the user account
+	roles  []*Role  // all roles assigned to this user
+	groups []*Group // all groups this user is a part of
 }
 ```
 
@@ -88,9 +90,9 @@ A privilege represents an authorisation to perform a specific action on a specif
 
 ```go
 type Privilege struct {
-    privs    []PrivilegeType
-    resource *Resource
-    doc      *Document // only if not on a resource
+	resource *Resource
+	doc      *Document // only if not on a resource
+	privs    []PrivilegeType
 }
 ```
 
@@ -119,10 +121,10 @@ Resources represent collections of documents of a given type.  Resources are the
 
 ```go
 type Resource struct {
-    id        uint16
-    name      string
-    endpoint  string
-    namespace string // optional
+	id        uint16 // globally-unique identifier
+	name      string // convenient name
+	endpoint  string // globally-unique end point path
+	namespace string // optional
 }
 ```
 
@@ -133,14 +135,17 @@ Documents are central to the workflow engine and its operations.  Each document 
 
 ```go
 type Document struct {
-    id       uint64      // globally-unique
-    dtype    DocType
-    title    string
-    text     string      // primary content
-    author   *User       // creator of the document
-    ctime    time.Time
-    events   []*DocEvent // state transitions so far, tracked in order
-    revision uint16
+	id     uint64 // globally-unique
+	dtype  DocType
+	title  string
+	text   string // primary content
+	author *User  // creator of the document
+	ctime  time.Time
+
+	mutex    sync.Mutex
+	state    *DocState   // current state
+	events   []*DocEvent // state transitions so far, tracked in order
+	revision uint16
 }
 ```
 
@@ -165,12 +170,12 @@ Together with documents, events are central to the workflow engine in `flow`.  E
 
 ```go
 type DocEvent struct {
-    doc         *Document
-    user        *User     // person causing this modification
-    mtime       time.Time
-    text        string
-    newState    *DocState
-    newRevision uint16    // serves as cross-check
+	doc      *Document
+	user     *User // user causing this modification
+	mtime    time.Time
+	text     string    // comment or other content
+	state    *DocState // result of the modification
+	revision uint16    // serves as a cross-check
 }
 ```
 
@@ -181,9 +186,9 @@ Each defined document state has a specified set of valid succeeding states.  A d
 
 ```go
 type DocState struct {
-    dtype      DocType // for namespace purposes
-    name       string
-    successors []*DocState
+	dtype      DocType // for namespace purposes
+	name       string
+	successors []*DocState // possible next states
 }
 ```
 
