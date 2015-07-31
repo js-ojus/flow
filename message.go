@@ -45,7 +45,7 @@ func NewMessage(wf *Workflow, node *Node) (*Message, error) {
 	}
 
 	// WARNING: In a truly busy application, this manner of generating
-	// message IDs could lead to clashes.
+	// IDs could lead to clashes.
 	t := time.Now().UTC()
 	msg := &Message{id: uint64(t.UnixNano()), workflow: wf, node: node}
 	msg.mtime = t
