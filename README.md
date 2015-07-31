@@ -30,6 +30,6 @@ A tiny workflow engine written in Go (golang).
 
 `flow` - at least currently - aims to support only graph-like regimes (not hierarchical).
 
-`flow` is a library -- it requires workflows to be programmed.
+`flow` is a library -- it requires workflows to be programmed.  The only "programming in the small" language supported is Go!
 
-`flow` is **not** intended to be an enterprise-grade workflow engine.  Accordingly, import from - and export to - workflow modelling formats like XPDL and BPMN are not supported.  Similarly, executable specifications like BPEL and Wf-XML are not supported.  True enterprise-grade engines already exist for addressing such complex workflows and interoperability as require high-end engines.
+`flow` is intended to be small!  It is expressly **not** intended to be an enterprise-grade workflow engine.  Accordingly, import from - and export to - workflow modelling formats like BPMN/XPDL are not supported.  Similarly, executable specifications like BPEL and Wf-XML are not supported.  True enterprise-grade engines already exist for addressing such complex workflows and interoperability as require high-end engines.
