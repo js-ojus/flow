@@ -20,63 +20,91 @@ import (
 )
 
 // NodeFunc defines the type of functions that can be used as
-// processors of documents in workflows.  These functions generate
-// document events that are applied to documents to transform them.
+// processors of documents in workflows.
+//
+// These functions generate document events that are applied to
+// documents to transform them.
+//
+// NodeFunc instances must be stateless and not capture their
+// environment in any manner!
 type NodeFunc func(*Document, ...interface{}) (*DocEvent, *Message, error)
 
-// Node represents some processing or a response to an explicit user
-// action.
-type Node struct {
-	id       uint64
-	workflow *Workflow // containing flow of this node
-	name     string    // for display purposes only
-	ntype    NodeType
-	nfunc    NodeFunc
-	doc      *Document
-	resEv    *DocEvent
-	resMsg   *Message
+// NodeDefinition represents a specific logical unit of processing in
+// a workflow.  A single definition can be used to instantiate any
+// number of node instances.
+type NodeDefinition struct {
+	wfdefn *WfDefinition // containing flow of this node
+	name   string        // unique within its workflow
+	ntype  NodeType
+	nfunc  NodeFunc
 }
 
-// NewNode creates and initialises a node acting on the given
-// document, using the given processing function.
-func NewNode(wf *Workflow, name string, ntype NodeType, nfunc NodeFunc) (*Node, error) {
-	if wf == nil || nfunc == nil {
-		return nil, fmt.Errorf("invalid initialisation data -- workflow: %v, nfunc: %v", wf, nfunc)
+// NewNodeDefinition creates and initialises a node definition in the
+// given workflow, using the given processing function.
+func NewNodeDefinition(wf *WfDefinition, name string, ntype NodeType, nfunc NodeFunc) (*NodeDefinition, error) {
+	if wf == nil || name == "" || nfunc == nil {
+		return nil, fmt.Errorf("invalid initialisation data -- workflow: %v, name: %s, nfunc: %v", wf, name, nfunc)
+	}
+
+	nd := &NodeDefinition{wfdefn: wf, name: name, ntype: ntype, nfunc: nfunc}
+	return nd, nil
+}
+
+// WfDefinition answers this node definition's containing workflow
+// definition.
+func (nd *NodeDefinition) WfDefinition() *WfDefinition {
+	return nd.wfdefn
+}
+
+// Name answers the descriptive title of this node.
+func (nd *NodeDefinition) Name() string {
+	return nd.name
+}
+
+// Type answers the type of this node.
+func (nd *NodeDefinition) Type() NodeType {
+	return nd.ntype
+}
+
+// Func answers the processing function registered in this node
+// definition.
+func (nd *NodeDefinition) Func() NodeFunc {
+	return nd.nfunc
+}
+
+// Instance creates and initialises a node acting on the given
+// document, using this node definition's processing function.
+func (nd *NodeDefinition) Instance(wf *Workflow, doc *Document) (*Node, error) {
+	if wf == nil || doc == nil {
+		return nil, fmt.Errorf("invalid initialisation data -- workflow: %v, doc: %v", wf, doc)
 	}
 
 	// WARNING: In a truly busy application, this manner of generating
 	// IDs could lead to clashes.
 	t := time.Now().UTC().UnixNano()
-	n := &Node{id: uint64(t), workflow: wf, name: name, ntype: ntype, nfunc: nfunc}
-	return n, nil
+	node := &Node{id: uint64(t), defn: nd, workflow: wf, doc: doc}
+	return node, nil
+}
+
+// Node represents some processing or a response to an explicit user
+// action.
+type Node struct {
+	id       uint64
+	defn     *NodeDefinition
+	workflow *Workflow
+	doc      *Document
+	resEv    *DocEvent
+	resMsg   *Message
+}
+
+// Definition answers the node definition of this instance.
+func (n *Node) Definition() *NodeDefinition {
+	return n.defn
 }
 
 // Workflow answers the containing flow of this node.
 func (n *Node) Workflow() *Workflow {
 	return n.workflow
-}
-
-// Name answers the descriptive title of this node.
-func (n *Node) Name() string {
-	return n.name
-}
-
-// Type answers the type of this node.
-func (n *Node) Type() NodeType {
-	return n.ntype
-}
-
-// SetDocument registers the document to process.
-func (n *Node) SetDocument(doc *Document) error {
-	if n.doc != nil {
-		return fmt.Errorf("node already has a document: %d", n.doc.id)
-	}
-	if doc == nil {
-		return fmt.Errorf("nil document provided")
-	}
-
-	n.doc = doc
-	return nil
 }
 
 // Document answers the document in this workflow.
@@ -87,7 +115,7 @@ func (n *Node) Document() *Document {
 // Run processes the document in this node, using the registered
 // function and the given parameters.
 func (n *Node) Run(args ...interface{}) (*Message, error) {
-	ev, msg, err := n.nfunc(n.doc, args...)
+	ev, msg, err := n.defn.nfunc(n.doc, args...)
 	if err != nil {
 		return nil, err
 	}

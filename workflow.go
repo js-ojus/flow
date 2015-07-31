@@ -16,6 +16,15 @@ package flow
 
 import "sync"
 
+// WfDefinition holds the definition of a specific workflow.  A single
+// definition can be used to instantiate any number of workflow
+// instances.
+type WfDefinition struct {
+	ns   string // globally-unique namespace identifier
+	name string // unique within its namespace
+
+}
+
 // Workflow represents the entire life cycle of a single document.
 //
 // A workflow begins with the creation of a document, and drives its
@@ -25,8 +34,7 @@ import "sync"
 // The engine in `flow` is visible primarily through workflows,
 // documents and their behaviour.
 type Workflow struct {
-	id   uint64 // globally-unique workflow instance ID
-	name string // for display purposes only
+	id uint64 // globally-unique workflow instance ID
 
 	mutex     sync.Mutex
 	node      *Node   // current node in the workflow
