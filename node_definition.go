@@ -14,10 +14,7 @@
 
 package flow
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // NodeFunc defines the type of functions that can be used as
 // processors of documents in workflows.
@@ -83,9 +80,6 @@ func (nd *NodeDefinition) Instance(wf *Workflow, doc *Document) (*Node, error) {
 		return nil, fmt.Errorf("invalid initialisation data -- workflow: %v, doc: %v", wf, doc)
 	}
 
-	// WARNING: In a truly busy application, this manner of generating
-	// IDs could lead to clashes.
-	t := time.Now().UTC().UnixNano()
-	node := &Node{id: uint64(t), defn: nd, workflow: wf, doc: doc}
+	node := newNode(nd, wf, doc)
 	return node, nil
 }

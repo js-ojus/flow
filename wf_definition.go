@@ -99,3 +99,16 @@ func (wd *WfDefinition) NodeDefinition(name string) *NodeDefinition {
 	}
 	return nil
 }
+
+// Instance creates a new workflow instance with this definition.
+func (wd *WfDefinition) Instance(doc *Document) (*Workflow, error) {
+	wf := newWorkflow(wd)
+
+	node, err := wd.begin.Instance(wf, doc)
+	if err != nil {
+		return nil, err
+	}
+	wf.node = node
+
+	return wf, nil
+}

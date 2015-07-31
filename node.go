@@ -14,6 +14,8 @@
 
 package flow
 
+import "time"
+
 // Node represents some processing or a response to an explicit user
 // action.
 type Node struct {
@@ -23,6 +25,15 @@ type Node struct {
 	doc      *Document
 	resEv    *DocEvent
 	resMsg   *Message
+}
+
+// newNode creates and initialises a node in the given workflow, as
+// per the given node definition.
+func newNode(defn *NodeDefinition, wf *Workflow, doc *Document) *Node {
+	// WARNING: In a truly busy application, this manner of generating
+	// IDs could lead to clashes.
+	t := time.Now().UTC().UnixNano()
+	return &Node{id: uint64(t), defn: defn, workflow: wf, doc: doc}
 }
 
 // Definition answers the node definition of this instance.
@@ -57,6 +68,7 @@ func (n *Node) Run(args ...interface{}) (*Message, error) {
 		return nil, err
 	}
 
+	n.workflow.moveToNode(n, msg.node)
 	return msg, nil
 }
 
