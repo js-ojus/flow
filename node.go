@@ -23,7 +23,16 @@ import (
 // processors of documents in workflows.
 //
 // These functions generate document events that are applied to
-// documents to transform them.
+// documents to transform them.  For purely informational messages,
+// the event returned can be `nil` i.e., the document need not undergo
+// a state transition necessarily.  However, for the workflow itself
+// to move forward, the answered message must point to the next node
+// in the flow.
+//
+// Error should be returned only when an impossible situation arises,
+// and processing needs to abort.  Note that returning an error stops
+// the workflow.  Manual intervention will be needed to move the
+// document further.
 //
 // NodeFunc instances must be stateless and not capture their
 // environment in any manner!
@@ -39,15 +48,10 @@ type NodeDefinition struct {
 	nfunc  NodeFunc
 }
 
-// NewNodeDefinition creates and initialises a node definition in the
+// newNodeDefinition creates and initialises a node definition in the
 // given workflow, using the given processing function.
-func NewNodeDefinition(wf *WfDefinition, name string, ntype NodeType, nfunc NodeFunc) (*NodeDefinition, error) {
-	if wf == nil || name == "" || nfunc == nil {
-		return nil, fmt.Errorf("invalid initialisation data -- workflow: %v, name: %s, nfunc: %v", wf, name, nfunc)
-	}
-
-	nd := &NodeDefinition{wfdefn: wf, name: name, ntype: ntype, nfunc: nfunc}
-	return nd, nil
+func newNodeDefinition(wf *WfDefinition, name string, ntype NodeType, nfunc NodeFunc) *NodeDefinition {
+	return &NodeDefinition{wfdefn: wf, name: name, ntype: ntype, nfunc: nfunc}
 }
 
 // WfDefinition answers this node definition's containing workflow

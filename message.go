@@ -29,7 +29,7 @@ import (
 type Message struct {
 	id       uint64    // globally-unique
 	workflow *Workflow // containing workflow
-	node     *Node     // next step in the workflow; `nil` for informational messages
+	node     *Node     // next step in the workflow
 	user     *User     // intended recipient of this message
 	group    *Group    // in case of a group 'to do' item or a broadcast message
 	doc      *Document // can be `nil` for informational messages
