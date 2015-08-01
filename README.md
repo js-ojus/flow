@@ -19,6 +19,8 @@
 ## flow
 A tiny workflow engine written in Go (golang).
 
+### What is `flow`?
+
 `flow` is intended to help in defining and driving "front office" <---> "back office" document flows.  Examples of such flows are:
 
 - customer registration and verification of details,
@@ -32,4 +34,10 @@ A tiny workflow engine written in Go (golang).
 
 `flow` is a library -- it requires workflows to be programmed.  The only "programming in the small" language supported is Go!
 
+### What `flow` is not
+
 `flow` is intended to be small!  It is expressly **not** intended to be an enterprise-grade workflow engine.  Accordingly, import from - and export to - workflow modelling formats like BPMN/XPDL are not supported.  Similarly, executable specifications like BPEL and Wf-XML are not supported.  True enterprise-grade engines already exist for addressing such complex workflows and interoperability as require high-end engines.
+
+### Status
+
+`flow` is in initial stages of development, and is currently not usable.
