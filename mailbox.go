@@ -32,7 +32,7 @@ type Mailbox struct {
 	user  *User  // in case of an individual user
 	group *Group // in case of a group; does not receive broadcast messages
 
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	msgs  []*Message // messages awaiting user consumption
 }
 
@@ -50,7 +50,7 @@ func newMailbox(u *User, grp *Group) (*Mailbox, error) {
 	return &Mailbox{id: uint64(t), group: grp, msgs: make([]*Message, 1)}, nil
 }
 
-// TODO(js): implement `OpenMailbox()`
+// TODO(js): `OpenMailbox()`
 
 // ID answers this mailbox's ID.
 func (mb *Mailbox) ID() uint64 {
@@ -69,8 +69,8 @@ func (mb *Mailbox) Group() *Group {
 
 // MsgCount answers the number of messages in this mailbox.
 func (mb *Mailbox) MsgCount() int {
-	mb.mutex.Lock()
-	defer mb.mutex.Unlock()
+	mb.mutex.RLock()
+	defer mb.mutex.RUnlock()
 
 	return len(mb.msgs)
 }
@@ -100,6 +100,8 @@ func (mb *Mailbox) reassignMsg(msgID uint64, other *Mailbox) error {
 	if msgID == 0 || other == nil {
 		return fmt.Errorf("invalid inputs -- message ID: %d, mailbox: %v", msgID, other)
 	}
+
+	// TODO(js): this can deadlock currently; resolution needed
 
 	mb.mutex.Lock()
 	defer mb.mutex.Unlock()
