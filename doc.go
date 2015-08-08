@@ -14,3 +14,10 @@
 
 // Package flow is a tiny workflow engine written in Go (golang).
 package flow
+
+import "log"
+
+func init() {
+	f := log.Flags()
+	log.SetFlags(f | log.Llongfile)
+}

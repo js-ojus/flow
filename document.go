@@ -16,6 +16,7 @@ package flow
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -39,10 +40,11 @@ type Document struct {
 	author *User  // creator of the document
 	ctime  time.Time
 
-	mutex    sync.Mutex
+	mutex    sync.RWMutex
 	state    *DocState   // current state
 	events   []*DocEvent // state transitions so far, tracked in order
 	revision uint16
+	tags     []string // user-defined tags associated with this document
 }
 
 // NewDocument creates and initialises a document.
@@ -59,6 +61,7 @@ func NewDocument(id uint64, dtype DocType, title string, author *User, instate *
 	d.state = instate
 	d.events = make([]*DocEvent, 1)
 	d.revision = 1
+	d.tags = make([]string, 1)
 	return d, nil
 }
 
@@ -139,8 +142,8 @@ func (d *Document) Revision() uint16 {
 // transformed this document so far.
 func (d *Document) Events() []*DocEvent {
 	// Synchronised because events are dynamic.
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
 
 	es := make([]*DocEvent, len(d.events))
 	copy(es, d.events)
@@ -174,4 +177,53 @@ func (d *Document) applyEvent(e *DocEvent) error {
 	d.state = e.state
 	d.events = append(d.events, e)
 	return nil
+}
+
+// AddTag associates the given tag with this document.
+func (d *Document) AddTag(tag string) bool {
+	if tag == "" {
+		log.Printf("empty tag given")
+		return false
+	}
+
+	for _, el := range d.tags {
+		if el == tag {
+			return false
+		}
+	}
+
+	d.tags = append(d.tags, tag)
+	return true
+}
+
+// RemoveTag disassociates the given tag from this document.
+func (d *Document) RemoveTag(tag string) bool {
+	if tag == "" {
+		return false
+	}
+
+	idx := -1
+	for i, el := range d.tags {
+		if el == tag {
+			idx = i
+			break
+		}
+	}
+
+	if idx > -1 {
+		d.tags = append(d.tags[:idx], d.tags[idx+1:]...)
+		return true
+	}
+
+	return false
+}
+
+// Tags answers a copy of the tags associated with this document.
+func (d *Document) Tags() []string {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	ts := make([]string, len(d.tags))
+	copy(ts, d.tags)
+	return ts
 }
