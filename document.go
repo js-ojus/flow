@@ -186,6 +186,9 @@ func (d *Document) AddTag(tag string) bool {
 		return false
 	}
 
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	for _, el := range d.tags {
 		if el == tag {
 			return false
@@ -201,6 +204,9 @@ func (d *Document) RemoveTag(tag string) bool {
 	if tag == "" {
 		return false
 	}
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	idx := -1
 	for i, el := range d.tags {
