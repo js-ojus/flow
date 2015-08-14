@@ -59,9 +59,9 @@ func NewDocument(id uint64, dtype DocType, title string, author *User, instate *
 	d := &Document{id: id, dtype: dtype, title: title, author: author}
 	d.ctime = time.Now().UTC()
 	d.state = instate
-	d.events = make([]*DocEvent, 1)
+	d.events = make([]*DocEvent, 0, 1)
 	d.revision = 1
-	d.tags = make([]string, 1)
+	d.tags = make([]string, 0, 1)
 	return d, nil
 }
 
@@ -145,7 +145,7 @@ func (d *Document) Events() []*DocEvent {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	es := make([]*DocEvent, len(d.events))
+	es := make([]*DocEvent, 0, len(d.events))
 	copy(es, d.events)
 	return es
 }
@@ -229,7 +229,7 @@ func (d *Document) Tags() []string {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	ts := make([]string, len(d.tags))
+	ts := make([]string, 0, len(d.tags))
 	copy(ts, d.tags)
 	return ts
 }

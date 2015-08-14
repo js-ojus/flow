@@ -49,7 +49,7 @@ func NewPrivilege(res *Resource, doc *Document) (*Privilege, error) {
 	}
 
 	p := &Privilege{resource: res, doc: doc}
-	p.privs = make([]PrivilegeType, 4)
+	p.privs = make([]PrivilegeType, 0, 4)
 	return p, nil
 }
 
@@ -77,7 +77,7 @@ func (p *Privilege) AddPrivilegeType(pt PrivilegeType) bool {
 
 // PrivilegeTypes answers a copy of this privilege's permissions.
 func (p *Privilege) PrivilegeTypes() []PrivilegeType {
-	pts := make([]PrivilegeType, len(p.privs))
+	pts := make([]PrivilegeType, 0, len(p.privs))
 	copy(pts, p.privs)
 	return pts
 }

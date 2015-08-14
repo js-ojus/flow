@@ -41,7 +41,7 @@ func NewDocState(dtype DocType, name string) (*DocState, error) {
 	}
 
 	ds := &DocState{dtype: dtype, name: name}
-	ds.successors = make([]*DocState, 1)
+	ds.successors = make([]*DocState, 0, 1)
 	return ds, nil
 }
 
@@ -76,7 +76,7 @@ func (s *DocState) AddSuccessor(ds *DocState) bool {
 // Successors answers a copy of this state's possible successor
 // states.
 func (s *DocState) Successors() []*DocState {
-	ds := make([]*DocState, len(s.successors))
+	ds := make([]*DocState, 0, len(s.successors))
 	copy(ds, s.successors)
 	return ds
 }

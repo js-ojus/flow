@@ -36,7 +36,7 @@ func NewRole(id uint16, name string) (*Role, error) {
 	}
 
 	r := &Role{id: id, name: name}
-	r.privs = make([]*Privilege, 1)
+	r.privs = make([]*Privilege, 0, 1)
 	return r, nil
 }
 

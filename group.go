@@ -37,7 +37,7 @@ func NewGroup(id uint16, name string) (*Group, error) {
 	}
 
 	g := &Group{id: id, name: name}
-	g.privs = make([]*Privilege, 1)
+	g.privs = make([]*Privilege, 0, 1)
 	return g, nil
 }
 

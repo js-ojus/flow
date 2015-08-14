@@ -40,8 +40,8 @@ func NewUser(id uint64, name string) (*User, error) {
 	}
 
 	u := &User{id: id, name: name}
-	u.roles = make([]*Role, 1)
-	u.groups = make([]*Group, 1)
+	u.roles = make([]*Role, 0, 1)
+	u.groups = make([]*Group, 0, 1)
 	return u, nil
 }
 
@@ -101,7 +101,7 @@ func (u *User) UnassignRole(r *Role) bool {
 
 // Roles answers a copy of the roles currently assigned to this user.
 func (u *User) Roles() []*Role {
-	rs := make([]*Role, len(u.roles))
+	rs := make([]*Role, 0, len(u.roles))
 	copy(rs, u.roles)
 	return rs
 }
@@ -142,7 +142,7 @@ func (u *User) RemoveFromGroup(g *Group) bool {
 // Groups answers a copy of the groups to which this user currently
 // belongs.
 func (u *User) Groups() []*Group {
-	gs := make([]*Group, len(u.groups))
+	gs := make([]*Group, 0, len(u.groups))
 	copy(gs, u.groups)
 	return gs
 }

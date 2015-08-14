@@ -44,7 +44,7 @@ func newWorkflow(wd *WfDefinition) *Workflow {
 	// WARNING: In a truly busy application, this manner of generating
 	// IDs could lead to clashes.
 	t := time.Now().UTC().UnixNano()
-	return &Workflow{id: uint64(t), defn: wd, path: make([]*Node, 2)}
+	return &Workflow{id: uint64(t), defn: wd, path: make([]*Node, 0, 2)}
 }
 
 // moveToNode adds the first node to the path of this workflow, as a

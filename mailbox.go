@@ -45,9 +45,9 @@ func newMailbox(u *User, grp *Group) (*Mailbox, error) {
 
 	t := time.Now().UTC().UnixNano()
 	if u != nil {
-		return &Mailbox{id: uint64(t), user: u, msgs: make([]*Message, 1)}, nil
+		return &Mailbox{id: uint64(t), user: u, msgs: make([]*Message, 0, 1)}, nil
 	}
-	return &Mailbox{id: uint64(t), group: grp, msgs: make([]*Message, 1)}, nil
+	return &Mailbox{id: uint64(t), group: grp, msgs: make([]*Message, 0, 1)}, nil
 }
 
 // TODO(js): `OpenMailbox()`
