@@ -21,6 +21,16 @@ import (
 	"time"
 )
 
+// DocSection represents one user-edited section of text and,
+// possibly, enclosures.
+type DocSection struct {
+	id     uint16    // serial number of this section in the document
+	text   string    // textual context of this section
+	blobs  []string  // paths to enclosures
+	author uint64    // editor of this section
+	mtime  time.Time // modification time of this section
+}
+
 // Document represents a task in a workflow, whose life cycle it
 // tracks.
 //
@@ -33,30 +43,30 @@ import (
 // Most applications should embed `Document` in their document
 // structures rather than use this directly.
 type Document struct {
-	id     uint64 // globally-unique
-	dtype  DocType
-	title  string
-	text   string // primary content
-	author *User  // creator of the document
-	ctime  time.Time
+	id       uint64       // globally-unique
+	dtype    DocType      // for namespacing
+	title    string       // human-readable title
+	sections []DocSection // sections in this document
+	owner    uint64       // creator of this document
+	ctime    time.Time    // creation time of this revision
 
 	mutex    sync.RWMutex
 	state    *DocState   // current state
 	events   []*DocEvent // state transitions so far, tracked in order
-	revision uint16
-	tags     []string // user-defined tags associated with this document
+	revision uint16      // running revision number
+	tags     []string    // user-defined tags associated with this document
 }
 
 // NewDocument creates and initialises a document.
 //
 // The document created through this method has a life cycle that is
 // associated with it through a particular workflow.
-func NewDocument(id uint64, dtype DocType, title string, author *User, instate *DocState) (*Document, error) {
-	if id == 0 || string(dtype) == "" || title == "" || author == nil {
-		return nil, fmt.Errorf("invalid initialisation data -- id: %d, dtype: %s, title: %s, author: %s", id, dtype, title, author.Name())
+func NewDocument(id uint64, dtype DocType, title string, owner uint64, instate *DocState) (*Document, error) {
+	if id == 0 || string(dtype) == "" || title == "" || owner == 0 {
+		return nil, fmt.Errorf("invalid initialisation data -- id: %d, dtype: %s, title: %s, author: %d", id, dtype, title, owner)
 	}
 
-	d := &Document{id: id, dtype: dtype, title: title, author: author}
+	d := &Document{id: id, dtype: dtype, title: title, owner: owner}
 	d.ctime = time.Now().UTC()
 	d.state = instate
 	d.events = make([]*DocEvent, 0, 1)
@@ -82,14 +92,8 @@ func (d *Document) Title() string {
 	return d.title
 }
 
-// SetText sets the primary content of this document.
-func (d *Document) SetText(t string) error {
-	if d.revision > 1 {
-		return fmt.Errorf("document revision > 1 : %d", d.revision)
-	}
-	if d.text != "" {
-		return fmt.Errorf("document text already set")
-	}
+// AddText adds the primary content of this document.
+func (d *Document) AddText(t string) error {
 	if t == "" {
 		return fmt.Errorf("empty content given")
 	}
@@ -97,12 +101,12 @@ func (d *Document) SetText(t string) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	d.text = t
+	d.text = append(d.text, t)
 	return nil
 }
 
 // Text answers this document's primary content.
-func (d *Document) Text() string {
+func (d *Document) Text() []string {
 	return d.text
 }
 
