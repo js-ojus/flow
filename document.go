@@ -15,20 +15,106 @@
 package flow
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
 
 // DocSection represents one user-edited section of text and,
 // possibly, enclosures.
+//
+// N.B. All updates to data in this structure must be made in the
+// mutex context of its containing document.
 type DocSection struct {
 	id     uint16    // serial number of this section in the document
 	text   string    // textual context of this section
 	blobs  []string  // paths to enclosures
 	author uint64    // editor of this section
 	mtime  time.Time // modification time of this section
+}
+
+// NewDocSection creates a new section with the given data.
+func NewDocSection(id uint16, text string, blobs []string, author uint64) *DocSection {
+	return &DocSection{id: id, text: text, blobs: blobs, author: author, mtime: time.Now()}
+}
+
+// ID answers this section's unique identifier in its document.
+func (s *DocSection) ID() uint16 {
+	return s.id
+}
+
+// Text answers this section's text content.
+func (s *DocSection) Text() string {
+	return s.text
+}
+
+// setText replaces this section's text with the given text, only if
+// the user is the same as the author of this section.
+func (s *DocSection) setText(text string, author uint64) error {
+	if author != s.author {
+		return errors.New("author of modification not the same as the original author of this section")
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return errors.New("section text should not be empty")
+	}
+
+	s.text = text
+	s.mtime = time.Now()
+	return nil
+}
+
+// Blobs answers the copy of this section's enclosures (as paths, not
+// the actual blobs).
+func (s *DocSection) Blobs() []string {
+	bs := make([]string, len(s.blobs))
+	copy(bs, s.blobs)
+	return bs
+}
+
+// addBlob adds the path to an enclosure to this section.
+func (s *DocSection) addBlob(path string, author uint64) error {
+	if author != s.author {
+		return errors.New("author of modification not the same as the original author of this section")
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return errors.New("blob path should not be empty")
+	}
+
+	s.blobs = append(s.blobs, path)
+	s.mtime = time.Now()
+	return nil
+}
+
+// removeBlob remove the specified path from the list of this
+// section's blobs.
+func (s *DocSection) removeBlob(path string, author uint64) error {
+	if author != s.author {
+		return errors.New("author of modification not the same as the original author of this section")
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return errors.New("blob path should not be empty")
+	}
+
+	idx := -1
+	for i, p := range s.blobs {
+		if p == path {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return errors.New("given blob path not found")
+	}
+
+	s.blobs = append(s.blobs[:idx], s.blobs[idx+1:]...)
+	s.mtime = time.Now()
+	return nil
 }
 
 // Document represents a task in a workflow, whose life cycle it
@@ -43,12 +129,12 @@ type DocSection struct {
 // Most applications should embed `Document` in their document
 // structures rather than use this directly.
 type Document struct {
-	id       uint64       // globally-unique
-	dtype    DocType      // for namespacing
-	title    string       // human-readable title
-	sections []DocSection // sections in this document
-	owner    uint64       // creator of this document
-	ctime    time.Time    // creation time of this revision
+	id       uint64        // globally-unique
+	dtype    DocType       // for namespacing
+	title    string        // human-readable title
+	sections []*DocSection // sections in this document
+	owner    uint64        // creator of this document
+	ctime    time.Time     // creation time of this revision
 
 	mutex    sync.RWMutex
 	state    *DocState   // current state
@@ -62,11 +148,14 @@ type Document struct {
 // The document created through this method has a life cycle that is
 // associated with it through a particular workflow.
 func NewDocument(id uint64, dtype DocType, title string, owner uint64, instate *DocState) (*Document, error) {
-	if id == 0 || string(dtype) == "" || title == "" || owner == 0 {
+	dt := strings.TrimSpace(string(dtype))
+	title = strings.TrimSpace(title)
+	if id == 0 || dt == "" || title == "" || owner == 0 {
 		return nil, fmt.Errorf("invalid initialisation data -- id: %d, dtype: %s, title: %s, author: %d", id, dtype, title, owner)
 	}
 
 	d := &Document{id: id, dtype: dtype, title: title, owner: owner}
+	d.sections = make([]*DocSection, 0, 1)
 	d.ctime = time.Now().UTC()
 	d.state = instate
 	d.events = make([]*DocEvent, 0, 1)
@@ -92,27 +181,58 @@ func (d *Document) Title() string {
 	return d.title
 }
 
-// AddText adds the primary content of this document.
-func (d *Document) AddText(t string) error {
-	if t == "" {
-		return fmt.Errorf("empty content given")
+// Sections answers the list of this document's sections.
+func (d *Document) Sections() []*DocSection {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	dss := make([]*DocSection, len(d.sections))
+	copy(dss, d.sections)
+	return dss
+}
+
+// SetSectionText sets the text of the given section to the given
+// text.
+func (d *Document) SetSectionText(id uint16, text string, author uint64) error {
+	if id == 0 || int(id) > len(d.sections) {
+		return errors.New("section ID out of bounds")
 	}
 
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	d.text = append(d.text, t)
-	return nil
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+	sec := d.sections[id-1]
+	return sec.setText(text, author)
 }
 
-// Text answers this document's primary content.
-func (d *Document) Text() []string {
-	return d.text
+// AddSectionBlob adds the given path to a blob to the specified
+// section.
+func (d *Document) AddSectionBlob(id uint16, path string, author uint64) error {
+	if id == 0 || int(id) > len(d.sections) {
+		return errors.New("section ID out of bounds")
+	}
+
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+	sec := d.sections[id-1]
+	return sec.addBlob(path, author)
 }
 
-// Author answers the user who created this document.
-func (d *Document) Author() *User {
-	return d.author
+// RemoveSectionBlob removes the given path to a blob to the specified
+// section.
+func (d *Document) RemoveSectionBlob(id uint16, path string, author uint64) error {
+	if id == 0 || int(id) > len(d.sections) {
+		return errors.New("section ID out of bounds")
+	}
+
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+	sec := d.sections[id-1]
+	return sec.removeBlob(path, author)
+}
+
+// Owner answers the user who created this document.
+func (d *Document) Owner() uint64 {
+	return d.owner
 }
 
 // Ctime answers the creation time of this document.
@@ -145,11 +265,10 @@ func (d *Document) Revision() uint16 {
 // Events answers a copy of the sequence of events that has
 // transformed this document so far.
 func (d *Document) Events() []*DocEvent {
-	// Synchronised because events are dynamic.
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	es := make([]*DocEvent, 0, len(d.events))
+	es := make([]*DocEvent, len(d.events))
 	copy(es, d.events)
 	return es
 }
@@ -233,7 +352,7 @@ func (d *Document) Tags() []string {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	ts := make([]string, 0, len(d.tags))
+	ts := make([]string, len(d.tags))
 	copy(ts, d.tags)
 	return ts
 }
