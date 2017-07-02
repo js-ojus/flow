@@ -63,7 +63,8 @@ func (n *Node) Run(args ...interface{}) (*Message, error) {
 	n.resEv = ev
 	n.resMsg = msg
 
-	err = n.doc.applyEvent(ev)
+	// TODO(js): Resolve this.
+	// err = n.doc.applyEvent(ev)
 	if err != nil {
 		return nil, err
 	}
