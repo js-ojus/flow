@@ -16,7 +16,7 @@ package flow
 
 // DocType enumerates the types of documents in the system, as defined
 // by the consuming application.  Each document type has an associated
-// workflow definition that drives it.
+// workflow definition that drives its life cycle.
 //
 // Accordingly, `flow` does not assume anything about the specifics of
 // the any document type.  Instead, it treats document types as plain,
