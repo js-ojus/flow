@@ -44,7 +44,7 @@ type Document struct {
 	outer     *Document // containing document, if any (loaded)
 
 	author uint64    // creator of this document
-	state  *DocState // current state
+	state  DocState  // current state
 	ctime  time.Time // creation time of this revision
 
 	title    string               // human-readable title; applicable only for top-level documents
@@ -60,13 +60,18 @@ type Document struct {
 //
 // The document created through this method has a life cycle that is
 // associated with it through a particular workflow.
-func NewDocument(dtype DocType, author uint64, instate *DocState) (*Document, error) {
+func NewDocument(dtype DocType, outer *Document, author uint64, instate DocState) (*Document, error) {
 	dt := strings.TrimSpace(string(dtype))
 	if dt == "" || author == 0 {
 		return nil, fmt.Errorf("invalid initialisation data -- dtype: %s, author: %d", dtype, author)
 	}
 
 	d := &Document{dtype: dtype, author: author, state: instate}
+	if outer != nil {
+		d.outer = outer
+		d.outerID = outer.id
+		d.outerType = outer.dtype
+	}
 	d.children = make(map[uint64]*Document)
 	return d, nil
 }
@@ -112,7 +117,7 @@ func (d *Document) Ctime() time.Time {
 }
 
 // State answer this document's current state.
-func (d *Document) State() *DocState {
+func (d *Document) State() DocState {
 	return d.state
 }
 
@@ -123,6 +128,9 @@ func (d *Document) Title() string {
 
 // SetTitle sets the title of the document, if one is not already set.
 func (d *Document) SetTitle(title string) error {
+	if d.outerID != 0 {
+		return errors.New("cannot set title for a child document")
+	}
 	if d.title != "" {
 		return errors.New("document already has a title")
 	}

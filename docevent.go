@@ -16,49 +16,32 @@ package flow
 
 import (
 	"fmt"
-	"time"
+	"strings"
 )
 
 // DocEvent represents a user action performed on a document in the
 // system.
 //
-// Together with documents, events are central to the workflow engine
-// in `flow`.  Events cause documents to switch from one state to
-// another, usually in response to user actions.  They also carry
-// information of the modification to the document.
+// Together with documents and nodes, events are central to the
+// workflow engine in `flow`.  Events cause documents to transition
+// from one state to another, usually in response to user actions.  It
+// is possible for system events to cause state transitions, as well.
 type DocEvent struct {
-	doc    *Document
-	user   *User // user causing this modification
-	mtime  time.Time
+	doc    *Document // document to which this event is to be applied
+	user   uint64    // user who caused this action
+	action DocAction // action performed by the user
 	text   string    // comment or other content
-	state  *DocState // result of the modification
-	oldRev uint16    // serves as a cross-check
-	newRev uint16    // assigned by the document after applying this event
 }
 
 // NewDocEvent creates and initialises an event that transforms the
 // document that it refers to.
-func NewDocEvent(doc *Document, user *User, text string, ns *DocState) (*DocEvent, error) {
-	if doc == nil || user == nil || ns == nil {
+func NewDocEvent(doc *Document, user uint64, action DocAction, text string) (*DocEvent, error) {
+	taction := strings.TrimSpace(string(action))
+	if doc == nil || user == 0 || taction == "" {
 		return nil, fmt.Errorf("nil initialisation data")
 	}
-	if doc.dtype != ns.dtype {
-		return nil, fmt.Errorf("mismatched document types -- document's: %s, new state's: %s", doc.dtype, ns.dtype)
-	}
 
-	found := false
-	ds := doc.state
-	for _, el := range ds.successors {
-		if el.name == ns.name {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("impossible transition requested -- current: %s, new: %s", ds.name, ns.name)
-	}
-
-	e := &DocEvent{doc: doc, user: user, text: text, state: ns}
+	e := &DocEvent{doc: doc, user: user, action: DocAction(taction), text: text}
 	return e, nil
 }
 
@@ -68,32 +51,16 @@ func (e *DocEvent) Document() *Document {
 }
 
 // User answers the user who caused this event to occur.
-func (e *DocEvent) User() *User {
+func (e *DocEvent) User() uint64 {
 	return e.user
 }
 
-// Mtime answers the time when this event affected the referred
-// document.  If this event has not been applied to the document yet,
-// the answered time satisfies `time.IsZero()`.
-func (e *DocEvent) Mtime() time.Time {
-	return e.mtime
+// Action answers the document action that this event represents.
+func (e *DocEvent) Action() DocAction {
+	return e.action
 }
 
-// State answers the document state into which the referred document
-// transitioned.
-func (e *DocEvent) State() *DocState {
-	return e.state
-}
-
-// OldRevision answers the revision number of the referred document
-// before this event affected it.
-func (e *DocEvent) OldRevision() uint16 {
-	return e.oldRev
-}
-
-// NewRevision answers the revision number of the referred document
-// after this event affected it.  If this event has not been applied
-// to the document yet, the answered revision number is zero.
-func (e *DocEvent) NewRevision() uint16 {
-	return e.newRev
+// Text answers the comment or other content enclosed in this event.
+func (e *DocEvent) Text() string {
+	return e.text
 }

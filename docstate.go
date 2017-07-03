@@ -15,33 +15,37 @@
 package flow
 
 import (
-	"fmt"
-	"log"
+	"errors"
+	"strings"
 )
 
-// DocState is one of a set of enumerated states for a document, as
-// defined by the consuming application.
+// DocState is one of a set of enumerated states for a top-level
+// document, as defined by the consuming application.
 //
 // `flow`, therefore, does not assume anything about the specifics of
 // any state.  Applications can, for example, embed `DocState` in a
-// struct that provides more context.
+// struct that provides more context.  Document states should be
+// loaded during application initialisation.
 //
-// Document states should be loaded during application initialisation.
+// N.B. A `DocState` once defined and used, should *NEVER* be removed.
+// At best, it can be deprecated by defining a new one, and then
+// altering the corresponding workflow definition to use the new one
+// instead.
 type DocState struct {
-	dtype      DocType // for namespace purposes
-	name       string
-	successors []*DocState // possible next states
+	dtype DocType // for namespace purposes
+	name  string  // unique identifier of this state in its workflow
 }
 
 // NewDocState creates an enumerated state as defined by the consuming
 // application.
 func NewDocState(dtype DocType, name string) (*DocState, error) {
-	if string(dtype) == "" || name == "" {
-		return nil, fmt.Errorf("invalid initialisation data -- type: %s, name: %s", dtype, name)
+	tdtype := strings.TrimSpace(string(dtype))
+	tname := strings.TrimSpace(name)
+	if tdtype == "" || tname == "" {
+		return nil, errors.New("document type and name cannot be empty")
 	}
 
 	ds := &DocState{dtype: dtype, name: name}
-	ds.successors = make([]*DocState, 0, 1)
 	return ds, nil
 }
 
@@ -53,30 +57,4 @@ func (s *DocState) Type() DocType {
 // Name answers this state's name.
 func (s *DocState) Name() string {
 	return s.name
-}
-
-// AddSuccessor adds a possible successor state for this document
-// state, if it is not already defined.
-func (s *DocState) AddSuccessor(ds *DocState) bool {
-	if ds.dtype != s.dtype {
-		log.Printf("mismatched DocType -- current: %s, given: %s", s.dtype, ds.dtype)
-		return false
-	}
-
-	for _, el := range s.successors {
-		if el.name == ds.name {
-			return false
-		}
-	}
-
-	s.successors = append(s.successors, ds)
-	return true
-}
-
-// Successors answers a copy of this state's possible successor
-// states.
-func (s *DocState) Successors() []*DocState {
-	ds := make([]*DocState, 0, len(s.successors))
-	copy(ds, s.successors)
-	return ds
 }

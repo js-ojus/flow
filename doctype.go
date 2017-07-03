@@ -15,11 +15,23 @@
 package flow
 
 // DocType enumerates the types of documents in the system, as defined
-// by the consuming application.
+// by the consuming application.  Each document type has an associated
+// workflow definition that drives it.
 //
 // Accordingly, `flow` does not assume anything about the specifics of
 // the any document type.  Instead, it treats document types as plain,
-// but controlled, vocabulary.
+// but controlled, vocabulary.  Nonetheless, it is highly recommended,
+// but not necessary, that document types be defined in a system of
+// hierarchical namespaces. For example:
 //
-// All document types must be defined as constant strings.
+//     PUR:RFQ
+//
+// could mean that the department is 'Purchasing', while the document
+// type is 'Request For Quotation'.  As a variant,
+//
+//     PUR:ORD
+//
+// could mean that the document type is 'Purchase Order'.
+//
+// N.B. All document types must be defined as constant strings.
 type DocType string
