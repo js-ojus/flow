@@ -74,6 +74,9 @@ func (w *Workflow) BeginState() DocState {
 // AddNode maps the given document state to the specified node.  This
 // map is consulted by the workflow when performing a state transition
 // of the system.
+//
+// N.B. This method is not protected by a mutex since this is expected
+// to be exercised only during start-up.  Do not violate that!
 func (w *Workflow) AddNode(state DocState, node *Node) error {
 	if node == nil {
 		return errors.New("node should not be `nil`")
@@ -84,4 +87,21 @@ func (w *Workflow) AddNode(state DocState, node *Node) error {
 
 	w.nodes[state] = node
 	return nil
+}
+
+// ApplyEvent takes an input user action or a system event, and
+// applies its document action to the given document.  This results in
+// a possibly new document state.  In addition, a registered
+// processing function is invoked on the document to prepare a message
+// that can be posted to applicable mailboxes.
+//
+// Internally, the workflow delegates this method to the appropriate
+// node, if one such is registered.
+func (w *Workflow) ApplyEvent(event *DocEvent, args ...interface{}) error {
+	node, ok := w.nodes[event.doc.state]
+	if !ok {
+		return errors.New("no node is registered for the document state : " + event.doc.state.name)
+	}
+
+	return node.applyEvent(event, args...)
 }

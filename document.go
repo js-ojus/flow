@@ -344,32 +344,3 @@ func (d *Document) RemoveChild(cid uint64) error {
 // TODO(js): Save()
 
 // TODO(js): LoadChild()
-
-// applyEvent transitions this document into a new state as per the
-// applied event.
-//
-// We perform as many validations as possible when constructing the
-// event, so that we spend a minimum amount of time in this
-// synchronised method.
-// func (d *Document) applyEvent(e *DocEvent) error {
-// 	if e.doc.id != d.id {
-// 		return fmt.Errorf("mismatched document IDs -- current: %d, event's: %d", d.id, e.doc.id)
-// 	}
-
-// 	d.mutex.Lock()
-// 	defer d.mutex.Unlock()
-
-// 	if !e.mtime.IsZero() {
-// 		return fmt.Errorf("event already applied")
-// 	}
-// 	if e.oldRev != d.revision {
-// 		return fmt.Errorf("revision mismatch -- document rev: %d, event rev: %d", d.revision, e.oldRev)
-// 	}
-
-// 	e.mtime = time.Now().UTC()
-// 	d.revision++
-// 	e.newRev = d.revision
-// 	d.state = e.state
-// 	d.events = append(d.events, e)
-// 	return nil
-// }

@@ -15,6 +15,7 @@
 package flow
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -34,13 +35,14 @@ import (
 //
 // N. B. NodeFunc instances must be stateless and not capture their
 // environment in any manner!
-type NodeFunc func(*Document, *DocEvent, ...interface{}) (DocState, *Message, error)
+type NodeFunc func(*Document, DocAction, ...interface{}) (*Message, error)
 
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
 	wflow  *Workflow              // containing flow of this node
 	name   string                 // unique within its workflow
+	state  DocState               // a document reaching this node must be in this state
 	ntype  NodeType               // topology type of this node
 	nfunc  NodeFunc               // processing function of this node
 	xforms map[DocAction]DocState // map of which action at this node transforms a document into which state
@@ -48,8 +50,8 @@ type Node struct {
 
 // NewNode creates and initialises a node definition in the
 // given workflow, using the given processing function.
-func NewNode(wf *Workflow, name string, ntype NodeType, nfunc NodeFunc) *Node {
-	node := &Node{wflow: wf, name: name, ntype: ntype, nfunc: nfunc}
+func NewNode(wf *Workflow, name string, state DocState, ntype NodeType, nfunc NodeFunc) *Node {
+	node := &Node{wflow: wf, name: name, state: state, ntype: ntype, nfunc: nfunc}
 	node.xforms = make(map[DocAction]DocState)
 	return node
 }
@@ -87,5 +89,26 @@ func (n *Node) AddXform(da DocAction, ds DocState) error {
 	}
 
 	n.xforms[da] = ds
+	return nil
+}
+
+// applyEvent takes an input user action or a system event, and
+// applies its document action to the given document.  This results in
+// a possibly new document state.  In addition, a registered
+// processing function is invoked on the document to prepare a message
+// that can be posted to applicable mailboxes.
+func (n *Node) applyEvent(event *DocEvent, args ...interface{}) error {
+	if _, ok := n.xforms[event.action]; !ok {
+		return errors.New("given action not registered in this node : " + string(event.action))
+	}
+
+	// msg, err := n.nfunc(event.doc, event.action, args...)
+	_, err := n.nfunc(event.doc, event.action, args...)
+	if err != nil {
+		return err
+	}
+
+	// TODO(js): routing of message
+
 	return nil
 }
