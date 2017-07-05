@@ -15,15 +15,17 @@
 package flow
 
 import "fmt"
+import "sort"
+import "sync"
 
-// Group represents a specified collection of users.
-//
-// A user belongs to zero or more groups.  Groups can have associated
-// privileges, too.
+// Group represents a specified collection of users.  A user belongs
+// to zero or more groups.
 type Group struct {
-	id    uint16
-	name  string
-	privs []*Privilege
+	id    uint16   // globally-unique ID
+	name  string   // globally-unique name
+	users []uint64 // users included in this group
+
+	mutex sync.RWMutex
 }
 
 // NewGroup creates and initialises a group.
@@ -37,50 +39,76 @@ func NewGroup(id uint16, name string) (*Group, error) {
 	}
 
 	g := &Group{id: id, name: name}
-	g.privs = make([]*Privilege, 0, 1)
 	return g, nil
 }
 
-// AddPrivilege includes the given privilege in the set of privileges
-// assigned to this group.
-func (g *Group) AddPrivilege(p *Privilege) bool {
-	for _, el := range g.privs {
-		if el.IsOnSameTargetAs(p) {
-			return false
-		}
-	}
+// AddUser includes the given user in this group
+func (g *Group) AddUser(u uint64) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
-	g.privs = append(g.privs, p)
-	return true
+	return g.addUser(u)
 }
 
-// RemovePrivilegesOn removes the privileges that this group has on
-// the given target.
-func (g *Group) RemovePrivilegesOn(res *Resource, doc *Document) bool {
-	found := false
-	idx := -1
-	for i, el := range g.privs {
-		if el.IsOnTarget(res, doc) {
-			found = true
-			idx = i
-			break
-		}
-	}
-	if !found {
+// addUser includes the given user in this group
+func (g *Group) addUser(u uint64) bool {
+	idx := sort.Search(len(g.users), func(i int) bool { return g.users[i] >= u })
+	if idx < len(g.users) && g.users[idx] == u {
 		return false
 	}
 
-	g.privs = append(g.privs[:idx], g.privs[idx+1:]...)
+	g.users = append(g.users, 0)
+	copy(g.users[idx+1:], g.users[idx:])
+	g.users[idx] = u
 	return true
 }
 
-// ReplacePrivilege any current privilege on the given target, with
-// the given privilege.
-func (g *Group) ReplacePrivilege(p *Privilege) bool {
-	if !g.RemovePrivilegesOn(p.resource, p.doc) {
+// RemoveUser removes the given user from this group.
+func (g *Group) RemoveUser(u uint64) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	return g.removeUser(u)
+}
+
+// removeUser removes the given user from this group.
+func (g *Group) removeUser(u uint64) bool {
+	idx := sort.Search(len(g.users), func(i int) bool { return g.users[i] >= u })
+	if idx < len(g.users) && g.users[idx] == u {
 		return false
 	}
 
-	g.privs = append(g.privs, p)
+	g.users = append(g.users[:idx], g.users[idx+1:]...)
 	return true
+}
+
+// AddGroup includes all the users in the given group to this group.
+func (g *Group) AddGroup(other *Group) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	ret := true
+	for _, u := range other.users {
+		if ok := g.addUser(u); !ok {
+			ret = false
+		}
+	}
+
+	return ret
+}
+
+// RemoveGroup removes all the users in the given group from this
+// group.
+func (g *Group) RemoveGroup(other *Group) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	ret := true
+	for _, u := range other.users {
+		if ok := g.removeUser(u); !ok {
+			ret = false
+		}
+	}
+
+	return ret
 }
