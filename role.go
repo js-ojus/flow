@@ -60,6 +60,10 @@ func (r *Role) Name() string {
 // AddPermissions adds the given actions to this role, for the given
 // document type.
 func (r *Role) AddPermissions(dt DocType, das []DocAction) error {
+	if len(das) == 0 {
+		return errors.New("list of permitted actions should not be empty")
+	}
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -88,6 +92,10 @@ func (r *Role) RemovePermissions(dt DocType) error {
 // UpdatePermissions updates the set of permissions this role has, for
 // the given document type.
 func (r *Role) UpdatePermissions(dt DocType, das []DocAction) error {
+	if len(das) == 0 {
+		return errors.New("list of permitted actions should not be empty")
+	}
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -113,4 +121,23 @@ func (r *Role) Permissions(dt DocType) []DocAction {
 	}
 
 	return nil
+}
+
+// HasPermission answers `true` if this role has the queried
+// permission for the given document type.
+func (r *Role) HasPermission(dt DocType, da DocAction) bool {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	das, ok := r.perms[dt]
+	if !ok {
+		return false
+	}
+
+	for _, el := range das {
+		if el == da {
+			return true
+		}
+	}
+	return false
 }

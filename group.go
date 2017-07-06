@@ -136,6 +136,13 @@ func (g *Group) Users() []uint64 {
 	return us
 }
 
+// HasUser answers `true` if this group includes the given user;
+// `false` otherwise.
+func (g *Group) HasUser(u uint64) bool {
+	_, ok := g.users[u]
+	return ok
+}
+
 // AddGroup includes all the users in the given group to this group.
 //
 // Answers `true` if at least one user from the other group did not
