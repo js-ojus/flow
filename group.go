@@ -15,15 +15,15 @@
 package flow
 
 import "fmt"
-import "sort"
+
 import "sync"
 
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id    uint16   // globally-unique ID
-	name  string   // globally-unique name
-	users []uint64 // users included in this group
+	id    uint16              // globally-unique ID
+	name  string              // globally-unique name
+	users map[uint64]struct{} // users included in this group
 
 	mutex sync.RWMutex
 }
@@ -39,76 +39,71 @@ func NewGroup(id uint16, name string) (*Group, error) {
 	}
 
 	g := &Group{id: id, name: name}
+	g.users = make(map[uint64]struct{})
 	return g, nil
 }
 
-// AddUser includes the given user in this group
+// AddUser includes the given user in this group.
+//
+// Answers `true` if the user was not already included in this group;
+// `false` otherwise.
 func (g *Group) AddUser(u uint64) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	return g.addUser(u)
-}
-
-// addUser includes the given user in this group
-func (g *Group) addUser(u uint64) bool {
-	idx := sort.Search(len(g.users), func(i int) bool { return g.users[i] >= u })
-	if idx < len(g.users) && g.users[idx] == u {
+	if _, ok := g.users[u]; ok {
 		return false
 	}
 
-	g.users = append(g.users, 0)
-	copy(g.users[idx+1:], g.users[idx:])
-	g.users[idx] = u
+	g.users[u] = struct{}{}
 	return true
 }
 
 // RemoveUser removes the given user from this group.
+//
+// Answers `true` if the user was removed from this group now; `false`
+// if the user was not a part of this group.
 func (g *Group) RemoveUser(u uint64) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	return g.removeUser(u)
-}
-
-// removeUser removes the given user from this group.
-func (g *Group) removeUser(u uint64) bool {
-	idx := sort.Search(len(g.users), func(i int) bool { return g.users[i] >= u })
-	if idx < len(g.users) && g.users[idx] == u {
+	if _, ok := g.users[u]; !ok {
 		return false
 	}
 
-	g.users = append(g.users[:idx], g.users[idx+1:]...)
+	delete(g.users, u)
 	return true
 }
 
 // AddGroup includes all the users in the given group to this group.
+//
+// Answers `true` if at least one user from the other group did not
+// already exist in this group; `false` otherwise.
 func (g *Group) AddGroup(other *Group) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	ret := true
-	for _, u := range other.users {
-		if ok := g.addUser(u); !ok {
-			ret = false
-		}
+	l1 := len(g.users)
+	for u := range other.users {
+		g.users[u] = struct{}{}
 	}
-
-	return ret
+	l2 := len(g.users)
+	return l2 > l1
 }
 
 // RemoveGroup removes all the users in the given group from this
 // group.
+//
+// Answers `true` if at least one user from the other group existed in
+// this group; `false` otherwise.
 func (g *Group) RemoveGroup(other *Group) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	ret := true
-	for _, u := range other.users {
-		if ok := g.removeUser(u); !ok {
-			ret = false
-		}
+	l1 := len(g.users)
+	for u := range other.users {
+		delete(g.users, u)
 	}
-
-	return ret
+	l2 := len(g.users)
+	return l2 < l1
 }
