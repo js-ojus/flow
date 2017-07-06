@@ -36,13 +36,13 @@ type Role struct {
 // Usually, all available roles should be loaded during system
 // initialization.  Only roles created during runtime should be added
 // dynamically.
-func NewRole(id uint16, name string) (*Role, error) {
+func NewRole(name string) (*Role, error) {
 	name = strings.TrimSpace(name)
-	if id == 0 || name == "" {
-		return nil, errors.New("ID should be a positive integer; name should not be empty")
+	if name == "" {
+		return nil, errors.New("role name should not be empty")
 	}
 
-	r := &Role{id: id, name: name}
+	r := &Role{name: name}
 	r.perms = make(map[DocType][]DocAction)
 	return r, nil
 }

@@ -14,16 +14,19 @@
 
 package flow
 
-import "fmt"
-
-import "sync"
+import (
+	"errors"
+	"strings"
+	"sync"
+)
 
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id    uint16              // globally-unique ID
-	name  string              // globally-unique name
-	users map[uint64]struct{} // users included in this group
+	id          uint16              // globally-unique ID
+	name        string              // globally-unique name
+	users       map[uint64]struct{} // users included in this group
+	isUserGroup bool                // is this a user-specific group?
 
 	mutex sync.RWMutex
 }
@@ -33,12 +36,33 @@ type Group struct {
 // Usually, all available groups should be loaded during system
 // initialization.  Only groups created during runtime should be added
 // dynamically.
-func NewGroup(id uint16, name string) (*Group, error) {
-	if id == 0 || name == "" {
-		return nil, fmt.Errorf("invalid group data -- id: %d, name: %s", id, name)
+func NewGroup(name string) (*Group, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("group name should not be empty")
 	}
 
-	g := &Group{id: id, name: name}
+	g := &Group{name: name}
+	g.users = make(map[uint64]struct{})
+	return g, nil
+}
+
+// NewUserGroup creates and initialises a group that is exclusive to
+// the given user.
+//
+// Usually, all available groups should be loaded during system
+// initialization.  Only groups created during runtime should be added
+// dynamically.
+func NewUserGroup(name string, u uint64) (*Group, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("group name should not be empty")
+	}
+	if u == 0 {
+		return nil, errors.New("user ID should be a positive integer")
+	}
+
+	g := &Group{name: name, isUserGroup: true}
 	g.users = make(map[uint64]struct{})
 	return g, nil
 }
@@ -48,6 +72,10 @@ func NewGroup(id uint16, name string) (*Group, error) {
 // Answers `true` if the user was not already included in this group;
 // `false` otherwise.
 func (g *Group) AddUser(u uint64) bool {
+	if g.isUserGroup {
+		return false
+	}
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -64,6 +92,10 @@ func (g *Group) AddUser(u uint64) bool {
 // Answers `true` if the user was removed from this group now; `false`
 // if the user was not a part of this group.
 func (g *Group) RemoveUser(u uint64) bool {
+	if g.isUserGroup {
+		return false
+	}
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -80,6 +112,10 @@ func (g *Group) RemoveUser(u uint64) bool {
 // Answers `true` if at least one user from the other group did not
 // already exist in this group; `false` otherwise.
 func (g *Group) AddGroup(other *Group) bool {
+	if g.isUserGroup {
+		return false
+	}
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -97,6 +133,10 @@ func (g *Group) AddGroup(other *Group) bool {
 // Answers `true` if at least one user from the other group existed in
 // this group; `false` otherwise.
 func (g *Group) RemoveGroup(other *Group) bool {
+	if g.isUserGroup {
+		return false
+	}
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 

@@ -14,7 +14,10 @@
 
 package flow
 
-import "fmt"
+import (
+	"errors"
+	"sync"
+)
 
 // User represents any kind of a user invoking or otherwise
 // participating in a defined workflow in the system.
@@ -26,21 +29,21 @@ type User struct {
 	id     uint64   // must be globally-unique
 	name   string   // for display purposes only
 	active bool     // status of the user account
-	roles  []*Role  // all roles assigned to this user
 	groups []*Group // all groups this user is a part of
+
+	mutex sync.RWMutex
 }
 
 // NewUser instantiates a user instance in the system.
 //
 // In most cases, this should be done upon the corresponding user's
 // first action in the system.
-func NewUser(id uint64, name string) (*User, error) {
-	if id == 0 || name == "" {
-		return nil, fmt.Errorf("invalid user data -- id: %d, name: %s", id, name)
+func NewUser(name string) (*User, error) {
+	if name == "" {
+		return nil, errors.New("user name should not be empty")
 	}
 
-	u := &User{id: id, name: name}
-	u.roles = make([]*Role, 0, 1)
+	u := &User{name: name}
 	u.groups = make([]*Group, 0, 1)
 	return u, nil
 }
@@ -55,8 +58,8 @@ func (u *User) Name() string {
 	return u.name
 }
 
-// Active answers if this user's account is enabled.
-func (u *User) Active() bool {
+// IsActive answers if this user's account is enabled.
+func (u *User) IsActive() bool {
 	return u.active
 }
 
@@ -64,84 +67,16 @@ func (u *User) Active() bool {
 // dynamically.
 func (u *User) SetStatus(active bool) {
 	u.active = active
-}
 
-// AssignRole adds the given role to this user, if it is not assigned
-// already.
-func (u *User) AssignRole(r *Role) bool {
-	for _, el := range u.roles {
-		if el.id == r.id {
-			return false
-		}
-	}
-
-	u.roles = append(u.roles, r)
-	return true
-}
-
-// UnassignRole removes the given role from this user, if it is
-// assigned currently.
-func (u *User) UnassignRole(r *Role) bool {
-	found := false
-	idx := -1
-	for i, el := range u.roles {
-		if el.id == r.id {
-			found = true
-			idx = i
-			break
-		}
-	}
-	if !found {
-		return false
-	}
-
-	u.roles = append(u.roles[:idx], u.roles[idx+1:]...)
-	return true
-}
-
-// Roles answers a copy of the roles currently assigned to this user.
-func (u *User) Roles() []*Role {
-	rs := make([]*Role, 0, len(u.roles))
-	copy(rs, u.roles)
-	return rs
-}
-
-// AddToGroup records that this user participates in the given group,
-// if (s)he does not already.
-func (u *User) AddToGroup(g *Group) bool {
-	for _, el := range u.groups {
-		if el.id == g.id {
-			return false
-		}
-	}
-
-	u.groups = append(u.groups, g)
-	return true
-}
-
-// RemoveFromGroup records that this user no longer participates in
-// the given group, if (s)he does currently.
-func (u *User) RemoveFromGroup(g *Group) bool {
-	found := false
-	idx := -1
-	for i, el := range u.groups {
-		if el.id == g.id {
-			found = true
-			idx = i
-			break
-		}
-	}
-	if !found {
-		return false
-	}
-
-	u.groups = append(u.groups[:idx], u.groups[idx+1:]...)
-	return true
+	// TODO(js): Persist this.
 }
 
 // Groups answers a copy of the groups to which this user currently
 // belongs.
 func (u *User) Groups() []*Group {
+	u.mutex.RLock()
+	defer u.mutex.RUnlock()
+
 	gs := make([]*Group, 0, len(u.groups))
 	copy(gs, u.groups)
 	return gs
