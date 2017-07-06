@@ -14,15 +14,21 @@
 
 package flow
 
-import "fmt"
+import (
+	"errors"
+	"strings"
+	"sync"
+)
 
 // Role represents a collection of privileges.
 //
 // Each user in the system has one or more roles assigned.
 type Role struct {
-	id    uint16
-	name  string
-	privs []*Privilege
+	id    uint16                  // globally-unique ID of this role
+	name  string                  // name of this role
+	perms map[DocType][]DocAction // actions allowed to perform on each document type
+
+	mutex sync.RWMutex
 }
 
 // NewRole creates and initialises a role.
@@ -31,55 +37,70 @@ type Role struct {
 // initialization.  Only roles created during runtime should be added
 // dynamically.
 func NewRole(id uint16, name string) (*Role, error) {
+	name = strings.TrimSpace(name)
 	if id == 0 || name == "" {
-		return nil, fmt.Errorf("invalid role data -- id: %d, name: %s", id, name)
+		return nil, errors.New("ID should be a positive integer; name should not be empty")
 	}
 
 	r := &Role{id: id, name: name}
-	r.privs = make([]*Privilege, 0, 1)
+	r.perms = make(map[DocType][]DocAction)
 	return r, nil
 }
 
-// AddPrivilege includes the given privilege in the set of privileges
-// assigned to this role.
-func (r *Role) AddPrivilege(p *Privilege) bool {
-	for _, el := range r.privs {
-		if el.IsOnSameTargetAs(p) {
-			return false
-		}
+// AddPermissions adds the given actions to this role, for the given
+// document type.
+func (r *Role) AddPermissions(dt DocType, das []DocAction) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.perms[dt]; ok {
+		return errors.New("given document type already has permissions set")
 	}
 
-	r.privs = append(r.privs, p)
-	return true
+	r.perms[dt] = append([]DocAction{}, das...)
+	return nil
 }
 
-// RemovePrivilegesOn removes the privileges that this role has on the
-// given target.
-func (r *Role) RemovePrivilegesOn(res *Resource, doc *Document) bool {
-	found := false
-	idx := -1
-	for i, el := range r.privs {
-		if el.IsOnTarget(res, doc) {
-			found = true
-			idx = i
-			break
-		}
-	}
-	if !found {
-		return false
+// RemovePermissions removes all permissions from this role, for the
+// given document type.
+func (r *Role) RemovePermissions(dt DocType) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.perms[dt]; !ok {
+		return errors.New("given document type does not have any permissions set")
 	}
 
-	r.privs = append(r.privs[:idx], r.privs[idx+1:]...)
-	return true
+	delete(r.perms, dt)
+	return nil
 }
 
-// ReplacePrivilege any current privilege on the given target, with
-// the given privilege.
-func (r *Role) ReplacePrivilege(p *Privilege) bool {
-	if !r.RemovePrivilegesOn(p.resource, p.doc) {
-		return false
+// UpdatePermissions updates the set of permissions this role has, for
+// the given document type.
+func (r *Role) UpdatePermissions(dt DocType, das []DocAction) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.perms[dt]; !ok {
+		return errors.New("given document type does not have any permissions set")
 	}
 
-	r.privs = append(r.privs, p)
-	return true
+	r.perms[dt] = nil
+	delete(r.perms, dt)
+	r.perms[dt] = append([]DocAction{}, das...)
+	return nil
+}
+
+// Permissions answers the current set of permissions this role has,
+// for the given document type.  It answers `nil` in case the given
+// document type does not have any permissions set in this role.
+func (r *Role) Permissions(dt DocType) []DocAction {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	if as, ok := r.perms[dt]; ok {
+		return append([]DocAction{}, as...)
+	}
+
+	return nil
 }
