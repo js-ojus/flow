@@ -47,6 +47,16 @@ func NewRole(name string) (*Role, error) {
 	return r, nil
 }
 
+// ID answers this role's identifier.
+func (r *Role) ID() uint16 {
+	return r.id
+}
+
+// Name answers this role's name.
+func (r *Role) Name() string {
+	return r.name
+}
+
 // AddPermissions adds the given actions to this role, for the given
 // document type.
 func (r *Role) AddPermissions(dt DocType, das []DocAction) error {

@@ -23,7 +23,7 @@ import (
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id          uint16              // globally-unique ID
+	id          uint64              // globally-unique ID
 	name        string              // globally-unique name
 	users       map[uint64]struct{} // users included in this group
 	isUserGroup bool                // is this a user-specific group?
@@ -67,6 +67,22 @@ func NewUserGroup(name string, u uint64) (*Group, error) {
 	return g, nil
 }
 
+// ID answers this group's identifier.
+func (g *Group) ID() uint64 {
+	return g.id
+}
+
+// Name answers this group's name.
+func (g *Group) Name() string {
+	return g.name
+}
+
+// IsUserGroup answers `true` if this group was auto-created as the
+// native group of a user account; `false` otherwise.
+func (g *Group) IsUserGroup() bool {
+	return g.isUserGroup
+}
+
 // AddUser includes the given user in this group.
 //
 // Answers `true` if the user was not already included in this group;
@@ -105,6 +121,19 @@ func (g *Group) RemoveUser(u uint64) bool {
 
 	delete(g.users, u)
 	return true
+}
+
+// Users answers a copy of the list of users included in this group,
+// as their IDs.
+func (g *Group) Users() []uint64 {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	us := make([]uint64, 0, len(g.users))
+	for u := range g.users {
+		us = append(us, u)
+	}
+	return us
 }
 
 // AddGroup includes all the users in the given group to this group.
