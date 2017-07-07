@@ -47,13 +47,13 @@ func NewGroup(name string) (*Group, error) {
 	return g, nil
 }
 
-// NewUserGroup creates and initialises a group that is exclusive to
+// newUserGroup creates and initialises a group that is exclusive to
 // the given user.
 //
 // Usually, all available groups should be loaded during system
 // initialization.  Only groups created during runtime should be added
 // dynamically.
-func NewUserGroup(name string, u uint64) (*Group, error) {
+func newUserGroup(name string, u uint64) (*Group, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("group name should not be empty")
