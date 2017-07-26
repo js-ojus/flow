@@ -20,12 +20,15 @@ import (
 	"sync"
 )
 
+// GroupID is the type of unique group identifiers.
+type GroupID int64
+
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id          uint64              // globally-unique ID
+	id          GroupID             // globally-unique ID
 	name        string              // globally-unique name
-	users       map[uint64]struct{} // users included in this group
+	users       map[UserID]struct{} // users included in this group
 	isUserGroup bool                // is this a user-specific group?
 
 	mutex sync.RWMutex
@@ -43,7 +46,7 @@ func NewGroup(name string) (*Group, error) {
 	}
 
 	g := &Group{name: name}
-	g.users = make(map[uint64]struct{})
+	g.users = make(map[UserID]struct{})
 	return g, nil
 }
 
@@ -63,12 +66,12 @@ func newUserGroup(name string, u uint64) (*Group, error) {
 	}
 
 	g := &Group{name: name, isUserGroup: true}
-	g.users = make(map[uint64]struct{})
+	g.users = make(map[UserID]struct{})
 	return g, nil
 }
 
 // ID answers this group's identifier.
-func (g *Group) ID() uint64 {
+func (g *Group) ID() GroupID {
 	return g.id
 }
 
@@ -87,7 +90,7 @@ func (g *Group) IsUserGroup() bool {
 //
 // Answers `true` if the user was not already included in this group;
 // `false` otherwise.
-func (g *Group) AddUser(u uint64) bool {
+func (g *Group) AddUser(u UserID) bool {
 	if g.isUserGroup {
 		return false
 	}
@@ -107,7 +110,7 @@ func (g *Group) AddUser(u uint64) bool {
 //
 // Answers `true` if the user was removed from this group now; `false`
 // if the user was not a part of this group.
-func (g *Group) RemoveUser(u uint64) bool {
+func (g *Group) RemoveUser(u UserID) bool {
 	if g.isUserGroup {
 		return false
 	}
@@ -125,11 +128,11 @@ func (g *Group) RemoveUser(u uint64) bool {
 
 // Users answers a copy of the list of users included in this group,
 // as their IDs.
-func (g *Group) Users() []uint64 {
+func (g *Group) Users() []UserID {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
-	us := make([]uint64, 0, len(g.users))
+	us := make([]UserID, 0, len(g.users))
 	for u := range g.users {
 		us = append(us, u)
 	}
@@ -138,7 +141,7 @@ func (g *Group) Users() []uint64 {
 
 // HasUser answers `true` if this group includes the given user;
 // `false` otherwise.
-func (g *Group) HasUser(u uint64) bool {
+func (g *Group) HasUser(u UserID) bool {
 	_, ok := g.users[u]
 	return ok
 }

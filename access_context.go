@@ -16,90 +16,180 @@ package flow
 
 import (
 	"errors"
-	"strings"
+	"log"
 	"sync"
 )
 
 // AccessContext is a namespace in which groups are mapped to their
 // permissions.  This mapping happens through roles.
 type AccessContext struct {
-	id    uint16             // globally-unique identifier
-	name  string             // globally-unique namespace; can be a department, project, location, branch, etc.
-	perms map[uint64][]*Role // map of roles assigned to different groups, in this context
+	nsID  int64                // globally-unique namespace; can be a department, project, location, branch, etc.
+	perms map[GroupID][]RoleID // map of roles assigned to different groups, in this context
 
 	mutex sync.RWMutex
 }
 
-// NewAccessContext creates a new access context that determines how
-// the workflows that operate in its context run.
+// NewAccessContext creates a new in-memory access context.
+func NewAccessContext(nsID int64) (*AccessContext, error) {
+	if nsID <= 0 {
+		return nil, errors.New("namespace ID must be a positive integer")
+	}
+
+	ac := &AccessContext{nsID: nsID}
+	ac.perms = make(map[GroupID][]RoleID)
+	return ac, nil
+}
+
+// GetAccessContext fetches the requested access context that
+// determines how the workflows that operate in its context run.
 //
 // Each workflow that operates on a document type is given an
 // associated access context.  This context is used to determine
 // workflow routing, possible branching and rendezvous points.
-func NewAccessContext(name string) (*AccessContext, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, errors.New("access context name should not be empty")
+//
+// For complex organisational requirements, the name of the access
+// context can be made hierarchical with a suitable delimiter.  For
+// example:
+//     IN:south:HYD:BR-101
+//     sbu-08/client-0249/prj-006348
+func GetAccessContext(nsID int64) (*AccessContext, error) {
+	if nsID <= 0 {
+		return nil, errors.New("namespace ID should not be negative")
+	}
+	rows, err := db.Query("SELECT * FROM wf_access_contexts WHERE ns_id = ?", nsID)
+	if err != nil {
+		log.Printf("error fetching access context '%d' : %s\n", nsID, err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	ac := &AccessContext{nsID: nsID}
+	ac.perms = make(map[GroupID][]RoleID)
+
+	var acID int64
+	var tnsID int64
+	var gid GroupID
+	var rid RoleID
+	for rows.Next() {
+		err = rows.Scan(&acID, &tnsID, &gid, &rid)
+		if err != nil {
+			log.Printf("error fetching details for access context '%d' : %s\n", nsID, err.Error())
+			return nil, err
+		}
+		roles, ok := ac.perms[gid]
+		if !ok {
+			roles = make([]RoleID, 0, DefACRoleCount)
+		}
+		roles = append(roles, rid)
+		ac.perms[gid] = roles
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Printf("error fetching details for access context '%d' : %s\n", nsID, err.Error())
+		return nil, err
 	}
 
-	return &AccessContext{name: name}, nil
+	return ac, nil
 }
 
-// ID answers this access context's unique ID.
-func (ac *AccessContext) ID() uint16 {
-	return ac.id
-}
-
-// Name answers this access context's (unique) namespace.
-func (ac *AccessContext) Name() string {
-	return ac.name
+// Namespace answers this access context's namespace ID.
+func (ac *AccessContext) Namespace() int64 {
+	return ac.nsID
 }
 
 // AddGroupRole assigns the specified role to the given group, if it
 // is not already assigned.
-func (ac *AccessContext) AddGroupRole(gr uint64, r *Role) error {
-	if gr == 0 || r == nil {
-		return errors.New("group ID must be a positive integer; role should not be `nil`")
+func (ac *AccessContext) AddGroupRole(gid GroupID, rid RoleID) error {
+	if gid == 0 || rid == 0 {
+		return errors.New("group ID and role ID must be positive integers")
+	}
+
+	save := func(gid GroupID, rid RoleID) error {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec("INSERT INTO wf_access_contexts(ns_id, group_id, role_id) VALUES(?, ?, ?)", ac.nsID, gid, rid)
+		if err != nil {
+			return err
+		}
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
 
-	rs, ok := ac.perms[gr]
+	rs, ok := ac.perms[gid]
 	if !ok {
-		rs = []*Role{r}
-		ac.perms[gr] = rs
+		err := save(gid, rid)
+		if err != nil {
+			return err
+		}
+
+		rs = []RoleID{rid}
+		ac.perms[gid] = rs
 		return nil
 	}
 
 	for _, el := range rs {
-		if el.name == r.name {
+		if el == rid {
 			return nil
 		}
 	}
-	rs = append(rs, r)
-	ac.perms[gr] = rs
+
+	err := save(gid, rid)
+	if err != nil {
+		return err
+	}
+	rs = append(rs, rid)
+	ac.perms[gid] = rs
+
 	return nil
 }
 
 // RemoveGroupRole unassigns the specified role from the given group.
-// func (ac *AccessContext)
-func (ac *AccessContext) RemoveGroupRole(gr uint64, r *Role) error {
-	if gr == 0 || r == nil {
-		return errors.New("group ID must be a positive integer; role should not be `nil`")
+func (ac *AccessContext) RemoveGroupRole(gid GroupID, rid RoleID) error {
+	if gid == 0 || rid == 0 {
+		return errors.New("group ID and role ID must be positive integers")
+	}
+
+	save := func(gid GroupID, rid RoleID) error {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec("DELETE FROM wf_access_contexts WHERE ns_id = ? AND group_id = ? AND role_id = ?", ac.nsID, gid, rid)
+		if err != nil {
+			return err
+		}
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	ac.mutex.Lock()
 	defer ac.mutex.Unlock()
 
-	rs, ok := ac.perms[gr]
+	rs, ok := ac.perms[gid]
 	if !ok {
 		return nil
 	}
 
 	idx := -1
 	for i, el := range rs {
-		if el.name == r.name {
+		if el == rid {
 			idx = i
 			break
 		}
@@ -108,28 +198,34 @@ func (ac *AccessContext) RemoveGroupRole(gr uint64, r *Role) error {
 		return nil
 	}
 
+	err := save(gid, rid)
+	if err != nil {
+		return err
+	}
+
 	rs = append(rs[:idx], rs[idx+1:]...)
-	ac.perms[gr] = rs
+	ac.perms[gid] = rs
 	return nil
 }
 
 // HasPermission answers `true` if the given group has the requested
 // action enabled on the specified document type; `false` otherwise.
-func (ac *AccessContext) HasPermission(gr uint64, dt DocType, da DocAction) bool {
-	if gr == 0 {
+func (ac *AccessContext) HasPermission(gid GroupID, dt DocType, da DocAction) bool {
+	if gid == 0 {
 		return false
 	}
 
 	ac.mutex.RLock()
 	defer ac.mutex.RUnlock()
 
-	rs, ok := ac.perms[gr]
+	rs, ok := ac.perms[gid]
 	if !ok {
 		return false
 	}
 
 	for _, el := range rs {
-		if el.HasPermission(dt, da) {
+		r, _ := GetRole(el)
+		if r.HasPermission(dt, da) {
 			return true
 		}
 	}

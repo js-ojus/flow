@@ -19,6 +19,9 @@ import (
 	"sync"
 )
 
+// UserID is the type of unique user identifiers.
+type UserID int64
+
 // User represents any kind of a user invoking or otherwise
 // participating in a defined workflow in the system.
 //
@@ -26,7 +29,7 @@ import (
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	id     uint64   // must be globally-unique
+	id     UserID   // must be globally-unique
 	name   string   // for display purposes only
 	active bool     // status of the user account
 	groups []*Group // all groups this user is a part of
@@ -49,7 +52,7 @@ func NewUser(name string) (*User, error) {
 }
 
 // ID answers this user's ID.
-func (u *User) ID() uint64 {
+func (u *User) ID() UserID {
 	return u.id
 }
 

@@ -20,20 +20,27 @@ import (
 	"log"
 )
 
-var db sql.DB
+const (
+	// DefACRoleCount is the default number of roles a group can have
+	// in an access context.
+	DefACRoleCount = 1
+)
+
+var db *sql.DB
+
+//
 
 func init() {
 	f := log.Flags()
 	log.SetFlags(f | log.Llongfile)
 }
 
-// OpenDB opens the database connection as per the given driver and
-// connection information.
-func OpenDB(driver, connInfo string) *sql.DB {
-	db, err := sql.Open(driver, connInfo)
-	if err != nil {
-		log.Fatalf("fatal error during DB connection setup : %v\n", err.Error())
+// RegisterDB provides an already initialised database handle to `flow`.
+func RegisterDB(sdb *sql.DB) error {
+	if db == nil {
+		log.Fatal("given database handle is `nil`")
 	}
+	db = sdb
 
-	return db
+	return nil
 }

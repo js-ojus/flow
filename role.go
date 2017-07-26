@@ -20,11 +20,14 @@ import (
 	"sync"
 )
 
+// RoleID is the type of unique role identifiers.
+type RoleID int64
+
 // Role represents a collection of privileges.
 //
 // Each user in the system has one or more roles assigned.
 type Role struct {
-	id    uint16                  // globally-unique ID of this role
+	id    RoleID                  // globally-unique ID of this role
 	name  string                  // name of this role
 	perms map[DocType][]DocAction // actions allowed to perform on each document type
 
@@ -47,8 +50,15 @@ func NewRole(name string) (*Role, error) {
 	return r, nil
 }
 
+// GetRole loads the role object corresponding to the given role ID
+// from the database, and answers that.
+func GetRole(rid RoleID) (*Role, error) {
+	// TODO(js): implement
+	return nil, nil
+}
+
 // ID answers this role's identifier.
-func (r *Role) ID() uint16 {
+func (r *Role) ID() RoleID {
 	return r.id
 }
 
