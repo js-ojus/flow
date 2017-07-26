@@ -15,9 +15,25 @@
 // Package flow is a tiny workflow engine written in Go (golang).
 package flow
 
-import "log"
+import (
+	"database/sql"
+	"log"
+)
+
+var db sql.DB
 
 func init() {
 	f := log.Flags()
 	log.SetFlags(f | log.Llongfile)
+}
+
+// OpenDB opens the database connection as per the given driver and
+// connection information.
+func OpenDB(driver, connInfo string) *sql.DB {
+	db, err := sql.Open(driver, connInfo)
+	if err != nil {
+		log.Fatalf("fatal error during DB connection setup : %v\n", err.Error())
+	}
+
+	return db
 }
