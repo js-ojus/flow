@@ -29,25 +29,29 @@ type UserID int64
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	id     UserID   // must be globally-unique
-	name   string   // for display purposes only
-	active bool     // status of the user account
-	groups []*Group // all groups this user is a part of
+	id     UserID // Must be globally-unique
+	name   string // For display purposes only
+	active bool   // Status of the user account
 
 	mutex sync.RWMutex
 }
 
-// NewUser instantiates a user instance in the system.
-//
-// In most cases, this should be done upon the corresponding user's
-// first action in the system.
-func NewUser(name string) (*User, error) {
-	if name == "" {
-		return nil, errors.New("user name should not be empty")
+// GetUser instantiates a user instance by reading the database.
+func GetUser(uid UserID) (*User, error) {
+	if uid <= 0 {
+		return nil, errors.New("user ID should be a positive integer")
 	}
 
-	u := &User{name: name}
-	u.groups = make([]*Group, 0, 1)
+	var tid int64
+	var fname string
+	var lname string
+	var status bool
+	row := db.QueryRow("SELECT id, first_name, last_name, status FROM users_master WHERE id = ?", uid)
+	err := row.Scan(&tid, &fname, &lname, &status)
+	if err != nil {
+		return nil, err
+	}
+	u := &User{id: uid, name: fname + " " + lname, active: status}
 	return u, nil
 }
 
@@ -64,23 +68,4 @@ func (u *User) Name() string {
 // IsActive answers if this user's account is enabled.
 func (u *User) IsActive() bool {
 	return u.active
-}
-
-// SetStatus can be used to enable or disable a user account
-// dynamically.
-func (u *User) SetStatus(active bool) {
-	u.active = active
-
-	// TODO(js): Persist this.
-}
-
-// Groups answers a copy of the groups to which this user currently
-// belongs.
-func (u *User) Groups() []*Group {
-	u.mutex.RLock()
-	defer u.mutex.RUnlock()
-
-	gs := make([]*Group, 0, len(u.groups))
-	copy(gs, u.groups)
-	return gs
 }

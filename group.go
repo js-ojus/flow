@@ -16,7 +16,6 @@ package flow
 
 import (
 	"errors"
-	"strings"
 	"sync"
 )
 
@@ -25,48 +24,38 @@ type GroupID int64
 
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
+//
+// Group details are expected to be provided by an external identity
+// provider application or directory.  `flow` neither defines nor
+// manages groups.
 type Group struct {
-	id          GroupID             // globally-unique ID
-	name        string              // globally-unique name
-	users       map[UserID]struct{} // users included in this group
-	isUserGroup bool                // is this a user-specific group?
+	id        GroupID // Globally-unique ID
+	name      string  // Globally-unique name
+	groupType string  // Is this a user-specific group? Etc.
 
 	mutex sync.RWMutex
 }
 
-// NewGroup creates and initialises a group.
+// GetGroup initialises the group by reading from database.
 //
 // Usually, all available groups should be loaded during system
 // initialization.  Only groups created during runtime should be added
 // dynamically.
-func NewGroup(name string) (*Group, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, errors.New("group name should not be empty")
+func GetGroup(gid GroupID) (*Group, error) {
+	if gid <= 0 {
+		return nil, errors.New("group ID should be a positive integer")
 	}
 
-	g := &Group{name: name}
-	g.users = make(map[UserID]struct{})
-	return g, nil
-}
-
-// newUserGroup creates and initialises a group that is exclusive to
-// the given user.
-//
-// Usually, all available groups should be loaded during system
-// initialization.  Only groups created during runtime should be added
-// dynamically.
-func newUserGroup(name string, u uint64) (*Group, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, errors.New("group name should not be empty")
-	}
-	if u == 0 {
-		return nil, errors.New("user ID should be a positive integer")
+	var tid GroupID
+	var name string
+	var gtype string
+	row := db.QueryRow("SELECT id, name, group_type FROM groups_master WHERE id = ?", gid)
+	err := row.Scan(&tid, &name, &gtype)
+	if err != nil {
+		return nil, err
 	}
 
-	g := &Group{name: name, isUserGroup: true}
-	g.users = make(map[UserID]struct{})
+	g := &Group{id: gid, name: name, groupType: gtype}
 	return g, nil
 }
 
@@ -80,109 +69,25 @@ func (g *Group) Name() string {
 	return g.name
 }
 
-// IsUserGroup answers `true` if this group was auto-created as the
-// native group of a user account; `false` otherwise.
-func (g *Group) IsUserGroup() bool {
-	return g.isUserGroup
-}
-
-// AddUser includes the given user in this group.
-//
-// Answers `true` if the user was not already included in this group;
-// `false` otherwise.
-func (g *Group) AddUser(u UserID) bool {
-	if g.isUserGroup {
-		return false
-	}
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	if _, ok := g.users[u]; ok {
-		return false
-	}
-
-	g.users[u] = struct{}{}
-	return true
-}
-
-// RemoveUser removes the given user from this group.
-//
-// Answers `true` if the user was removed from this group now; `false`
-// if the user was not a part of this group.
-func (g *Group) RemoveUser(u UserID) bool {
-	if g.isUserGroup {
-		return false
-	}
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	if _, ok := g.users[u]; !ok {
-		return false
-	}
-
-	delete(g.users, u)
-	return true
-}
-
-// Users answers a copy of the list of users included in this group,
-// as their IDs.
-func (g *Group) Users() []UserID {
-	g.mutex.RLock()
-	defer g.mutex.RUnlock()
-
-	us := make([]UserID, 0, len(g.users))
-	for u := range g.users {
-		us = append(us, u)
-	}
-	return us
+// GroupType answers the nature of this group.  For instance, if this
+// group was auto-created as the native group of a user account, or is
+// a collection of users, etc.
+func (g *Group) GroupType() string {
+	return g.groupType
 }
 
 // HasUser answers `true` if this group includes the given user;
 // `false` otherwise.
-func (g *Group) HasUser(u UserID) bool {
-	_, ok := g.users[u]
-	return ok
-}
-
-// AddGroup includes all the users in the given group to this group.
-//
-// Answers `true` if at least one user from the other group did not
-// already exist in this group; `false` otherwise.
-func (g *Group) AddGroup(other *Group) bool {
-	if g.isUserGroup {
-		return false
+func (g *Group) HasUser(uid UserID) (bool, error) {
+	var count int64
+	row := db.QueryRow("SELECT COUNT(*) FROM group_user WHERE group_id = ? AND user_id = ? LIMIT 1", g.id, uid)
+	err := row.Scan(&count)
+	if err != nil {
+		return false, err
 	}
 
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	l1 := len(g.users)
-	for u := range other.users {
-		g.users[u] = struct{}{}
+	if count == 0 {
+		return false, nil
 	}
-	l2 := len(g.users)
-	return l2 > l1
-}
-
-// RemoveGroup removes all the users in the given group from this
-// group.
-//
-// Answers `true` if at least one user from the other group existed in
-// this group; `false` otherwise.
-func (g *Group) RemoveGroup(other *Group) bool {
-	if g.isUserGroup {
-		return false
-	}
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	l1 := len(g.users)
-	for u := range other.users {
-		delete(g.users, u)
-	}
-	l2 := len(g.users)
-	return l2 < l1
+	return true, nil
 }
