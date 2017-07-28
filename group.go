@@ -15,6 +15,7 @@
 package flow
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 )
@@ -33,12 +34,17 @@ type Group struct {
 // NewSingletonGroup creates a singleton group associated with the
 // given user.  The e-mail address of the user is used as the name of
 // the group.  This serves as the linking identifier.
-func NewSingletonGroup(uid UserID, email string) (GroupID, error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return 0, err
+func NewSingletonGroup(otx *sql.Tx, uid UserID, email string) (GroupID, error) {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
 	}
-	defer tx.Rollback()
 
 	res, err := tx.Exec("INSERT INTO wf_groups_master(name, group_type) VALUES(?, ?)", email, "S")
 	if err != nil {
@@ -59,16 +65,19 @@ func NewSingletonGroup(uid UserID, email string) (GroupID, error) {
 		return 0, err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return 0, err
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
 	}
+
 	return GroupID(gid), nil
 }
 
 // NewGroup creates a new group that can be populated with users
 // later.
-func NewGroup(name string, gtype string) (GroupID, error) {
+func NewGroup(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 	name = strings.TrimSpace(name)
 	gtype = strings.TrimSpace(gtype)
 	if name == "" || gtype == "" {
@@ -82,11 +91,16 @@ func NewGroup(name string, gtype string) (GroupID, error) {
 		return 0, errors.New("unknown group type")
 	}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return 0, err
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
 	}
-	defer tx.Rollback()
 
 	res, err := tx.Exec("INSERT INTO wf_groups_master(name, group_type) VALUES(?, ?)", name, gtype)
 	if err != nil {
@@ -98,10 +112,13 @@ func NewGroup(name string, gtype string) (GroupID, error) {
 		return 0, err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return 0, err
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
 	}
+
 	return GroupID(gid), nil
 }
 
