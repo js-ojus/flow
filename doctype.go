@@ -14,6 +14,12 @@
 
 package flow
 
+import (
+	"database/sql"
+	"errors"
+	"strings"
+)
+
 // DocType enumerates the types of documents in the system, as defined
 // by the consuming application.  Each document type has an associated
 // workflow definition that drives its life cycle.
@@ -35,3 +41,56 @@ package flow
 //
 // N.B. All document types must be defined as constant strings.
 type DocType string
+
+// NewDocType creates and registers a new document type in the system.
+func NewDocType(otx *sql.Tx, dt DocType) error {
+	name := strings.TrimSpace(string(dt))
+	if name == "" {
+		return errors.New("document type cannot be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err := tx.Exec("INSERT INTO wf_doctypes_master(name) VALUES(?)", name)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DocTypeExists answers `true` if a document type with the given name
+// is registered; `false` otherwise.
+func DocTypeExists(dt DocType) (bool, error) {
+	name := strings.TrimSpace(string(dt))
+	if name == "" {
+		return false, errors.New("document type cannot be empty")
+	}
+
+	row := db.QueryRow("SELECT COUNT(*) from wf_doctypes_master WHERE name = ?", name)
+	var n int64
+	err := row.Scan(&n)
+	if err != nil {
+		return false, err
+	}
+
+	if n == 0 {
+		return false, nil
+	}
+	return true, nil
+}
