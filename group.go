@@ -123,10 +123,6 @@ func NewGroup(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 }
 
 // GetGroup initialises the group by reading from database.
-//
-// Usually, all available groups should be loaded during system
-// initialization.  Only groups created during runtime should be added
-// dynamically.
 func GetGroup(gid GroupID) (*Group, error) {
 	if gid <= 0 {
 		return nil, errors.New("group ID should be a positive integer")
@@ -139,6 +135,21 @@ func GetGroup(gid GroupID) (*Group, error) {
 	err := row.Scan(&tid, &name, &gtype)
 	if err != nil {
 		return nil, err
+	}
+	if gtype == "S" {
+		q := `
+		SELECT status FROM wf_users_master
+		WHERE user_id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
+		`
+		var active bool
+		row = db.QueryRow(q, gid)
+		err = row.Scan(&active)
+		if err != nil {
+			return nil, err
+		}
+		if !active {
+			return nil, errors.New("user corresponding to this singleton group is currently inactive")
+		}
 	}
 
 	g := &Group{id: gid, name: name, groupType: gtype}
