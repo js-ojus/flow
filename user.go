@@ -31,6 +31,7 @@ type UserID int64
 type User struct {
 	id     UserID // Must be globally-unique
 	name   string // For display purposes only
+	email  string // E-mail address of this user
 	active bool   // Status of the user account
 
 	mutex sync.RWMutex
@@ -45,13 +46,14 @@ func GetUser(uid UserID) (*User, error) {
 	var tid int64
 	var fname string
 	var lname string
+	var email string
 	var status bool
-	row := db.QueryRow("SELECT id, first_name, last_name, status FROM users_master WHERE id = ?", uid)
-	err := row.Scan(&tid, &fname, &lname, &status)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE id = ?", uid)
+	err := row.Scan(&tid, &fname, &lname, &email, &status)
 	if err != nil {
 		return nil, err
 	}
-	u := &User{id: uid, name: fname + " " + lname, active: status}
+	u := &User{id: uid, name: fname + " " + lname, email: email, active: status}
 	return u, nil
 }
 
@@ -65,7 +67,49 @@ func (u *User) Name() string {
 	return u.name
 }
 
+// Email answers this user's e-mail address.
+func (u *User) Email() string {
+	return u.email
+}
+
 // IsActive answers if this user's account is enabled.
 func (u *User) IsActive() bool {
 	return u.active
+}
+
+// Groups answers a list of groups that this user is a member of.
+func (u *User) Groups() ([]GroupID, error) {
+	rows, err := db.Query("SELECT group_id FROM wf_group_users WHERE user_id = ?", u.id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	gids := make([]GroupID, 0, 1)
+	var gid GroupID
+	for rows.Next() {
+		err = rows.Scan(&gid)
+		if err != nil {
+			return nil, err
+		}
+		gids = append(gids, gid)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return gids, nil
+}
+
+// SingletonGroup answers the ID of this user's singleton group.
+func (u *User) SingletonGroup() (GroupID, error) {
+	row := db.QueryRow("SELECT id from wf_groups_master WHERE name = ?", u.email)
+	var gid GroupID
+	err := row.Scan(&gid)
+	if err != nil {
+		return 0, err
+	}
+
+	return gid, nil
 }

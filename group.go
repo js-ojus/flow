@@ -16,7 +16,7 @@ package flow
 
 import (
 	"errors"
-	"sync"
+	"strings"
 )
 
 // GroupID is the type of unique group identifiers.
@@ -32,8 +32,81 @@ type Group struct {
 	id        GroupID // Globally-unique ID
 	name      string  // Globally-unique name
 	groupType string  // Is this a user-specific group? Etc.
+}
 
-	mutex sync.RWMutex
+// NewSingletonGroup creates a singleton group associated with the
+// given user.  The e-mail address of the user is used as the name of
+// the group.  This serves as the linking identifier.
+func NewSingletonGroup(uid UserID, email string) (GroupID, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec("INSERT INTO wf_groups_master(name, group_type) VALUES(?, ?)", email, "S")
+	if err != nil {
+		return 0, err
+	}
+	var gid int64
+	gid, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	res, err = tx.Exec("INSERT INTO wf_group_users(group_id, user_id) VALUES(?, ?)", gid, uid)
+	if err != nil {
+		return 0, err
+	}
+	_, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+	return GroupID(gid), nil
+}
+
+// NewGroup creates a new group that can be populated with users
+// later.
+func NewGroup(name string, gtype string) (GroupID, error) {
+	name = strings.TrimSpace(name)
+	gtype = strings.TrimSpace(gtype)
+	if name == "" || gtype == "" {
+		return 0, errors.New("group name and type must not be empty")
+	}
+	switch gtype {
+	case "G": // General
+	// Nothing to do
+
+	default:
+		return 0, errors.New("unknown group type")
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec("INSERT INTO wf_groups_master(name, group_type) VALUES(?, ?)", name, gtype)
+	if err != nil {
+		return 0, err
+	}
+	var gid int64
+	gid, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+	return GroupID(gid), nil
 }
 
 // GetGroup initialises the group by reading from database.
@@ -80,7 +153,7 @@ func (g *Group) GroupType() string {
 // `false` otherwise.
 func (g *Group) HasUser(uid UserID) (bool, error) {
 	var count int64
-	row := db.QueryRow("SELECT COUNT(*) FROM group_user WHERE group_id = ? AND user_id = ? LIMIT 1", g.id, uid)
+	row := db.QueryRow("SELECT COUNT(*) FROM wf_group_users WHERE group_id = ? AND user_id = ? LIMIT 1", g.id, uid)
 	err := row.Scan(&count)
 	if err != nil {
 		return false, err
@@ -90,4 +163,20 @@ func (g *Group) HasUser(uid UserID) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// SingletonUser answer the user ID of the corresponding user, if this
+// group is a singleton group.
+func (g *Group) SingletonUser() (UserID, error) {
+	if g.groupType != "S" {
+		return 0, errors.New("this group is not a singleton group")
+	}
+
+	var uid UserID
+	row := db.QueryRow("SELECT user_id FROM wf_group_users WHERE group_id = ?", g.id)
+	err := row.Scan(&uid)
+	if err != nil {
+		return 0, err
+	}
+	return uid, nil
 }
