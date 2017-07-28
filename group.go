@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -138,8 +139,8 @@ func GetGroup(gid GroupID) (*Group, error) {
 	}
 	if gtype == "S" {
 		q := `
-		SELECT status FROM wf_users_master
-		WHERE user_id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
+		SELECT status FROM wf_users_master_v
+		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
 		`
 		var active bool
 		row = db.QueryRow(q, gid)
@@ -154,6 +155,64 @@ func GetGroup(gid GroupID) (*Group, error) {
 
 	g := &Group{id: gid, name: name, groupType: gtype}
 	return g, nil
+}
+
+// DeleteGroup deletes the given group from the system, if no access
+// context is actively using it.
+func DeleteGroup(otx *sql.Tx, gid GroupID) error {
+	if gid <= 0 {
+		return errors.New("group ID must be a positive integer")
+	}
+
+	row := db.QueryRow("SELECT group_type FROM wf_groups_master WHERE group_id = ?", gid)
+	var gtype string
+	err := row.Scan(&gtype)
+	if err != nil {
+		return err
+	}
+	if gtype == "S" {
+		return errors.New("singleton groups cannot be deleted")
+	}
+
+	row = db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE group_id = ?", gid)
+	var n int64
+	err = row.Scan(&n)
+	if n > 0 {
+		return errors.New("group is being used in at least one access context; cannot delete")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err = tx.Exec("DELETE FROM wf_group_users WHERE group_id = ?", gid)
+	if err != nil {
+		return err
+	}
+	res, err := tx.Exec("DELETE FROM wf_groups_master WHERE id = ?", gid)
+	if err != nil {
+		return err
+	}
+	n, err = res.RowsAffected()
+	if n != 1 {
+		return fmt.Errorf("expected number of affected rows : 1; actual affected : %d", n)
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ID answers this group's identifier.
@@ -203,4 +262,81 @@ func (g *Group) SingletonUser() (UserID, error) {
 		return 0, err
 	}
 	return uid, nil
+}
+
+// AddUser adds the given user as a member of this group.
+func (g *Group) AddUser(otx *sql.Tx, uid UserID) error {
+	if g.groupType == "S" {
+		return errors.New("cannot add users to a singleton group")
+	}
+	if uid <= 0 {
+		return errors.New("user ID must be a positive integer")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err := tx.Exec("INSERT INTO wf_group_users(group_id, user_id) VALUES(?, ?)", g.id, uid)
+	if err != nil {
+		return err
+	}
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveUser removes the given user from this group, if the user is a
+// member of the group.  This operation is idempotent.
+func (g *Group) RemoveUser(otx *sql.Tx, uid UserID) error {
+	if g.groupType == "S" {
+		return errors.New("cannot delete users from a singleton group")
+	}
+	if uid <= 0 {
+		return errors.New("user ID must be a positive integer")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("DELETE FROM wf_group_users WHERE group_id = ? AND user_id = ?", g.id, uid)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return fmt.Errorf("expected number of affected rows : 1; actual affected : %d", n)
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

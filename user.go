@@ -43,7 +43,7 @@ func GetUser(uid UserID) (*User, error) {
 	var fname string
 	var lname string
 	var email string
-	row := db.QueryRow("SELECT id, first_name, last_name, email FROM wf_users_master WHERE id = ?", uid)
+	row := db.QueryRow("SELECT id, first_name, last_name, email FROM wf_users_master_v WHERE id = ?", uid)
 	err := row.Scan(&tid, &fname, &lname, &email)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (u *User) Email() string {
 
 // IsActive answers `true` if this user's account is enabled.
 func (u *User) IsActive() (bool, error) {
-	row := db.QueryRow("SELECT status FROM wf_users_master WHERE id = ?", u.id)
+	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", u.id)
 	var status bool
 	err := row.Scan(&status)
 	if err != nil {
@@ -81,7 +81,7 @@ func (u *User) IsActive() (bool, error) {
 
 // IsUserActive answers `true` if the given user's account is enabled.
 func IsUserActive(uid UserID) (bool, error) {
-	row := db.QueryRow("SELECT status FROM wf_users_master WHERE id = ?", uid)
+	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", uid)
 	var status bool
 	err := row.Scan(&status)
 	if err != nil {
