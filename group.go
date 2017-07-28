@@ -24,10 +24,6 @@ type GroupID int64
 
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
-//
-// Group details are expected to be provided by an external identity
-// provider application or directory.  `flow` neither defines nor
-// manages groups.
 type Group struct {
 	id        GroupID // Globally-unique ID
 	name      string  // Globally-unique name
