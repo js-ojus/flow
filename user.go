@@ -16,6 +16,7 @@ package flow
 
 import (
 	"errors"
+	"math"
 )
 
 // UserID is the type of unique user identifiers.
@@ -33,8 +34,79 @@ type User struct {
 	email string // E-mail address of this user
 }
 
-// GetUser instantiates a user instance by reading the database.
-func GetUser(uid UserID) (*User, error) {
+// ID answers this user's ID.
+func (u *User) ID() UserID {
+	return u.id
+}
+
+// Name answers this user's name.
+func (u *User) Name() string {
+	return u.name
+}
+
+// Email answers this user's e-mail address.
+func (u *User) Email() string {
+	return u.email
+}
+
+// Unexported type, only for convenience methods.
+type _Users struct{}
+
+var _users *_Users
+
+func init() {
+	_users = &_Users{}
+}
+
+// Users provides a resource-like interface to users in the system.
+func Users() *_Users {
+	return _users
+}
+
+// List answers a subset of the users, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (us *_Users) List(offset, limit int64) ([]User, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, fname, lname, email
+	FROM wf_users_master
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var uid UserID
+	var fname, lname, email string
+	uary := make([]User, 0, 10)
+	for rows.Next() {
+		err = rows.Scan(&uid, &fname, &lname, &email)
+		if err != nil {
+			return nil, err
+		}
+		uary = append(uary, User{id: uid, name: fname + " " + lname, email: email})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return uary, nil
+}
+
+// Get instantiates a user instance by reading the database.
+func (us *_Users) Get(uid UserID) (*User, error) {
 	if uid <= 0 {
 		return nil, errors.New("user ID should be a positive integer")
 	}
@@ -52,35 +124,8 @@ func GetUser(uid UserID) (*User, error) {
 	return u, nil
 }
 
-// ID answers this user's ID.
-func (u *User) ID() UserID {
-	return u.id
-}
-
-// Name answers this user's name.
-func (u *User) Name() string {
-	return u.name
-}
-
-// Email answers this user's e-mail address.
-func (u *User) Email() string {
-	return u.email
-}
-
-// IsActive answers `true` if this user's account is enabled.
-func (u *User) IsActive() (bool, error) {
-	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", u.id)
-	var status bool
-	err := row.Scan(&status)
-	if err != nil {
-		return false, err
-	}
-
-	return status, nil
-}
-
-// IsUserActive answers `true` if the given user's account is enabled.
-func IsUserActive(uid UserID) (bool, error) {
+// IsActive answers `true` if the given user's account is enabled.
+func (us *_Users) IsActive(uid UserID) (bool, error) {
 	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", uid)
 	var status bool
 	err := row.Scan(&status)
@@ -91,14 +136,10 @@ func IsUserActive(uid UserID) (bool, error) {
 	return status, nil
 }
 
-// Groups answers a list of groups that this user is a member of.
-func (u *User) Groups() ([]GroupID, error) {
-	active, err := u.IsActive()
-	if !active {
-		return nil, errors.New("this user is currently not active")
-	}
-
-	rows, err := db.Query("SELECT group_id FROM wf_group_users WHERE user_id = ?", u.id)
+// GroupsOf answers a list of groups that the given user is a member
+// of.
+func (us *_Users) GroupsOf(uid UserID) ([]GroupID, error) {
+	rows, err := db.Query("SELECT group_id FROM wf_group_users WHERE user_id = ?", uid)
 	if err != nil {
 		return nil, err
 	}
@@ -121,19 +162,17 @@ func (u *User) Groups() ([]GroupID, error) {
 	return gids, nil
 }
 
-// SingletonGroup answers the ID of this user's singleton group.
-func (u *User) SingletonGroup() (GroupID, error) {
-	active, err := u.IsActive()
-	if err != nil {
-		return 0, err
-	}
-	if !active {
-		return 0, errors.New("this user is currently not active")
-	}
-
-	row := db.QueryRow("SELECT id from wf_groups_master WHERE name = ?", u.email)
+// SingletonGroupOf answers the ID of the given user's singleton
+// group.
+func (us *_Users) SingletonGroupOf(uid UserID) (GroupID, error) {
+	q := `
+	SELECT gm.id FROM wf_groups_master gm
+	JOIN wf_users_master um ON gm.name = um.email
+	WHERE um.id = ?
+	`
+	row := db.QueryRow(q, uid)
 	var gid GroupID
-	err = row.Scan(&gid)
+	err := row.Scan(&gid)
 	if err != nil {
 		return 0, err
 	}
