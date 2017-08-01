@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 )
 
@@ -42,8 +43,65 @@ import (
 // N.B. All document types must be defined as constant strings.
 type DocType string
 
-// NewDocType creates and registers a new document type in the system.
-func NewDocType(otx *sql.Tx, dt DocType) error {
+// Unexported type, only for convenience methods.
+type _DocTypes struct{}
+
+var _doctypes *_DocTypes
+
+func init() {
+	_doctypes = &_DocTypes{}
+}
+
+// DocTypes provides a resource-like interface to document types in
+// the system.
+func DocTypes() *_DocTypes {
+	return _doctypes
+}
+
+// List answers a subset of the document types, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (dts *_DocTypes) List(offset, limit int64) ([]DocType, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT name
+	FROM wf_doctypes_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var name string
+	dtary := make([]DocType, 0, 10)
+	for rows.Next() {
+		err = rows.Scan(&name)
+		if err != nil {
+			return nil, err
+		}
+		dtary = append(dtary, DocType(name))
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dtary, nil
+}
+
+// New creates and registers a new document type in the system.
+func (dts *_DocTypes) New(otx *sql.Tx, dt DocType) error {
 	name := strings.TrimSpace(string(dt))
 	if name == "" {
 		return errors.New("document type cannot be empty")
@@ -74,9 +132,9 @@ func NewDocType(otx *sql.Tx, dt DocType) error {
 	return nil
 }
 
-// DocTypeExists answers `true` if a document type with the given name
-// is registered; `false` otherwise.
-func DocTypeExists(dt DocType) (bool, error) {
+// Exists answers `true` if a document type with the given name is
+// registered; `false` otherwise.
+func (dts *_DocTypes) Exists(dt DocType) (bool, error) {
 	name := strings.TrimSpace(string(dt))
 	if name == "" {
 		return false, errors.New("document type cannot be empty")
