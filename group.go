@@ -32,10 +32,41 @@ type Group struct {
 	groupType string  // Is this a user-specific group? Etc.
 }
 
-// NewSingletonGroup creates a singleton group associated with the
-// given user.  The e-mail address of the user is used as the name of
-// the group.  This serves as the linking identifier.
-func NewSingletonGroup(otx *sql.Tx, uid UserID, email string) (GroupID, error) {
+// ID answers this group's identifier.
+func (g *Group) ID() GroupID {
+	return g.id
+}
+
+// Name answers this group's name.
+func (g *Group) Name() string {
+	return g.name
+}
+
+// GroupType answers the nature of this group.  For instance, if this
+// group was auto-created as the native group of a user account, or is
+// a collection of users, etc.
+func (g *Group) GroupType() string {
+	return g.groupType
+}
+
+// Unexported type, only for convenience methods.
+type _Groups struct{}
+
+var _groups *_Groups
+
+func init() {
+	_groups = &_Groups{}
+}
+
+// Groups provides a resource-like interface to groups in the system.
+func Groups() *_Groups {
+	return _groups
+}
+
+// NewSingleton creates a singleton group associated with the given
+// user.  The e-mail address of the user is used as the name of the
+// group.  This serves as the linking identifier.
+func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID, email string) (GroupID, error) {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -76,9 +107,8 @@ func NewSingletonGroup(otx *sql.Tx, uid UserID, email string) (GroupID, error) {
 	return GroupID(gid), nil
 }
 
-// NewGroup creates a new group that can be populated with users
-// later.
-func NewGroup(otx *sql.Tx, name string, gtype string) (GroupID, error) {
+// New creates a new group that can be populated with users later.
+func (gs *_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 	name = strings.TrimSpace(name)
 	gtype = strings.TrimSpace(gtype)
 	if name == "" || gtype == "" {
@@ -123,8 +153,8 @@ func NewGroup(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 	return GroupID(gid), nil
 }
 
-// GetGroup initialises the group by reading from database.
-func GetGroup(gid GroupID) (*Group, error) {
+// Get initialises the group by reading from database.
+func (gs *_Groups) Get(gid GroupID) (*Group, error) {
 	if gid <= 0 {
 		return nil, errors.New("group ID should be a positive integer")
 	}
@@ -157,9 +187,9 @@ func GetGroup(gid GroupID) (*Group, error) {
 	return g, nil
 }
 
-// DeleteGroup deletes the given group from the system, if no access
+// Delete deletes the given group from the system, if no access
 // context is actively using it.
-func DeleteGroup(otx *sql.Tx, gid GroupID) error {
+func (gs *_Groups) Delete(otx *sql.Tx, gid GroupID) error {
 	if gid <= 0 {
 		return errors.New("group ID must be a positive integer")
 	}
@@ -215,62 +245,61 @@ func DeleteGroup(otx *sql.Tx, gid GroupID) error {
 	return nil
 }
 
-// ID answers this group's identifier.
-func (g *Group) ID() GroupID {
-	return g.id
-}
-
-// Name answers this group's name.
-func (g *Group) Name() string {
-	return g.name
-}
-
-// GroupType answers the nature of this group.  For instance, if this
-// group was auto-created as the native group of a user account, or is
-// a collection of users, etc.
-func (g *Group) GroupType() string {
-	return g.groupType
-}
-
 // HasUser answers `true` if this group includes the given user;
 // `false` otherwise.
-func (g *Group) HasUser(uid UserID) (bool, error) {
-	var count int64
-	row := db.QueryRow("SELECT COUNT(*) FROM wf_group_users WHERE group_id = ? AND user_id = ? LIMIT 1", g.id, uid)
-	err := row.Scan(&count)
-	if err != nil {
-		return false, err
-	}
+func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
+	q := `
+	SELECT id FROM wf_group_users
+	WHERE group_id = ?
+	AND user_id = ?
+	ORDER BY id
+	LIMIT 1
+	`
+	var id int64
+	row := db.QueryRow(q, gid, uid)
+	err := row.Scan(&id)
+	switch {
+	case err == sql.ErrNoRows:
+		return false, errors.New("given user is not part of the specified group")
 
-	if count == 0 {
-		return false, nil
+	case err != nil:
+		return false, err
+
+	default:
+		return true, nil
 	}
-	return true, nil
 }
 
 // SingletonUser answer the user ID of the corresponding user, if this
 // group is a singleton group.
-func (g *Group) SingletonUser() (UserID, error) {
-	if g.groupType != "S" {
-		return 0, errors.New("this group is not a singleton group")
-	}
-
+func (gs *_Groups) SingletonUser(gid GroupID) (UserID, error) {
+	q := `
+	SELECT gus.user_id FROM wf_group_users gus
+	JOIN wf_groups_master gm ON gus.group_id = gm.group_id
+	WHERE gm.id = ?
+	AND gm.group_type = 'S'
+	ORDER BY gus.id
+	LIMIT 1
+	`
 	var uid UserID
-	row := db.QueryRow("SELECT user_id FROM wf_group_users WHERE group_id = ?", g.id)
+	row := db.QueryRow(q, gid)
 	err := row.Scan(&uid)
-	if err != nil {
+	switch {
+	case err == sql.ErrNoRows:
+		return 0, errors.New("given group may not be a singleton group")
+
+	case err != nil:
 		return 0, err
+
+	default:
+		return uid, nil
 	}
-	return uid, nil
 }
 
 // AddUser adds the given user as a member of this group.
-func (g *Group) AddUser(otx *sql.Tx, uid UserID) error {
-	if g.groupType == "S" {
-		return errors.New("cannot add users to a singleton group")
-	}
-	if uid <= 0 {
-		return errors.New("user ID must be a positive integer")
+func (gs *_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
+	if gid <= 0 || uid <= 0 {
+		return errors.New("group ID and user ID must be positive integers")
 	}
 
 	var tx *sql.Tx
@@ -284,7 +313,17 @@ func (g *Group) AddUser(otx *sql.Tx, uid UserID) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("INSERT INTO wf_group_users(group_id, user_id) VALUES(?, ?)", g.id, uid)
+	var gtype string
+	row := tx.QueryRow("SELECT group_type FROM wf_groups_master WHERE id = ?", gid)
+	err := row.Scan(&gtype)
+	if err != nil {
+		return err
+	}
+	if gtype == "S" {
+		return errors.New("cannot add users to singleton groups")
+	}
+
+	_, err = tx.Exec("INSERT INTO wf_group_users(group_id, user_id) VALUES(?, ?)", gid, uid)
 	if err != nil {
 		return err
 	}
@@ -300,12 +339,9 @@ func (g *Group) AddUser(otx *sql.Tx, uid UserID) error {
 
 // RemoveUser removes the given user from this group, if the user is a
 // member of the group.  This operation is idempotent.
-func (g *Group) RemoveUser(otx *sql.Tx, uid UserID) error {
-	if g.groupType == "S" {
-		return errors.New("cannot delete users from a singleton group")
-	}
-	if uid <= 0 {
-		return errors.New("user ID must be a positive integer")
+func (gs *_Groups) RemoveUser(otx *sql.Tx, gid GroupID, uid UserID) error {
+	if gid <= 0 || uid <= 0 {
+		return errors.New("group ID and user ID must be positive integers")
 	}
 
 	var tx *sql.Tx
@@ -319,7 +355,17 @@ func (g *Group) RemoveUser(otx *sql.Tx, uid UserID) error {
 		tx = otx
 	}
 
-	res, err := tx.Exec("DELETE FROM wf_group_users WHERE group_id = ? AND user_id = ?", g.id, uid)
+	var gtype string
+	row := tx.QueryRow("SELECT group_type FROM wf_groups_master WHERE id = ?", gid)
+	err := row.Scan(&gtype)
+	if err != nil {
+		return err
+	}
+	if gtype == "S" {
+		return errors.New("cannot remove users from singleton groups")
+	}
+
+	res, err := tx.Exec("DELETE FROM wf_group_users WHERE group_id = ? AND user_id = ?", gid, uid)
 	if err != nil {
 		return err
 	}

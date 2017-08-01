@@ -80,6 +80,7 @@ func (us *_Users) List(offset, limit int64) ([]User, error) {
 	q := `
 	SELECT id, fname, lname, email
 	FROM wf_users_master
+	ORDER BY id
 	LIMIT ? OFFSET ?
 	`
 	rows, err := db.Query(q, limit, offset)
@@ -170,8 +171,8 @@ func (us *_Users) SingletonGroupOf(uid UserID) (GroupID, error) {
 	JOIN wf_users_master um ON gm.name = um.email
 	WHERE um.id = ?
 	`
-	row := db.QueryRow(q, uid)
 	var gid GroupID
+	row := db.QueryRow(q, uid)
 	err := row.Scan(&gid)
 	if err != nil {
 		return 0, err
