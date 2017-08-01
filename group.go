@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -61,6 +62,49 @@ func init() {
 // Groups provides a resource-like interface to groups in the system.
 func Groups() *_Groups {
 	return _groups
+}
+
+// List answers a subset of the groups, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (gs *_Groups) List(offset, limit int64) ([]Group, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, name, group_type
+	FROM wf_groups_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var gid GroupID
+	var name, gtype string
+	gary := make([]Group, 0, 10)
+	for rows.Next() {
+		err = rows.Scan(&gid, &name, &gtype)
+		if err != nil {
+			return nil, err
+		}
+		gary = append(gary, Group{id: gid, name: name, groupType: gtype})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return gary, nil
 }
 
 // NewSingleton creates a singleton group associated with the given

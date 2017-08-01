@@ -224,8 +224,7 @@ func (ac *AccessContext) HasPermission(gid GroupID, dt DocType, da DocAction) bo
 	}
 
 	for _, el := range rs {
-		r, _ := GetRole(el)
-		if ok, _ := r.HasPermission(dt, da); ok {
+		if ok, _ := Roles().HasPermission(el, dt, da); ok {
 			return true
 		}
 	}

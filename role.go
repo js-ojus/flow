@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 )
 
@@ -31,8 +32,75 @@ type Role struct {
 	name string // name of this role
 }
 
-// NewRole creates a role with the given name.
-func NewRole(otx *sql.Tx, name string) (RoleID, error) {
+// ID answers this role's identifier.
+func (r *Role) ID() RoleID {
+	return r.id
+}
+
+// Name answers this role's name.
+func (r *Role) Name() string {
+	return r.name
+}
+
+// Unexported type, only for convenience methods.
+type _Roles struct{}
+
+var _roles *_Roles
+
+func init() {
+	_roles = &_Roles{}
+}
+
+// Roles provides a resource-like interface to roles in the system.
+func Roles() *_Roles {
+	return _roles
+}
+
+// List answers a subset of the roles, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (rs *_Roles) List(offset, limit int64) ([]Role, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, name
+	FROM wf_roles_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rid RoleID
+	var name string
+	rary := make([]Role, 0, 10)
+	for rows.Next() {
+		err = rows.Scan(&rid, &name)
+		if err != nil {
+			return nil, err
+		}
+		rary = append(rary, Role{id: rid, name: name})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return rary, nil
+}
+
+// New creates a role with the given name.
+func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("role name cannot not be empty")
@@ -68,9 +136,9 @@ func NewRole(otx *sql.Tx, name string) (RoleID, error) {
 	return RoleID(rid), nil
 }
 
-// GetRole loads the role object corresponding to the given role ID
-// from the database, and answers that.
-func GetRole(rid RoleID) (*Role, error) {
+// Get loads the role object corresponding to the given role ID from
+// the database, and answers that.
+func (rs *_Roles) Get(rid RoleID) (*Role, error) {
 	if rid <= 0 {
 		return nil, errors.New("role ID must be a positive integer")
 	}
@@ -86,19 +154,12 @@ func GetRole(rid RoleID) (*Role, error) {
 	return r, nil
 }
 
-// ID answers this role's identifier.
-func (r *Role) ID() RoleID {
-	return r.id
-}
-
-// Name answers this role's name.
-func (r *Role) Name() string {
-	return r.name
-}
-
 // AddPermission adds the given action to this role, for the given
 // document type.
-func (r *Role) AddPermission(otx *sql.Tx, dt DocType, da DocAction) error {
+func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAction) error {
+	if rid <= 0 {
+		return errors.New("role ID must be a positive integer")
+	}
 	tdt := strings.TrimSpace(string(dt))
 	tda := strings.TrimSpace(string(da))
 	if tdt == "" || tda == "" {
@@ -132,7 +193,7 @@ func (r *Role) AddPermission(otx *sql.Tx, dt DocType, da DocAction) error {
 	INSERT INTO wf_role_docactions(role_id, doctype_id, docaction_id)
 	VALUES(?, ?, ?)
 	`
-	_, err = tx.Exec(q, r.id, dtid, daid)
+	_, err = tx.Exec(q, rid, dtid, daid)
 	if err != nil {
 		return err
 	}
@@ -148,7 +209,10 @@ func (r *Role) AddPermission(otx *sql.Tx, dt DocType, da DocAction) error {
 
 // RemovePermission removes all permissions from this role, for the
 // given document type.
-func (r *Role) RemovePermission(otx *sql.Tx, dt DocType, da DocAction) error {
+func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAction) error {
+	if rid <= 0 {
+		return errors.New("role ID must be a positive integer")
+	}
 	tdt := strings.TrimSpace(string(dt))
 	tda := strings.TrimSpace(string(da))
 	if tdt == "" || tda == "" {
@@ -184,7 +248,7 @@ func (r *Role) RemovePermission(otx *sql.Tx, dt DocType, da DocAction) error {
 	AND doctype_id = ?
 	AND docaction_id = ?
 	`
-	_, err = tx.Exec(q, r.id, dtid, daid)
+	_, err = tx.Exec(q, rid, dtid, daid)
 	if err != nil {
 		return err
 	}
@@ -201,7 +265,7 @@ func (r *Role) RemovePermission(otx *sql.Tx, dt DocType, da DocAction) error {
 // Permissions answers the current set of permissions this role has.
 // It answers `nil` in case the given document type does not have any
 // permissions set in this role.
-func (r *Role) Permissions() (map[DocType][]DocAction, error) {
+func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]DocAction, error) {
 	q := `
 	SELECT dtm.name, dam.name
 	FROM wf_doctypes_master dtm, wf_docactions_master dam
@@ -209,7 +273,7 @@ func (r *Role) Permissions() (map[DocType][]DocAction, error) {
 	JOIN ON dam.id = rdas.docaction_id
 	WHERE rdas.role_id = ?
 	`
-	rows, err := db.Query(q, r.id)
+	rows, err := db.Query(q, rid)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +303,7 @@ func (r *Role) Permissions() (map[DocType][]DocAction, error) {
 
 // HasPermission answers `true` if this role has the queried
 // permission for the given document type.
-func (r *Role) HasPermission(dt DocType, da DocAction) (bool, error) {
+func (rs *_Roles) HasPermission(rid RoleID, dt DocType, da DocAction) (bool, error) {
 	q := `
 	SELECT COUNT(*) FROM wf_role_docactions rdas
 	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
@@ -248,7 +312,7 @@ func (r *Role) HasPermission(dt DocType, da DocAction) (bool, error) {
 	AND dtm.name = ?
 	AND dam.name = ?
 	`
-	row := db.QueryRow(q, r.id, dt, da)
+	row := db.QueryRow(q, rid, dt, da)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
