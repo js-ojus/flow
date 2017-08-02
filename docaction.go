@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 )
 
@@ -39,8 +40,65 @@ import (
 // N.B. All document actions must be defined as constant strings.
 type DocAction string
 
-// NewDocAction creates and registers a new document action in the system.
-func NewDocAction(otx *sql.Tx, da DocAction) error {
+// Unexported type, only for convenience methods.
+type _DocActions struct{}
+
+var _docactions *_DocActions
+
+func init() {
+	_docactions = &_DocActions{}
+}
+
+// DocActions provides a resource-like interface to document actions
+// in the system.
+func DocActions() *_DocActions {
+	return _docactions
+}
+
+// List answers a subset of the document actions, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT name
+	FROM wf_docactions_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var name string
+	daary := make([]DocAction, 0, 10)
+	for rows.Next() {
+		err = rows.Scan(&name)
+		if err != nil {
+			return nil, err
+		}
+		daary = append(daary, DocAction(name))
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return daary, nil
+}
+
+// New creates and registers a new document action in the system.
+func (das *_DocActions) New(otx *sql.Tx, da DocAction) error {
 	name := strings.TrimSpace(string(da))
 	if name == "" {
 		return errors.New("document action cannot be empty")
@@ -71,9 +129,9 @@ func NewDocAction(otx *sql.Tx, da DocAction) error {
 	return nil
 }
 
-// DocActionExists answers `true` if a document action with the given
-// name is registered; `false` otherwise.
-func DocActionExists(da DocAction) (bool, error) {
+// Exists answers `true` if a document action with the given name is
+// registered; `false` otherwise.
+func (das *_DocActions) Exists(da DocAction) (bool, error) {
 	name := strings.TrimSpace(string(da))
 	if name == "" {
 		return false, errors.New("document action cannot be empty")
