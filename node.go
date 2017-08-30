@@ -15,7 +15,6 @@
 package flow
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -35,24 +34,24 @@ import (
 //
 // N. B. NodeFunc instances must be stateless and not capture their
 // environment in any manner!
-type NodeFunc func(*Document, DocAction, ...interface{}) (*Message, error)
+type NodeFunc func(*Document, DocAction, ...interface{}) (DocState, *Message, error)
 
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	wflow  *Workflow              // containing flow of this node
-	name   string                 // unique within its workflow
-	state  DocState               // a document reaching this node must be in this state
-	ntype  NodeType               // topology type of this node
-	nfunc  NodeFunc               // processing function of this node
-	xforms map[DocAction]DocState // map of which action at this node transforms a document into which state
+	wflow  *Workflow             // containing flow of this node
+	name   string                // unique within its workflow
+	state  DocState              // a document reaching this node must be in this state
+	ntype  NodeType              // topology type of this node
+	nfunc  NodeFunc              // processing function of this node
+	xforms map[DocState]struct{} // list of possible states into which a document can transition
 }
 
 // NewNode creates and initialises a node definition in the
 // given workflow, using the given processing function.
 func NewNode(wf *Workflow, name string, state DocState, ntype NodeType, nfunc NodeFunc) *Node {
 	node := &Node{wflow: wf, name: name, state: state, ntype: ntype, nfunc: nfunc}
-	node.xforms = make(map[DocAction]DocState)
+	node.xforms = make(map[DocState]struct{})
 	return node
 }
 
@@ -78,17 +77,17 @@ func (n *Node) Func() NodeFunc {
 	return n.nfunc
 }
 
-// AddXform adds a transform at this node, for the given document
-// action to the specified target document state.
+// AddXform adds a possible transition at this node, for a document
+// arriving at this node.
 //
 // N.B. This method is not protected by a mutex since this is expected
 // to be exercised only during start-up.  Do not violate that!
-func (n *Node) AddXform(da DocAction, ds DocState) error {
-	if tds, ok := n.xforms[da]; ok {
-		return fmt.Errorf("target state '%s' already registered for the given action", tds.name)
+func (n *Node) AddXform(ds DocState) error {
+	if _, ok := n.xforms[ds]; ok {
+		return fmt.Errorf("target state '%s' already registered", ds.name)
 	}
 
-	n.xforms[da] = ds
+	n.xforms[ds] = struct{}{}
 	return nil
 }
 
@@ -98,12 +97,8 @@ func (n *Node) AddXform(da DocAction, ds DocState) error {
 // processing function is invoked on the document to prepare a message
 // that can be posted to applicable mailboxes.
 func (n *Node) applyEvent(event *DocEvent, args ...interface{}) error {
-	if _, ok := n.xforms[event.action]; !ok {
-		return errors.New("given action not registered in this node : " + string(event.action))
-	}
-
-	// msg, err := n.nfunc(event.doc, event.action, args...)
-	_, err := n.nfunc(event.doc, event.action, args...)
+	// nds, msg, err := n.nfunc(event.doc, event.action, args...)
+	_, _, err := n.nfunc(event.doc, event.action, args...)
 	if err != nil {
 		return err
 	}
