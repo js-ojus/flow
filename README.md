@@ -47,6 +47,28 @@
 
 Let us familiarise ourselves with the most important concepts and moving parts of `flow`.
 
+### Users
+
+`flow` neither creates nor manages users.  It assumes that an external identity provider is in charge of user management.  Similarly, `flow` does not deal with user authentication, nor does it manage authorisation of tasks not flowing (pun intended) though it!
+
+Accordingly, users in `flow` are represented only by their unique IDs, names and unique e-mail addresses.  The identity provider has to also provide the status of the user: active vs. inactive.
+
+### Groups
+
+`flow`, similar to most UNIXes, implicitly creates a group for each defined user.  This is a singleton group: its only member is the corresponding user.
+
+In addition, arbitrary general (non-singleton) groups can be defined by including one or more users as members.  The relationship between users and groups is M:N.
+
+### Roles
+
+Sets of document actions permitted for a given document type, can be grouped into roles.  For instance, some users should be able to raise a request, but not approve it.  Some others should be able to, in turn, approve or reject it.  Roles make it convenient to group logically related sets of permissions.
+
+### Access Contexts
+
+An access context is a namespace that defines jurisdictions of permissions granted to users and groups.  Examples of such jurisdictions include departments, branches, cost centres and projects.
+
+Within an access context, a given user (though the associated singleton group) or group can be assigned one or more roles.  The effective set of permissions available to a user - in this access context - is the union of the permissions granted through all roles assigned to this user, through all groups the user is included in.
+
 ### Document Types
 
 Each type of document, whose workflow is managed by `flow`, has a unique `DocType` that is defined by the consuming application.  Document types are one of the central concepts in `flow`.  They serve as namespaces for several other types of entities.
@@ -88,3 +110,11 @@ A `DocEvent` represents a user (or system) `DocAction` on a particular document 
 A document in a particular state in its workflow, is sent to a `Node`.  There, it awaits an action to take place that moves it along the workflow, to a different state.  Thus, nodes are receivers of document events.
 
 A `DocAction` on a document in a `DocState` may require some processing to be performed before a possible state transition.  Accordingly, applications register custom processing functions with nodes.  Such functions are invoked by the respective nodes when an action is received by them.  These `NodeFunc`s determine the next states assumed by the documents that they process.
+
+### Mailboxes and Messages
+
+Every defined user has a mailbox of virtually no size limit.  Documents that transition into specific states trigger notifications for specific users.  These notifications are delivered to the mailboxes of such users.
+
+The actual content of a notification constitutes a message.  The most essential details include the document reference, the `Node` in the workflow at which the document is, and the time at which the message was sent.
+
+Upon getting notified, users open the corresponding documents, and take appropriate actions.
