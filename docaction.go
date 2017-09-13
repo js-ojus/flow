@@ -21,6 +21,9 @@ import (
 	"strings"
 )
 
+// DocActionID is the type of unique identifiers of document actions.
+type DocActionID int64
+
 // DocAction enumerates the types of actions in the system, as defined
 // by the consuming application.  Each document action has an
 // associated workflow transition that it causes.
@@ -38,7 +41,20 @@ import (
 //     REOPEN.
 //
 // N.B. All document actions must be defined as constant strings.
-type DocAction string
+type DocAction struct {
+	id   DocActionID // Unique identifier of this action
+	name string
+}
+
+// ID answers the unique identifier of this document action.
+func (da *DocAction) ID() DocActionID {
+	return da.id
+}
+
+// Name answers the name of this document action.
+func (da *DocAction) Name() string {
+	return da.name
+}
 
 // Unexported type, only for convenience methods.
 type _DocActions struct{}
@@ -53,6 +69,44 @@ func init() {
 // in the system.
 func DocActions() *_DocActions {
 	return _docactions
+}
+
+// New creates and registers a new document action in the system.
+func (das *_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("document action cannot be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("INSERT INTO wf_docactions_master(name) VALUES(?)", name)
+	if err != nil {
+		return 0, err
+	}
+	var aid int64
+	aid, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return DocActionID(aid), nil
 }
 
 // List answers a subset of the document actions, based on the input
@@ -81,14 +135,14 @@ func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
 	}
 	defer rows.Close()
 
-	var name string
 	daary := make([]DocAction, 0, 10)
 	for rows.Next() {
-		err = rows.Scan(&name)
+		var da DocAction
+		err = rows.Scan(&da.id, &da.name)
 		if err != nil {
 			return nil, err
 		}
-		daary = append(daary, DocAction(name))
+		daary = append(daary, da)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -97,42 +151,26 @@ func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
 	return daary, nil
 }
 
-// New creates and registers a new document action in the system.
-func (das *_DocActions) New(otx *sql.Tx, da DocAction) error {
-	name := strings.TrimSpace(string(da))
-	if name == "" {
-		return errors.New("document action cannot be empty")
+// Get retrieves the document action for the given ID.
+func (das *_DocActions) Get(aid DocActionID) (*DocAction, error) {
+	if aid <= 0 {
+		return nil, errors.New("group ID should be a positive integer")
 	}
 
-	var tx *sql.Tx
-	if otx == nil {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	} else {
-		tx = otx
-	}
-
-	_, err := tx.Exec("INSERT INTO wf_docactions_master(name) VALUES(?)", name)
+	var da DocAction
+	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE id = ?", aid)
+	err := row.Scan(&da.id, &da.name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if otx == nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return &da, nil
 }
 
 // Exists answers `true` if a document action with the given name is
 // registered; `false` otherwise.
-func (das *_DocActions) Exists(da DocAction) (bool, error) {
-	name := strings.TrimSpace(string(da))
+func (das *_DocActions) Exists(name string) (bool, error) {
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return false, errors.New("document action cannot be empty")
 	}
