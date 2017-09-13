@@ -167,6 +167,39 @@ func (das *_DocActions) Get(aid DocActionID) (*DocAction, error) {
 	return &da, nil
 }
 
+// Update renames the given document action.
+func (das *_DocActions) Update(otx *sql.Tx, da *DocAction, nname string) error {
+	nname = strings.TrimSpace(nname)
+	if nname == "" {
+		return errors.New("document action cannot be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", nname, da.id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Exists answers `true` if a document action with the given name is
 // registered; `false` otherwise.
 func (das *_DocActions) Exists(name string) (bool, error) {
