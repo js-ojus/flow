@@ -28,9 +28,9 @@ type GroupID int64
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id        GroupID // Globally-unique ID
-	name      string  // Globally-unique name
-	groupType string  // Is this a user-specific group? Etc.
+	id    GroupID // Globally-unique ID
+	name  string  // Globally-unique name
+	gtype string  // Is this a user-specific group? Etc.
 }
 
 // ID answers this group's identifier.
@@ -47,7 +47,7 @@ func (g *Group) Name() string {
 // group was auto-created as the native group of a user account, or is
 // a collection of users, etc.
 func (g *Group) GroupType() string {
-	return g.groupType
+	return g.gtype
 }
 
 // Unexported type, only for convenience methods.
@@ -62,49 +62,6 @@ func init() {
 // Groups provides a resource-like interface to groups in the system.
 func Groups() *_Groups {
 	return _groups
-}
-
-// List answers a subset of the groups, based on the input
-// specification.
-//
-// Result set begins with ID >= `offset`, and has not more than
-// `limit` elements.  A value of `0` for `offset` fetches from the
-// beginning, while a value of `0` for `limit` fetches until the end.
-func (gs *_Groups) List(offset, limit int64) ([]Group, error) {
-	if offset < 0 || limit < 0 {
-		return nil, errors.New("offset and limit must be non-negative integers")
-	}
-	if limit == 0 {
-		limit = math.MaxInt64
-	}
-
-	q := `
-	SELECT id, name, group_type
-	FROM wf_groups_master
-	ORDER BY id
-	LIMIT ? OFFSET ?
-	`
-	rows, err := db.Query(q, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var gid GroupID
-	var name, gtype string
-	gary := make([]Group, 0, 10)
-	for rows.Next() {
-		err = rows.Scan(&gid, &name, &gtype)
-		if err != nil {
-			return nil, err
-		}
-		gary = append(gary, Group{id: gid, name: name, groupType: gtype})
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return gary, nil
 }
 
 // NewSingleton creates a singleton group associated with the given
@@ -181,8 +138,8 @@ func (gs *_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) 
 	if err != nil {
 		return 0, err
 	}
-	var gid int64
-	gid, err = res.LastInsertId()
+	var id int64
+	id, err = res.LastInsertId()
 	if err != nil {
 		return 0, err
 	}
@@ -194,30 +151,70 @@ func (gs *_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) 
 		}
 	}
 
-	return GroupID(gid), nil
+	return GroupID(id), nil
 }
 
-// Get initialises the group by reading from database.
-func (gs *_Groups) Get(gid GroupID) (*Group, error) {
-	if gid <= 0 {
-		return nil, errors.New("group ID should be a positive integer")
+// List answers a subset of the groups, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (gs *_Groups) List(offset, limit int64) ([]*Group, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
 	}
 
-	var tid GroupID
-	var name string
-	var gtype string
-	row := db.QueryRow("SELECT id, name, group_type FROM groups_master WHERE id = ?", gid)
-	err := row.Scan(&tid, &name, &gtype)
+	q := `
+	SELECT id, name, group_type
+	FROM wf_groups_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	if gtype == "S" {
+	defer rows.Close()
+
+	ary := make([]*Group, 0, 10)
+	for rows.Next() {
+		var g Group
+		err = rows.Scan(&g.id, &g.name, &g.gtype)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, &g)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
+}
+
+// Get initialises the group by reading from database.
+func (gs *_Groups) Get(id GroupID) (*Group, error) {
+	if id <= 0 {
+		return nil, errors.New("group ID should be a positive integer")
+	}
+
+	var elem Group
+	row := db.QueryRow("SELECT id, name, group_type FROM wf_groups_master WHERE id = ?", id)
+	err := row.Scan(&elem.id, &elem.name, &elem.gtype)
+	if err != nil {
+		return nil, err
+	}
+	if elem.gtype == "S" {
 		q := `
 		SELECT status FROM wf_users_master_v
 		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
 		`
 		var active bool
-		row = db.QueryRow(q, gid)
+		row = db.QueryRow(q, id)
 		err = row.Scan(&active)
 		if err != nil {
 			return nil, err
@@ -227,18 +224,17 @@ func (gs *_Groups) Get(gid GroupID) (*Group, error) {
 		}
 	}
 
-	g := &Group{id: gid, name: name, groupType: gtype}
-	return g, nil
+	return &elem, nil
 }
 
 // Delete deletes the given group from the system, if no access
 // context is actively using it.
-func (gs *_Groups) Delete(otx *sql.Tx, gid GroupID) error {
-	if gid <= 0 {
+func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
+	if id <= 0 {
 		return errors.New("group ID must be a positive integer")
 	}
 
-	row := db.QueryRow("SELECT group_type FROM wf_groups_master WHERE group_id = ?", gid)
+	row := db.QueryRow("SELECT group_type FROM wf_groups_master WHERE group_id = ?", id)
 	var gtype string
 	err := row.Scan(&gtype)
 	if err != nil {
@@ -248,7 +244,7 @@ func (gs *_Groups) Delete(otx *sql.Tx, gid GroupID) error {
 		return errors.New("singleton groups cannot be deleted")
 	}
 
-	row = db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE group_id = ?", gid)
+	row = db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE group_id = ?", id)
 	var n int64
 	err = row.Scan(&n)
 	if n > 0 {
@@ -266,11 +262,11 @@ func (gs *_Groups) Delete(otx *sql.Tx, gid GroupID) error {
 		tx = otx
 	}
 
-	_, err = tx.Exec("DELETE FROM wf_group_users WHERE group_id = ?", gid)
+	_, err = tx.Exec("DELETE FROM wf_group_users WHERE group_id = ?", id)
 	if err != nil {
 		return err
 	}
-	res, err := tx.Exec("DELETE FROM wf_groups_master WHERE id = ?", gid)
+	res, err := tx.Exec("DELETE FROM wf_groups_master WHERE id = ?", id)
 	if err != nil {
 		return err
 	}

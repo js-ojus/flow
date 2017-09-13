@@ -169,8 +169,8 @@ func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
 	return &elem, nil
 }
 
-// Update renames the given document type.
-func (dts *_DocTypes) Update(otx *sql.Tx, elem *DocType, name string) error {
+// Rename renames the given document type.
+func (dts *_DocTypes) Rename(otx *sql.Tx, elem *DocType, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")

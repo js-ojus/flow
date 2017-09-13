@@ -167,8 +167,8 @@ func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
 	return &elem, nil
 }
 
-// Update renames the given document action.
-func (das *_DocActions) Update(otx *sql.Tx, elem *DocAction, name string) error {
+// Rename renames the given document action.
+func (das *_DocActions) Rename(otx *sql.Tx, elem *DocAction, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")

@@ -169,8 +169,8 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 	return &elem, nil
 }
 
-// Update renames the given document state.
-func (dss *_DocStates) Update(otx *sql.Tx, elem *DocState, name string) error {
+// Rename renames the given document state.
+func (dss *_DocStates) Rename(otx *sql.Tx, elem *DocState, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")

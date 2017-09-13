@@ -69,7 +69,7 @@ func Users() *_Users {
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (us *_Users) List(offset, limit int64) ([]User, error) {
+func (us *_Users) List(offset, limit int64) ([]*User, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -89,21 +89,22 @@ func (us *_Users) List(offset, limit int64) ([]User, error) {
 	}
 	defer rows.Close()
 
-	var uid UserID
-	var fname, lname, email string
-	uary := make([]User, 0, 10)
+	var fname, lname string
+	ary := make([]*User, 0, 10)
 	for rows.Next() {
-		err = rows.Scan(&uid, &fname, &lname, &email)
+		var elem User
+		err = rows.Scan(&elem.id, &fname, &lname, &elem.email)
 		if err != nil {
 			return nil, err
 		}
-		uary = append(uary, User{id: uid, name: fname + " " + lname, email: email})
+		elem.name = fname + " " + lname
+		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return uary, nil
+	return ary, nil
 }
 
 // Get instantiates a user instance by reading the database.
@@ -112,17 +113,16 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 		return nil, errors.New("user ID should be a positive integer")
 	}
 
-	var tid int64
-	var fname string
-	var lname string
-	var email string
+	var elem User
+	var fname, lname string
 	row := db.QueryRow("SELECT id, first_name, last_name, email FROM wf_users_master_v WHERE id = ?", uid)
-	err := row.Scan(&tid, &fname, &lname, &email)
+	err := row.Scan(&elem.id, &fname, &lname, &elem.email)
 	if err != nil {
 		return nil, err
 	}
-	u := &User{id: uid, name: fname + " " + lname, email: email}
-	return u, nil
+
+	elem.name = fname + " " + lname
+	return &elem, nil
 }
 
 // IsActive answers `true` if the given user's account is enabled.

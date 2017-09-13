@@ -56,13 +56,50 @@ func Roles() *_Roles {
 	return _roles
 }
 
+// New creates a role with the given name.
+func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("name cannot not be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("INSERT INTO wf_roles_master(name) VALUES(?)", name)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return RoleID(id), nil
+}
+
 // List answers a subset of the roles, based on the input
 // specification.
 //
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (rs *_Roles) List(offset, limit int64) ([]Role, error) {
+func (rs *_Roles) List(offset, limit int64) ([]*Role, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -82,100 +119,80 @@ func (rs *_Roles) List(offset, limit int64) ([]Role, error) {
 	}
 	defer rows.Close()
 
-	var rid RoleID
-	var name string
-	rary := make([]Role, 0, 10)
+	ary := make([]*Role, 0, 10)
 	for rows.Next() {
-		err = rows.Scan(&rid, &name)
+		var elem Role
+		err = rows.Scan(&elem.id, &elem.name)
 		if err != nil {
 			return nil, err
 		}
-		rary = append(rary, Role{id: rid, name: name})
+		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return rary, nil
+	return ary, nil
 }
 
-// New creates a role with the given name.
-func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
+// Get loads the role object corresponding to the given role ID from
+// the database, and answers that.
+func (rs *_Roles) Get(id RoleID) (*Role, error) {
+	if id <= 0 {
+		return nil, errors.New("ID must be a positive integer")
+	}
+
+	var elem Role
+	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE id = ?", id)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
+// Rename renames the given role.
+func (rs *_Roles) Rename(otx *sql.Tx, elem *Role, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return 0, errors.New("role name cannot not be empty")
+		return errors.New("name cannot be empty")
 	}
 
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
 		if err != nil {
-			return 0, err
+			return err
 		}
 		defer tx.Rollback()
 	} else {
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_roles_master(name) VALUES(?)", name)
+	res, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
-		return 0, err
-	}
-	rid, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
+		return err
 	}
 
 	if otx == nil {
 		err = tx.Commit()
 		if err != nil {
-			return 0, err
+			return err
 		}
 	}
 
-	return RoleID(rid), nil
-}
-
-// Get loads the role object corresponding to the given role ID from
-// the database, and answers that.
-func (rs *_Roles) Get(rid RoleID) (*Role, error) {
-	if rid <= 0 {
-		return nil, errors.New("role ID must be a positive integer")
-	}
-
-	row := db.QueryRow("SELECT name FROM wf_roles_master WHERE id = ?", rid)
-	var name string
-	err := row.Scan(&name)
-	if err != nil {
-		return nil, err
-	}
-
-	r := &Role{id: rid, name: name}
-	return r, nil
+	return nil
 }
 
 // AddPermission adds the given action to this role, for the given
 // document type.
-func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAction) error {
+func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
 	if rid <= 0 {
 		return errors.New("role ID must be a positive integer")
 	}
-	tdt := strings.TrimSpace(string(dt))
-	tda := strings.TrimSpace(string(da))
-	if tdt == "" || tda == "" {
-		return errors.New("document type and document action cannot be empty")
-	}
-
-	var dtid, daid int64
-	row := db.QueryRow("SELECT id FROM wf_doctypes_master WHERE name = ?", tdt)
-	err := row.Scan(&dtid)
-	if err != nil {
-		return err
-	}
-	row = db.QueryRow("SELECT id FROM wf_docactions_master WHERE name = ?", tda)
-	err = row.Scan(&daid)
-	if err != nil {
-		return err
+	if dt == nil || da == nil {
+		return errors.New("document type and document action should not be `nil`")
 	}
 
 	var tx *sql.Tx
@@ -193,7 +210,7 @@ func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt DocType, da DocActio
 	INSERT INTO wf_role_docactions(role_id, doctype_id, docaction_id)
 	VALUES(?, ?, ?)
 	`
-	_, err = tx.Exec(q, rid, dtid, daid)
+	_, err := tx.Exec(q, rid, dt.id, da.id)
 	if err != nil {
 		return err
 	}
@@ -209,26 +226,12 @@ func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt DocType, da DocActio
 
 // RemovePermission removes all permissions from this role, for the
 // given document type.
-func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAction) error {
+func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
 	if rid <= 0 {
 		return errors.New("role ID must be a positive integer")
 	}
-	tdt := strings.TrimSpace(string(dt))
-	tda := strings.TrimSpace(string(da))
-	if tdt == "" || tda == "" {
-		return errors.New("document type and document action cannot be empty")
-	}
-
-	var dtid, daid int64
-	row := db.QueryRow("SELECT id FROM wf_doctypes_master WHERE name = ?", tdt)
-	err := row.Scan(&dtid)
-	if err != nil {
-		return err
-	}
-	row = db.QueryRow("SELECT id FROM wf_docactions_master WHERE name = ?", tda)
-	err = row.Scan(&daid)
-	if err != nil {
-		return err
+	if dt == nil || da == nil {
+		return errors.New("document type and document action should not be `nil`")
 	}
 
 	var tx *sql.Tx
@@ -248,7 +251,7 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAc
 	AND doctype_id = ?
 	AND docaction_id = ?
 	`
-	_, err = tx.Exec(q, rid, dtid, daid)
+	_, err := tx.Exec(q, rid, dt.id, da.id)
 	if err != nil {
 		return err
 	}
@@ -265,9 +268,9 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt DocType, da DocAc
 // Permissions answers the current set of permissions this role has.
 // It answers `nil` in case the given document type does not have any
 // permissions set in this role.
-func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]DocAction, error) {
+func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 	q := `
-	SELECT dtm.name, dam.name
+	SELECT dtm.id, dtm.name, dam.id, dam.name
 	FROM wf_doctypes_master dtm, wf_docactions_master dam
 	JOIN wf_role_docactions rdas ON dtm.id = rdas.doctype_id
 	JOIN ON dam.id = rdas.docaction_id
@@ -279,20 +282,20 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]DocAction, error) {
 	}
 	defer rows.Close()
 
-	das := make(map[DocType][]DocAction)
-	var dt DocType
-	var da DocAction
+	das := make(map[DocType][]*DocAction)
 	for rows.Next() {
-		err = rows.Scan(&dt, &da)
+		var dt DocType
+		var da DocAction
+		err = rows.Scan(&dt.id, &dt.name, &da.id, &da.name)
 		if err != nil {
 			return nil, err
 		}
-		sl, ok := das[dt]
+		ary, ok := das[dt]
 		if !ok {
-			sl = make([]DocAction, 0, 1)
+			ary = make([]*DocAction, 0, 1)
 		}
-		sl = append(sl, da)
-		das[dt] = sl
+		ary = append(ary, &da)
+		das[dt] = ary
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -303,23 +306,22 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]DocAction, error) {
 
 // HasPermission answers `true` if this role has the queried
 // permission for the given document type.
-func (rs *_Roles) HasPermission(rid RoleID, dt DocType, da DocAction) (bool, error) {
+func (rs *_Roles) HasPermission(rid RoleID, dt *DocType, da *DocAction) (bool, error) {
 	q := `
-	SELECT COUNT(*) FROM wf_role_docactions rdas
+	SELECT rdas.id FROM wf_role_docactions rdas
 	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
 	JOIN wf_docactions_master dam ON rdas.docaction_id = dam.id
 	WHERE rdas.role_id = ?
 	AND dtm.name = ?
 	AND dam.name = ?
+	ORDER BY rdas.id
+	LIMIT 1
 	`
-	row := db.QueryRow(q, rid, dt, da)
+	row := db.QueryRow(q, rid, dt.id, da.id)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
 		return false, err
-	}
-	if n == 0 {
-		return false, nil
 	}
 
 	return true, nil
