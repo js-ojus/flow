@@ -115,7 +115,7 @@ func (das *_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
+func (das *_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -124,7 +124,7 @@ func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
 	}
 
 	q := `
-	SELECT name
+	SELECT *
 	FROM wf_docactions_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -135,43 +135,43 @@ func (das *_DocActions) List(offset, limit int64) ([]DocAction, error) {
 	}
 	defer rows.Close()
 
-	daary := make([]DocAction, 0, 10)
+	ary := make([]*DocAction, 0, 10)
 	for rows.Next() {
-		var da DocAction
-		err = rows.Scan(&da.id, &da.name)
+		var elem DocAction
+		err = rows.Scan(&elem.id, &elem.name)
 		if err != nil {
 			return nil, err
 		}
-		daary = append(daary, da)
+		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return daary, nil
+	return ary, nil
 }
 
 // Get retrieves the document action for the given ID.
-func (das *_DocActions) Get(aid DocActionID) (*DocAction, error) {
-	if aid <= 0 {
-		return nil, errors.New("group ID should be a positive integer")
+func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
+	if id <= 0 {
+		return nil, errors.New("ID should be a positive integer")
 	}
 
-	var da DocAction
-	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE id = ?", aid)
-	err := row.Scan(&da.id, &da.name)
+	var elem DocAction
+	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE id = ?", id)
+	err := row.Scan(&elem.id, &elem.name)
 	if err != nil {
 		return nil, err
 	}
 
-	return &da, nil
+	return &elem, nil
 }
 
 // Update renames the given document action.
-func (das *_DocActions) Update(otx *sql.Tx, da *DocAction, nname string) error {
-	nname = strings.TrimSpace(nname)
-	if nname == "" {
-		return errors.New("document action cannot be empty")
+func (das *_DocActions) Update(otx *sql.Tx, elem *DocAction, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("name cannot be empty")
 	}
 
 	var tx *sql.Tx
@@ -185,7 +185,7 @@ func (das *_DocActions) Update(otx *sql.Tx, da *DocAction, nname string) error {
 		tx = otx
 	}
 
-	res, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", nname, da.id)
+	res, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
 		return err
 	}
@@ -200,23 +200,20 @@ func (das *_DocActions) Update(otx *sql.Tx, da *DocAction, nname string) error {
 	return nil
 }
 
-// Exists answers `true` if a document action with the given name is
-// registered; `false` otherwise.
-func (das *_DocActions) Exists(name string) (bool, error) {
+// Exists answers its unique ID, if a document action with the given
+// name is registered; `0` and the error, otherwise.
+func (das *_DocActions) Exists(name string) (DocActionID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return false, errors.New("document action cannot be empty")
+		return 0, errors.New("document action cannot be empty")
 	}
 
-	row := db.QueryRow("SELECT COUNT(*) from wf_docactions_master WHERE name = ?", name)
+	row := db.QueryRow("SELECT id FROM wf_docactions_master WHERE name = ?", name)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
-	if n == 0 {
-		return false, nil
-	}
-	return true, nil
+	return DocActionID(n), nil
 }

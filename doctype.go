@@ -21,6 +21,9 @@ import (
 	"strings"
 )
 
+// DocTypeID is the type of unique identifiers of document types.
+type DocTypeID int64
+
 // DocType enumerates the types of documents in the system, as defined
 // by the consuming application.  Each document type has an associated
 // workflow definition that drives its life cycle.
@@ -41,7 +44,20 @@ import (
 // could mean that the document type is 'Purchase Order'.
 //
 // N.B. All document types must be defined as constant strings.
-type DocType string
+type DocType struct {
+	id   DocTypeID // Unique identifier of this document type
+	name string    // Unique name of this document type
+}
+
+// ID answers the unique identifier of this document type.
+func (s *DocType) ID() DocTypeID {
+	return s.id
+}
+
+// Name answers this type's name.
+func (s *DocType) Name() string {
+	return s.name
+}
 
 // Unexported type, only for convenience methods.
 type _DocTypes struct{}
@@ -58,13 +74,50 @@ func DocTypes() *_DocTypes {
 	return _doctypes
 }
 
+// New creates and registers a new document type in the system.
+func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("name cannot be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("INSERT INTO wf_doctypes_master(name) VALUES(?)", name)
+	if err != nil {
+		return 0, err
+	}
+	var id int64
+	id, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+	return DocTypeID(id), nil
+}
+
 // List answers a subset of the document types, based on the input
 // specification.
 //
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (dts *_DocTypes) List(offset, limit int64) ([]DocType, error) {
+func (dts *_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -84,27 +137,43 @@ func (dts *_DocTypes) List(offset, limit int64) ([]DocType, error) {
 	}
 	defer rows.Close()
 
-	var name string
-	dtary := make([]DocType, 0, 10)
+	ary := make([]*DocType, 0, 10)
 	for rows.Next() {
-		err = rows.Scan(&name)
+		var elem DocType
+		err = rows.Scan(&elem.id, &elem.name)
 		if err != nil {
 			return nil, err
 		}
-		dtary = append(dtary, DocType(name))
+		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return dtary, nil
+	return ary, nil
 }
 
-// New creates and registers a new document type in the system.
-func (dts *_DocTypes) New(otx *sql.Tx, dt DocType) error {
-	name := strings.TrimSpace(string(dt))
+// Get retrieves the document type for the given ID.
+func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
+	if id <= 0 {
+		return nil, errors.New("ID should be a positive integer")
+	}
+
+	var elem DocType
+	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE id = ?", id)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
+// Update renames the given document type.
+func (dts *_DocTypes) Update(otx *sql.Tx, elem *DocType, name string) error {
+	name = strings.TrimSpace(name)
 	if name == "" {
-		return errors.New("document type cannot be empty")
+		return errors.New("name cannot be empty")
 	}
 
 	var tx *sql.Tx
@@ -118,7 +187,7 @@ func (dts *_DocTypes) New(otx *sql.Tx, dt DocType) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("INSERT INTO wf_doctypes_master(name) VALUES(?)", name)
+	res, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
 		return err
 	}
@@ -129,26 +198,24 @@ func (dts *_DocTypes) New(otx *sql.Tx, dt DocType) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
-// Exists answers `true` if a document type with the given name is
-// registered; `false` otherwise.
-func (dts *_DocTypes) Exists(dt DocType) (bool, error) {
-	name := strings.TrimSpace(string(dt))
+// Exists answers its unique ID, if a document type with the given
+// name is registered; `0` and the error, otherwise.
+func (dts *_DocTypes) Exists(name string) (DocTypeID, error) {
+	name = strings.TrimSpace(name)
 	if name == "" {
-		return false, errors.New("document type cannot be empty")
+		return 0, errors.New("document type cannot be empty")
 	}
 
-	row := db.QueryRow("SELECT COUNT(*) from wf_doctypes_master WHERE name = ?", name)
+	row := db.QueryRow("SELECT id FROM wf_doctypes_master WHERE name = ?", name)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
-	if n == 0 {
-		return false, nil
-	}
-	return true, nil
+	return DocTypeID(n), nil
 }
