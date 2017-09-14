@@ -1,5 +1,6 @@
 CREATE TABLE wf_doctypes_master (
-id INT PRIMARY KEY,
+id INT NOT NULL AUTO_INCREMENT,
 name TEXT NOT NULL,
+PRIMARY KEY (id),
 UNIQUE (name)
 );
