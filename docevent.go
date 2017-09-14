@@ -91,10 +91,6 @@ func (e *DocEvent) Time() time.Time {
 
 // Status answers the status of this event.
 func (e *DocEvent) Status() (EventStatus, error) {
-	if e.status > 0 {
-		return e.status, nil
-	}
-
 	var dstatus string
 	row := db.QueryRow("SELECT status FROM wf_docevents WHERE id = ?", e.id)
 	err := row.Scan(&dstatus)
