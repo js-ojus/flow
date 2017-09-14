@@ -15,9 +15,25 @@
 package flow
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
-	"strings"
+	"math"
+	"time"
 )
+
+// EventStatus enumerates the query parameter values for filtering by
+// event state.
+type EventStatus uint8
+
+const (
+	EventStatusAll EventStatus = iota
+	EventStatusApplied
+	EventStatusPending
+)
+
+// DocEventID is the type of unique document event identifiers.
+type DocEventID int64
 
 // DocEvent represents a user action performed on a document in the
 // system.
@@ -27,31 +43,34 @@ import (
 // from one state to another, usually in response to user actions.  It
 // is possible for system events to cause state transitions, as well.
 type DocEvent struct {
-	doc    *Document // document to which this event is to be applied
-	user   uint64    // user who caused this action
-	action DocAction // action performed by the user
-	text   string    // comment or other content
+	id     DocEventID  // Unique ID of this event
+	docID  DocumentID  // Document to which this event is to be applied
+	state  DocState    // Current state of the document
+	user   UserID      // User who caused this action
+	action DocAction   // Action performed by the user
+	text   string      // Comment or other content
+	ctime  time.Time   // Time at which the event occurred
+	status EventStatus // Status of this event
 }
 
-// NewDocEvent creates and initialises an event that transforms the
-// document that it refers to.
-func NewDocEvent(doc *Document, user uint64, action DocAction, text string) (*DocEvent, error) {
-	taction := strings.TrimSpace(string(action))
-	if doc == nil || user == 0 || taction == "" {
-		return nil, fmt.Errorf("nil initialisation data")
-	}
-
-	e := &DocEvent{doc: doc, user: user, action: DocAction(taction), text: text}
-	return e, nil
+// ID answers the unique identifier of this document event.
+func (e *DocEvent) ID() DocEventID {
+	return e.id
 }
 
 // Document answers the document which this event transformed.
-func (e *DocEvent) Document() *Document {
-	return e.doc
+func (e *DocEvent) Document() DocumentID {
+	return e.docID
+}
+
+// State answers the state of the document as of the time this event
+// occurred.
+func (e *DocEvent) State() DocState {
+	return e.state
 }
 
 // User answers the user who caused this event to occur.
-func (e *DocEvent) User() uint64 {
+func (e *DocEvent) User() UserID {
 	return e.user
 }
 
@@ -63,4 +82,196 @@ func (e *DocEvent) Action() DocAction {
 // Text answers the comment or other content enclosed in this event.
 func (e *DocEvent) Text() string {
 	return e.text
+}
+
+// Time answers the time at which this event occurred.
+func (e *DocEvent) Time() time.Time {
+	return e.ctime
+}
+
+// Status answers the status of this event.
+func (e *DocEvent) Status() (EventStatus, error) {
+	if e.status > 0 {
+		return e.status, nil
+	}
+
+	var dstatus string
+	row := db.QueryRow("SELECT status FROM wf_docevents WHERE id = ?", e.id)
+	err := row.Scan(&dstatus)
+	if err != nil {
+		return 0, err
+	}
+	switch dstatus {
+	case "A":
+		e.status = EventStatusApplied
+
+	case "P":
+		e.status = EventStatusPending
+
+	default:
+		return 0, fmt.Errorf("unknown event status : %s", dstatus)
+	}
+
+	return e.status, nil
+}
+
+// Unexported type, only for convenience methods.
+type _DocEvents struct{}
+
+var _docevents *_DocEvents
+
+func init() {
+	_docevents = &_DocEvents{}
+}
+
+// New creates and initialises an event that transforms the document
+// that it refers to.
+func (des *_DocEvents) New(otx *sql.Tx, doc *Document, user UserID, action DocAction, text string) (DocEventID, error) {
+	if doc == nil || user <= 0 {
+		return 0, errors.New("document should be non-nil; user ID should be a positive integer")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_docevents(doc_id, docstate_id, user_id, docaction_id, data, ctime, status)
+	VALUES(?, ?, ?, ?, ?, NOW(), 'P')
+	`
+	res, err := tx.Exec(q, doc.id, doc.state.id, user, action.id, text)
+	if err != nil {
+		return 0, err
+	}
+	var id int64
+	id, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return DocEventID(id), nil
+}
+
+// List answers a subset of document events, based on the input
+// specification.
+//
+// `status` should be one of `all`, `applied` and `pending`.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (des *_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT *
+	FROM wf_docevents
+	`
+	switch status {
+	case EventStatusAll:
+		// Intentionally left blank
+
+	case EventStatusApplied:
+		q = q + `
+		WHERE status = 'A'
+		`
+
+	case EventStatusPending:
+		q = q + `
+		WHERE status = 'P'
+		`
+
+	default:
+		return nil, fmt.Errorf("unknown event status specified in filter : %d", status)
+	}
+	q = q + `
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var text sql.NullString
+	var dstatus string
+	ary := make([]*DocEvent, 0, 10)
+	for rows.Next() {
+		var elem DocEvent
+		err = rows.Scan(&elem.id, &elem.docID, &elem.state, &elem.user, &elem.action, &text, &elem.ctime, &dstatus)
+		if err != nil {
+			return nil, err
+		}
+		if text.Valid {
+			elem.text = text.String
+		}
+		switch dstatus {
+		case "A":
+			elem.status = EventStatusApplied
+
+		case "P":
+			elem.status = EventStatusPending
+
+		default:
+			return nil, fmt.Errorf("unknown event status : %s", dstatus)
+		}
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
+}
+
+// Get retrieves a document event from the database, using the given
+// event ID.
+func (des *_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
+	if eid <= 0 {
+		return nil, errors.New("event ID should be a positive integer")
+	}
+
+	var text sql.NullString
+	var dstatus string
+	var elem DocEvent
+	row := db.QueryRow("SELECT * FROM wf_docevents WHERE id = ?", eid)
+	err := row.Scan(&elem.id, &elem.docID, &elem.state, &elem.user, &elem.action, &text, &elem.ctime, &dstatus)
+	if err != nil {
+		return nil, err
+	}
+	if text.Valid {
+		elem.text = text.String
+	}
+	switch dstatus {
+	case "A":
+		elem.status = EventStatusApplied
+
+	case "P":
+		elem.status = EventStatusPending
+
+	default:
+		return nil, fmt.Errorf("unknown event status : %s", dstatus)
+	}
+
+	return &elem, nil
 }
