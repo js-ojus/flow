@@ -1,4 +1,4 @@
-// (c) Copyright 2015 JONNALAGADDA Srinivas
+// (c) Copyright 2015-2017 JONNALAGADDA Srinivas
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,8 +97,13 @@ func (n *Node) AddXform(ds DocState) error {
 // processing function is invoked on the document to prepare a message
 // that can be posted to applicable mailboxes.
 func (n *Node) applyEvent(event *DocEvent, args ...interface{}) error {
+	doc, err := _documents.Get(event.dtype, event.docID)
+	if err != nil {
+		return err
+	}
+
 	// nds, msg, err := n.nfunc(event.doc, event.action, args...)
-	_, _, err := n.nfunc(event.doc, event.action, args...)
+	_, _, err = n.nfunc(doc, event.action, args...)
 	if err != nil {
 		return err
 	}

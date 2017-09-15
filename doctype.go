@@ -212,7 +212,7 @@ func (dts *_DocTypes) Rename(otx *sql.Tx, elem *DocType, name string) error {
 		tx = otx
 	}
 
-	res, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
 		return err
 	}

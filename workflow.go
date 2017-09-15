@@ -1,4 +1,4 @@
-// (c) Copyright 2015 JONNALAGADDA Srinivas
+// (c) Copyright 2015-2017 JONNALAGADDA Srinivas
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package flow
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -41,16 +42,18 @@ type Workflow struct {
 }
 
 // NewWorkflow creates and initialises a workflow definition.
-func NewWorkflow(name string, dtype DocType, bstate DocState) (*Workflow, error) {
+func NewWorkflow(name string, dt *DocType, ds *DocState) (*Workflow, error) {
 	name = strings.TrimSpace(name)
-	tdtype := strings.TrimSpace(string(dtype))
-	if name == "" || tdtype == "" {
-		return nil, errors.New("workflow name and document type cannot be empty")
+	if name == "" {
+		return nil, errors.New("workflow name should not be empty")
+	}
+	if dt == nil || ds == nil {
+		return nil, errors.New("document type and origin document state should not be `nil`")
 	}
 
-	w := &Workflow{name: name, dtype: DocType(tdtype)}
+	w := &Workflow{name: name, dtype: *dt}
 	w.nodes = make(map[DocState]*Node, 2)
-	w.begin = bstate
+	w.begin = *ds
 	return w, nil
 }
 
@@ -98,9 +101,16 @@ func (w *Workflow) AddNode(state DocState, node *Node) error {
 // Internally, the workflow delegates this method to the appropriate
 // node, if one such is registered.
 func (w *Workflow) ApplyEvent(event *DocEvent, args ...interface{}) error {
-	node, ok := w.nodes[event.doc.state]
+	doc, err := _documents.Get(event.dtype, event.docID)
+	if err != nil {
+		return err
+	}
+	if doc.state != event.state {
+		return fmt.Errorf("document state is : %s, but event is targeting state : %s", doc.state.name, event.state.name)
+	}
+	node, ok := w.nodes[event.state]
 	if !ok {
-		return errors.New("no node is registered for the document state : " + event.doc.state.name)
+		return errors.New("no node is registered for the document state : " + event.state.name)
 	}
 
 	return node.applyEvent(event, args...)

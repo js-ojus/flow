@@ -185,7 +185,7 @@ func (das *_DocActions) Rename(otx *sql.Tx, elem *DocAction, name string) error 
 		tx = otx
 	}
 
-	res, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
 		return err
 	}

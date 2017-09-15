@@ -44,10 +44,11 @@ type DocEventID int64
 // is possible for system events to cause state transitions, as well.
 type DocEvent struct {
 	id     DocEventID  // Unique ID of this event
+	dtype  DocTypeID   // Document type of the document to which this event is to be applied
 	docID  DocumentID  // Document to which this event is to be applied
 	state  DocState    // Current state of the document
-	user   UserID      // User who caused this action
 	action DocAction   // Action performed by the user
+	user   UserID      // User who caused this action
 	text   string      // Comment or other content
 	ctime  time.Time   // Time at which the event occurred
 	status EventStatus // Status of this event
@@ -58,7 +59,13 @@ func (e *DocEvent) ID() DocEventID {
 	return e.id
 }
 
-// Document answers the document which this event transformed.
+// DocumentType answers the document type of the document to which
+// this event is to be applied.
+func (e *DocEvent) DocumentType() DocTypeID {
+	return e.dtype
+}
+
+// Document answers the document to which this event is to be applied.
 func (e *DocEvent) Document() DocumentID {
 	return e.docID
 }
@@ -69,14 +76,14 @@ func (e *DocEvent) State() DocState {
 	return e.state
 }
 
-// User answers the user who caused this event to occur.
-func (e *DocEvent) User() UserID {
-	return e.user
-}
-
 // Action answers the document action that this event represents.
 func (e *DocEvent) Action() DocAction {
 	return e.action
+}
+
+// User answers the user who caused this event to occur.
+func (e *DocEvent) User() UserID {
+	return e.user
 }
 
 // Text answers the comment or other content enclosed in this event.
@@ -215,7 +222,7 @@ func (des *_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEven
 	ary := make([]*DocEvent, 0, 10)
 	for rows.Next() {
 		var elem DocEvent
-		err = rows.Scan(&elem.id, &elem.docID, &elem.state, &elem.user, &elem.action, &text, &elem.ctime, &dstatus)
+		err = rows.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.state, &elem.action, &elem.user, &text, &elem.ctime, &dstatus)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +259,7 @@ func (des *_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
 	var dstatus string
 	var elem DocEvent
 	row := db.QueryRow("SELECT * FROM wf_docevents WHERE id = ?", eid)
-	err := row.Scan(&elem.id, &elem.docID, &elem.state, &elem.user, &elem.action, &text, &elem.ctime, &dstatus)
+	err := row.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.state, &elem.action, &elem.user, &text, &elem.ctime, &dstatus)
 	if err != nil {
 		return nil, err
 	}

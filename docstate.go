@@ -187,7 +187,7 @@ func (dss *_DocStates) Rename(otx *sql.Tx, elem *DocState, name string) error {
 		tx = otx
 	}
 
-	res, err := tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, elem.id)
 	if err != nil {
 		return err
 	}
