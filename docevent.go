@@ -122,9 +122,10 @@ func init() {
 
 // New creates and initialises an event that transforms the document
 // that it refers to.
-func (des *_DocEvents) New(otx *sql.Tx, user UserID, doc *Document, action DocAction, text string) (DocEventID, error) {
-	if doc == nil || user <= 0 {
-		return 0, errors.New("document should be non-nil; user ID should be a positive integer")
+func (des *_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did DocumentID,
+	state DocStateID, action DocActionID, text string) (DocEventID, error) {
+	if user <= 0 {
+		return 0, errors.New("user ID should be a positive integer")
 	}
 
 	var tx *sql.Tx
@@ -139,10 +140,10 @@ func (des *_DocEvents) New(otx *sql.Tx, user UserID, doc *Document, action DocAc
 	}
 
 	q := `
-	INSERT INTO wf_docevents(doc_id, docstate_id, user_id, docaction_id, data, ctime, status)
+	INSERT INTO wf_docevents(doctype_id, doc_id, docstate_id, docaction_id, user_id, data, ctime, status)
 	VALUES(?, ?, ?, ?, ?, NOW(), 'P')
 	`
-	res, err := tx.Exec(q, doc.id, doc.state, user, action.id, text)
+	res, err := tx.Exec(q, dtype, did, state, action, text)
 	if err != nil {
 		return 0, err
 	}
