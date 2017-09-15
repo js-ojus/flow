@@ -29,11 +29,12 @@ CREATE TABLE wf_document_blobs (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,
+    sha1sum CHAR(40) NOT NULL,
     name TEXT NOT NULL,
     path TEXT NOT NULL,
-    sha1sum CHAR(40) NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id)
+    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
+    UNIQUE (doctype_id, doc_id, sha1sum)
 );
 
 --
@@ -44,5 +45,6 @@ CREATE TABLE wf_document_tags (
     doc_id INT NOT NULL,
     tag VARCHAR(50) NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id)
+    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
+    UNIQUE (doctype_id, doc_id, tag)
 );

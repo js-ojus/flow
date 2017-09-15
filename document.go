@@ -381,6 +381,10 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 	if err != nil {
 		return err
 	}
+	// Clean-up in case of any error.  However, this mechanism is not
+	// adequate if this method runs in the scope of an outer
+	// transaction.  The moved file will be orphaned, should the outer
+	// transaction abort later.
 	defer func() {
 		if !success {
 			os.Remove(bpath)
@@ -402,7 +406,7 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 
 	q = `
 	INSERT INTO wf_document_blobs(doctype_id, doc_id, name, path, sha1sum)
-	VALUES
+	VALUES(?, ?, ?, ?, ?)
 	`
 	_, err = tx.Exec(q, dtype, id, blob.Name, bpath, csum)
 	if err != nil {
@@ -420,86 +424,197 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 	return nil
 }
 
-// RemoveBlob remove the specified path from the list of this
-// document's blobs.
-func (d *Document) RemoveBlob(path string, author UserID) error {
-	if author != d.author {
-		return errors.New("author of modification not the same as the original author of this document")
+// AddTag associates the given tag with this document.
+//
+// Tags are converted to lower case (as per normal Unicode casing)
+// before getting associated with documents.  Also, embedded spaces,
+// if any, are retained.
+func (ds *_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return errors.New("tag should not be empty")
 	}
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return errors.New("blob path should not be empty")
+	tag = strings.ToLower(tag)
+
+	tbl := _doctypes.docStorName(dtype)
+	var duser UserID
+	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	row := db.QueryRow(q, id)
+	err := row.Scan(&duser)
+	if err != nil {
+		return err
+	}
+	if duser != user {
+		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
 	}
 
-	idx := -1
-	for i, p := range d.blobs {
-		if p == path {
-			idx = i
-			break
+	// A child document does not have its own tags.
+
+	q = `
+	SELECT child_id
+	FROM wf_document_children
+	WHERE child_doctype_id = ?
+	AND child_id = ?
+	ORDER BY child_id
+	LIMIT 1
+	`
+	var tid int64
+	row = db.QueryRow(q, dtype, id)
+	err = row.Scan(&tid)
+	if err == nil {
+		return errors.New("a child document cannot have its own tags")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	// Now write the database entry.
+
+	q = `
+	INSERT INTO wf_document_tags(doctype_id, doc_id, tag)
+	VALUES(?, ?, ?)
+	`
+	_, err = tx.Exec(q, dtype, id, tag)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
 		}
 	}
-	if idx == -1 {
-		return errors.New("given blob path not found")
-	}
 
-	d.blobs = append(d.blobs[:idx], d.blobs[idx+1:]...)
 	return nil
 }
 
-// AddTag associates the given tag with this document.
-func (d *Document) AddTag(tag string) bool {
-	if tag == "" {
-		return false
-	}
-
-	for _, el := range d.tags {
-		if el == tag {
-			return false
-		}
-	}
-
-	d.tags = append(d.tags, tag)
-	return true
-}
-
 // RemoveTag disassociates the given tag from this document.
-func (d *Document) RemoveTag(tag string) bool {
+func (ds *_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+	tag = strings.TrimSpace(tag)
 	if tag == "" {
-		return false
+		return errors.New("tag should not be empty")
+	}
+	tag = strings.ToLower(tag)
+
+	tbl := _doctypes.docStorName(dtype)
+	var duser UserID
+	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	row := db.QueryRow(q, id)
+	err := row.Scan(&duser)
+	if err != nil {
+		return err
+	}
+	if duser != user {
+		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
 	}
 
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
 
-	idx := -1
-	for i, el := range d.tags {
-		if el == tag {
-			idx = i
-			break
+	// Now write the database entry.
+
+	q = `
+	DELETE FROM wf_document_tags
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	AND tag = ?
+	`
+	_, err = tx.Exec(q, dtype, id, tag)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
 		}
 	}
 
-	if idx > -1 {
-		d.tags = append(d.tags[:idx], d.tags[idx+1:]...)
-		return true
-	}
-
-	return false
+	return nil
 }
 
-// Tags answers a copy of the tags associated with this document.
-func (d *Document) Tags() []string {
-	ts := make([]string, len(d.tags))
-	copy(ts, d.tags)
-	return ts
+// Tags answers a list of the tags associated with this document.
+func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
+	ts := make([]string, 0, 1)
+	q := `
+	SELECT tag
+	FROM wf_document_tags
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	`
+	rows, err := db.Query(q, dtype, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t string
+		err = rows.Scan(&t)
+		if err != nil {
+			return nil, err
+		}
+		ts = append(ts, t)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return ts, nil
 }
 
-// ChildrenIDs answers a copy of the list of this document's children
-// IDs.
-func (d *Document) ChildrenIDs() []DocumentID {
-	ids := make([]DocumentID, len(d.children))
-	for k := range d.children {
-		ids = append(ids, k)
+// ChildrenIDs answers a list of this document's children IDs.
+func (ds *_Documents) ChildrenIDs(dtype DocTypeID, id DocumentID) ([]struct {
+	DocTypeID
+	DocumentID
+}, error) {
+	cids := make([]struct {
+		DocTypeID
+		DocumentID
+	}, 0, 1)
+
+	q := `
+	SELECT child_doctype_id, child_id
+	FROM wf_document_children
+	WHERE parent_doctype_id = ?
+	AND parent_id = ?
+	`
+	rows, err := db.Query(q, dtype, id)
+	if err != nil {
+		return nil, err
 	}
-	return ids
+	for rows.Next() {
+		var s struct {
+			DocTypeID
+			DocumentID
+		}
+		err = rows.Scan(&s.DocTypeID, &s.DocumentID)
+		if err != nil {
+			return nil, err
+		}
+		cids = append(cids, s)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return cids, nil
 }
