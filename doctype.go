@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 )
@@ -74,6 +75,12 @@ func DocTypes() *_DocTypes {
 	return _doctypes
 }
 
+// docStorName answers the appropriate table name for the given
+// document type.
+func (dts *_DocTypes) docStorName(dtid DocTypeID) string {
+	return fmt.Sprintf("wf_documents_%03d", dtid)
+}
+
 // New creates and registers a new document type in the system.
 func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	name = strings.TrimSpace(name)
@@ -98,6 +105,24 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	}
 	var id int64
 	id, err = res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	q := `
+	CREATE TABLE ` + _doctypes.docStorName(DocTypeID(id)) + `(
+		id INT NOT NULL AUTO_INCREMENT,
+		user_id INT NOT NULL,
+		docstate_id INT NOT NULL,
+		ctime TIMESTAMP NOT NULL,
+		title VARCHAR(250) NOT NULL,
+		data BLOB NOT NULL,
+		PRIMARY KEY (id),
+		FOREIGN KEY (outer_doctype_id) REFERENCES wf_doctypes_master(id),
+		FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id)
+	)
+	`
+	res, err = tx.Exec(q)
 	if err != nil {
 		return 0, err
 	}
