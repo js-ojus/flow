@@ -1,4 +1,4 @@
-// (c) Copyright 2015 JONNALAGADDA Srinivas
+// (c) Copyright 2015-2017 JONNALAGADDA Srinivas
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,65 +15,50 @@
 package flow
 
 import (
+	"crypto/sha1"
+	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"os"
+	"path"
 	"strings"
-	"sync"
 	"time"
 )
+
+// Blob is a simple data holder for information concerning the
+// user-supplied name of the binary object, the path of the stored
+// binary object, and its SHA1 checksum.
+type Blob struct {
+	Name    string // User-given name to the binary object
+	Path    string // Path to the stored binary object
+	Sha1Sum string // SHA1 checksum of the binary object
+}
+
+// DocumentID is the type of unique document identifiers.
+type DocumentID int64
 
 // Document represents a task in a workflow, whose life cycle it
 // tracks.
 //
-// Documents are central to the workflow engine and its operations.
-// Each document represents a task whose life cycle it tracks.  In the
-// process, it accumulates various details, and tracks the times of
-// its modifications.  The life cycle typically involves several state
-// transitions, whose details are also tracked.
+// Documents are central to the workflow engine and its operations. In
+// the process, it accumulates various details, and tracks the times
+// of its modifications.  The life cycle typically involves several
+// state transitions, whose details are also tracked.
 //
 // `Document` is a recursive structure: it can contain other
 // documents.  Most applications should embed `Document` in their
 // document structures rather than use this directly.
 type Document struct {
-	dtype     DocType   // for namespacing
-	id        uint64    // globally-unique identifier of this document
-	revision  uint16    // running revision number
-	outerType DocType   // type of the containing document, if any
-	outerID   uint64    // ID of the containing document, if any
-	outer     *Document // containing document, if any (loaded)
+	dtype DocType    // For namespacing
+	id    DocumentID // Globally-unique identifier of this document
 
-	author uint64    // creator of this document
-	state  DocState  // current state
-	ctime  time.Time // creation time of this revision
+	user  UserID    // Creator of this document
+	state DocState  // Current state
+	ctime time.Time // Creation time of this revision
 
-	title    string               // human-readable title; applicable only for top-level documents
-	data     []byte               // primary content of the document
-	blobs    []string             // paths to enclosures
-	tags     []string             // user-defined tags associated with this document
-	children map[uint64]*Document // children documents of this document
-
-	mutex sync.RWMutex
-}
-
-// NewDocument creates and initialises a document.
-//
-// The document created through this method has a life cycle that is
-// associated with it through a particular workflow.
-func NewDocument(dtype DocType, outer *Document, author uint64, instate DocState) (*Document, error) {
-	dt := strings.TrimSpace(string(dtype))
-	if dt == "" || author == 0 {
-		return nil, fmt.Errorf("invalid initialisation data -- dtype: %s, author: %d", dtype, author)
-	}
-
-	d := &Document{dtype: dtype, author: author, state: instate}
-	if outer != nil {
-		d.outer = outer
-		d.outerID = outer.id
-		d.outerType = outer.dtype
-	}
-	d.children = make(map[uint64]*Document)
-	return d, nil
+	title string // Human-readable title; applicable only for top-level documents
+	data  []byte // Primary content of the document
 }
 
 // Type answers this document's type.
@@ -82,33 +67,13 @@ func (d *Document) Type() DocType {
 }
 
 // ID answers this document's globally-unique ID.
-func (d *Document) ID() uint64 {
+func (d *Document) ID() DocumentID {
 	return d.id
 }
 
-// Revision answers the current revision number of this document.
-func (d *Document) Revision() uint16 {
-	return d.revision
-}
-
-// OuterType answers this document's containing type, if any.
-func (d *Document) OuterType() DocType {
-	return d.outerType
-}
-
-// OuterID answers this document's containing document's globally-unique ID, if any.
-func (d *Document) OuterID() uint64 {
-	return d.outerID
-}
-
-// Outer answers this document's containing document, if any.
-func (d *Document) Outer() *Document {
-	return d.outer
-}
-
-// Author answers the user who created this document.
-func (d *Document) Author() uint64 {
-	return d.author
+// User answers the user who created this document.
+func (d *Document) User() UserID {
+	return d.user
 }
 
 // Ctime answers the creation time of this document.
@@ -126,78 +91,338 @@ func (d *Document) Title() string {
 	return d.title
 }
 
-// SetTitle sets the title of the document, if one is not already set.
-func (d *Document) SetTitle(title string) error {
-	if d.outerID != 0 {
-		return errors.New("cannot set title for a child document")
-	}
-	if d.title != "" {
-		return errors.New("document already has a title")
-	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	d.title = strings.TrimSpace(title)
-	return nil
-}
-
 // Data answers this document's primary data content.
 func (d *Document) Data() []byte {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
 	dt := make([]byte, len(d.data))
 	copy(dt, d.data)
 	return dt
 }
 
-// SetData replaces this document's primary content with the given
-// data, only if the user is the same as the author of this document.
-func (d *Document) SetData(data []byte, author uint64) error {
-	if author != d.author {
-		return errors.New("author of modification not the same as the original author of this document")
+// Unexported type, only for convenience methods.
+type _Documents struct{}
+
+var _documents *_Documents
+
+func init() {
+	_documents = &_Documents{}
+}
+
+// New creates and initialises a document.
+//
+// The document created through this method has a life cycle that is
+// associated with it through a particular workflow.
+//
+// N.B. Blobs, tags and children documents have to be associated with
+// this document, if needed, through appropriate separate calls.
+func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTypeID, oid DocumentID,
+	state DocStateID, title string, data []byte) (DocumentID, error) {
+	if user <= 0 {
+		return 0, errors.New("user ID must be a positive integer")
 	}
 
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	// A child document does not have its own title.
+	if oid > 0 {
+		title = ChildDocTitle
+	}
 
-	d.data = make([]byte, len(data))
-	copy(d.data, data)
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	tbl := _doctypes.docStorName(dtype)
+	q := `INSERT INTO ` + tbl + `(user_id, docstate_id, ctime, title, data)
+	VALUES (?, ?, NOW(), ?, ?)
+	`
+	res, err := tx.Exec(q, user, state, title, data)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if oid > 0 {
+		q2 := `
+		INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
+		VALUES (?, ?, ?, ?)
+		`
+		res, err = tx.Exec(q2, otype, oid, dtype, id)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return DocumentID(id), nil
+}
+
+// Get initialises a document by reading from the database.
+//
+// N.B. This retrieves the primary data of the document.  Other
+// information viz. blobs, tags and children documents have to be
+// fetched separately.
+func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
+	tbl := _doctypes.docStorName(dtype)
+	var d Document
+	q := `
+	SELECT docs.user_id, docs.docstate_id, docs.ctime, docs.title, docs.data, states.name
+	FROM ` + tbl + ` AS docs
+	JOIN wf_docstates_master AS states ON docs.docstate_id = states.id
+	WHERE docs.id = ?
+	`
+	row := db.QueryRow(q, id, dtype)
+	err := row.Scan(&d.user, &d.state.id, &d.ctime, &d.title, &d.data, &d.state.name)
+	if err != nil {
+		return nil, err
+	}
+	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
+	row = db.QueryRow(q, dtype)
+	err = row.Scan(&d.dtype.name)
+	if err != nil {
+		return nil, err
+	}
+
+	d.id = id
+	d.dtype.id = dtype
+	return &d, nil
+}
+
+// SetTitle sets the title of the document.
+func (ds *_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, title string) error {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return errors.New("document title should not be empty")
+	}
+
+	// A child document does not have its own title.
+
+	q := `
+	SELECT child_id
+	FROM wf_document_children
+	WHERE child_doctype_id = ?
+	AND child_id = ?
+	ORDER BY child_id
+	LIMIT 1
+	`
+	var tid int64
+	row := db.QueryRow(q, dtype, id)
+	err := row.Scan(&tid)
+	if err == nil {
+		return errors.New("a child document cannot have its own title")
+	}
+
+	tbl := _doctypes.docStorName(dtype)
+	var duser UserID
+	q = `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	row = db.QueryRow(q, id)
+	err = row.Scan(&duser)
+	if err != nil {
+		return err
+	}
+	if duser != user {
+		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q = `UPDATE ` + tbl + ` SET title = ? WHERE doc_id = ?`
+	res, err := tx.Exec(q, title, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// Blobs answers the copy of this document's enclosures (as paths, not
-// the actual blobs).
-func (d *Document) Blobs() []string {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
+// SetData sets the data of the document.
+func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, data []byte) error {
+	if data == nil {
+		return errors.New("document data should not be empty")
+	}
 
-	bs := make([]string, len(d.blobs))
-	copy(bs, d.blobs)
-	return bs
+	tbl := _doctypes.docStorName(dtype)
+	var duser UserID
+	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	row := db.QueryRow(q, id)
+	err := row.Scan(&duser)
+	if err != nil {
+		return err
+	}
+	if duser != user {
+		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q = `UPDATE ` + tbl + ` SET data = ? WHERE doc_id = ?`
+	res, err := tx.Exec(q, data, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Blobs answers a list of this document's enclosures (as paths, not
+// the actual blobs).
+func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
+	bs := make([]*Blob, 0, 1)
+	q := `
+	SELECT name, path, sha1sum
+	FROM wf_document_blobs
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	`
+	rows, err := db.Query(q, dtype, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var b Blob
+		err = rows.Scan(&b.Name, &b.Path, &b.Sha1Sum)
+		if err != nil {
+			return nil, err
+		}
+		bs = append(bs, &b)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return bs, nil
 }
 
 // AddBlob adds the path to an enclosure to this document.
-func (d *Document) AddBlob(path string, author uint64) error {
-	if author != d.author {
-		return errors.New("author of modification not the same as the original author of this document")
-	}
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return errors.New("blob path should not be empty")
+func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, blob *Blob) error {
+	if blob == nil {
+		return errors.New("blob should be non-nil")
 	}
 
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	tbl := _doctypes.docStorName(dtype)
+	var duser UserID
+	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	row := db.QueryRow(q, id)
+	err := row.Scan(&duser)
+	if err != nil {
+		return err
+	}
+	if duser != user {
+		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	}
 
-	d.blobs = append(d.blobs, path)
+	// Verify the given checksum.
+
+	f, err := os.Open(blob.Path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha1.New()
+	_, err = io.Copy(h, f)
+	if err != nil {
+		return err
+	}
+	csum := fmt.Sprintf("%x", h.Sum(nil))
+	if blob.Sha1Sum != csum {
+		return fmt.Errorf("checksum mismatch -- given SHA1 sum : %s, computed SHA1 sum : %s", blob.Sha1Sum, csum)
+	}
+
+	// Store the blob in the appropriate path.
+
+	success := false
+	bpath := path.Join(blobsDir, csum[0:2], csum)
+	err = os.Rename(blob.Path, bpath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if !success {
+			os.Remove(bpath)
+		}
+	}()
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	// Now write the database entry.
+
+	q = `
+	INSERT INTO wf_document_blobs(doctype_id, doc_id, name, path, sha1sum)
+	VALUES
+	`
+	_, err = tx.Exec(q, dtype, id, blob.Name, bpath, csum)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	success = true
 	return nil
 }
 
 // RemoveBlob remove the specified path from the list of this
 // document's blobs.
-func (d *Document) RemoveBlob(path string, author uint64) error {
+func (d *Document) RemoveBlob(path string, author UserID) error {
 	if author != d.author {
 		return errors.New("author of modification not the same as the original author of this document")
 	}
@@ -205,9 +430,6 @@ func (d *Document) RemoveBlob(path string, author uint64) error {
 	if path == "" {
 		return errors.New("blob path should not be empty")
 	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
 
 	idx := -1
 	for i, p := range d.blobs {
@@ -224,25 +446,11 @@ func (d *Document) RemoveBlob(path string, author uint64) error {
 	return nil
 }
 
-// Tags answers a copy of the tags associated with this document.
-func (d *Document) Tags() []string {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	ts := make([]string, len(d.tags))
-	copy(ts, d.tags)
-	return ts
-}
-
 // AddTag associates the given tag with this document.
 func (d *Document) AddTag(tag string) bool {
 	if tag == "" {
-		log.Printf("empty tag given")
 		return false
 	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
 
 	for _, el := range d.tags {
 		if el == tag {
@@ -279,68 +487,19 @@ func (d *Document) RemoveTag(tag string) bool {
 	return false
 }
 
+// Tags answers a copy of the tags associated with this document.
+func (d *Document) Tags() []string {
+	ts := make([]string, len(d.tags))
+	copy(ts, d.tags)
+	return ts
+}
+
 // ChildrenIDs answers a copy of the list of this document's children
 // IDs.
-func (d *Document) ChildrenIDs() []uint64 {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	ids := make([]uint64, len(d.children))
+func (d *Document) ChildrenIDs() []DocumentID {
+	ids := make([]DocumentID, len(d.children))
 	for k := range d.children {
 		ids = append(ids, k)
 	}
 	return ids
 }
-
-// Children answers a copy of the list of this document's children.
-func (d *Document) Children() []*Document {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	docs := make([]*Document, len(d.children))
-	for _, v := range d.children {
-		docs = append(docs, v)
-	}
-	return docs
-}
-
-// AddChild adds the given document as a child of this document, if it
-// is not already a child.
-func (d *Document) AddChild(cid uint64, ch *Document) error {
-	if cid == 0 {
-		return errors.New("document ID cannot be 0")
-	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	if _, ok := d.children[cid]; ok {
-		return errors.New("given document is already a child of this document")
-	}
-
-	d.children[cid] = ch
-	return nil
-}
-
-// RemoveChild removes the given child from this document.
-func (d *Document) RemoveChild(cid uint64) error {
-	if cid == 0 {
-		return errors.New("document ID cannot be 0")
-	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	if _, ok := d.children[cid]; !ok {
-		return errors.New("given document is not a child of this document")
-	}
-
-	delete(d.children, cid)
-	return nil
-}
-
-// TODO(js): LoadDocument()
-
-// TODO(js): Save()
-
-// TODO(js): LoadChild()

@@ -29,8 +29,9 @@ CREATE TABLE wf_document_blobs (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
     sha1sum CHAR(40) NOT NULL,
-    filename TEXT NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id)
 );

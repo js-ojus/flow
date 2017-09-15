@@ -24,9 +24,14 @@ const (
 	// DefACRoleCount is the default number of roles a group can have
 	// in an access context.
 	DefACRoleCount = 1
+
+	// ChildDocTitle is the fixed title that all children documents
+	// have.
+	ChildDocTitle = "__CHILD__"
 )
 
 var db *sql.DB
+var blobsDir string
 
 //
 
@@ -36,11 +41,32 @@ func init() {
 }
 
 // RegisterDB provides an already initialised database handle to `flow`.
+//
+// N.B. This method **MUST** be called before anything else in `flow`.
 func RegisterDB(sdb *sql.DB) error {
 	if db == nil {
 		log.Fatal("given database handle is `nil`")
 	}
 	db = sdb
+
+	return nil
+}
+
+// SetBlobsDir specifies the base directory inside which blob files
+// should be stored.
+//
+// Inside this base directory, 256 subdirectories are created as hex
+// `00` through `ff`.  A blob is stored in the subdirectory whose name
+// matches the first two hex digits of its SHA1 sum.
+//
+// N.B. Once set, this MUST NOT change between runs.  Doing so will
+// result in loss of all previously stored blobs.  In addition,
+// corresponding documents get corrupted.
+func SetBlobsDir(base string) error {
+	if base == "" {
+		log.Fatal("given base directory path is empty")
+	}
+	blobsDir = base
 
 	return nil
 }
