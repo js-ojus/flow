@@ -466,6 +466,36 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 	return nil
 }
 
+// Tags answers a list of the tags associated with this document.
+func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
+	ts := make([]string, 0, 1)
+	q := `
+	SELECT tag
+	FROM wf_document_tags
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	`
+	rows, err := db.Query(q, dtype, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t string
+		err = rows.Scan(&t)
+		if err != nil {
+			return nil, err
+		}
+		ts = append(ts, t)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return ts, nil
+}
+
 // AddTag associates the given tag with this document.
 //
 // Tags are converted to lower case (as per normal Unicode casing)
@@ -591,36 +621,6 @@ func (ds *_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Do
 	}
 
 	return nil
-}
-
-// Tags answers a list of the tags associated with this document.
-func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
-	ts := make([]string, 0, 1)
-	q := `
-	SELECT tag
-	FROM wf_document_tags
-	WHERE doctype_id = ?
-	AND doc_id = ?
-	`
-	rows, err := db.Query(q, dtype, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var t string
-		err = rows.Scan(&t)
-		if err != nil {
-			return nil, err
-		}
-		ts = append(ts, t)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return ts, nil
 }
 
 // ChildrenIDs answers a list of this document's children IDs.
