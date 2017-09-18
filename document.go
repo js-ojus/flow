@@ -338,6 +338,48 @@ func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	return bs, nil
 }
 
+// GetBlob retrieves the requested blob from the specified document,
+// if one such exists.  Lookup happens based on the given blob name.
+// The retrieved blob is copied into the specified path.
+func (ds *_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
+	if blob == nil {
+		return errors.New("blob should be non-nil")
+	}
+
+	q := `
+	SELECT name, path, sha1sum
+	FROM wf_document_blobs
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	AND name = ?
+	`
+	row := db.QueryRow(q, dtype, id, blob.Name)
+	var b Blob
+	err := row.Scan(&b.Name, &b.Path, &b.Sha1Sum)
+	if err != nil {
+		return err
+	}
+
+	// Copy the blob into the destination path given.
+
+	inf, err := os.Open(b.Path)
+	if err != nil {
+		return err
+	}
+	defer inf.Close()
+	outf, err := os.Create(blob.Path)
+	if err != nil {
+		return err
+	}
+	defer outf.Close()
+	_, err = io.Copy(outf, inf)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AddBlob adds the path to an enclosure to this document.
 func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, blob *Blob) error {
 	if blob == nil {
