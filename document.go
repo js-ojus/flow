@@ -107,6 +107,12 @@ func init() {
 	_documents = &_Documents{}
 }
 
+// Documents provides a resource-like interface to the documents in
+// this system.
+func Documents() *_Documents {
+	return _documents
+}
+
 // New creates and initialises a document.
 //
 // The document created through this method has a life cycle that is

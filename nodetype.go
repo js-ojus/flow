@@ -15,19 +15,22 @@
 package flow
 
 // NodeType enumerates the possible types of workflow nodes.
-type NodeType byte
+type NodeType string
 
+// The following constants are represented **identically** as part of
+// an enumeration in the database.  DO NOT ALTER THESE WITHOUT ALSO
+// ALTERING THE DATABASE; ELSE DATA COULD GET CORRUPTED!
 const (
 	// NodeTypeBegin : none incoming, one outgoing
-	NodeTypeBegin NodeType = iota + 1
+	NodeTypeBegin NodeType = "begin"
 	// NodeTypeEnd : one incoming, none outgoing
-	NodeTypeEnd
+	NodeTypeEnd = "end"
 	// NodeTypeLinear : one incoming, one outgoing
-	NodeTypeLinear
+	NodeTypeLinear = "linear"
 	// NodeTypeBranch : one incoming, two or more outgoing
-	NodeTypeBranch
+	NodeTypeBranch = "branch"
 	// NodeTypeJoinAny : two or more incoming, one outgoing
-	NodeTypeJoinAny
+	NodeTypeJoinAny = "joinany"
 	// NodeTypeJoinAll : two or more incoming, one outgoing
-	NodeTypeJoinAll
+	NodeTypeJoinAll = "joinall"
 )

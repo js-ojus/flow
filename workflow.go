@@ -15,10 +15,14 @@
 package flow
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 )
+
+// WorkflowID is the type of unique workflow identifiers.
+type WorkflowID int64
 
 // Workflow represents the entire life cycle of a single document.
 //
@@ -35,61 +39,148 @@ import (
 // N.B. It is highly recommended, but not necessary, that workflow
 // names be defined in a system of hierarchical namespaces.
 type Workflow struct {
-	name  string             // globally-unique name of this workflow
-	dtype DocType            // document type of which this workflow defines the life cycle
-	nodes map[DocState]*Node // all nodes defined in this workflow
-	begin DocState           // where this flow begins
+	id     WorkflowID // Globally-unique identifier of this workflow
+	name   string     // Globally-unique name of this workflow
+	dtype  DocTypeID  // Document type of which this workflow defines the life cycle
+	bstate DocStateID // Where this flow begins
 }
 
-// NewWorkflow creates and initialises a workflow definition.
-func NewWorkflow(name string, dt *DocType, ds *DocState) (*Workflow, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, errors.New("workflow name should not be empty")
-	}
-	if dt == nil || ds == nil {
-		return nil, errors.New("document type and origin document state should not be `nil`")
-	}
-
-	w := &Workflow{name: name, dtype: *dt}
-	w.nodes = make(map[DocState]*Node, 2)
-	w.begin = *ds
-	return w, nil
+// ID answers the unique identifier of this workflow.
+func (w *Workflow) ID() WorkflowID {
+	return w.id
 }
 
-// Name answers this workflow definition's name.
+// Name answers the globally-unique name of this workflow.
 func (w *Workflow) Name() string {
 	return w.name
 }
 
 // DocType answers the document type for which this defines the
 // workflow.
-func (w *Workflow) DocType() DocType {
+func (w *Workflow) DocType() DocTypeID {
 	return w.dtype
 }
 
 // BeginState answers the document state in which the execution of
 // this workflow begins.
-func (w *Workflow) BeginState() DocState {
-	return w.begin
+func (w *Workflow) BeginState() DocStateID {
+	return w.bstate
+}
+
+// Unexported type, only for convenience methods.
+type _Workflows struct{}
+
+var _workflows *_Workflows
+
+func init() {
+	_workflows = &_Workflows{}
+}
+
+// Workflows provides a resource-like interface to the workflows
+// defined in this system.
+func Workflows() *_Workflows {
+	return _workflows
+}
+
+// New creates and initialises a workflow definition using the given
+// name, the document type whose life cycle this workflow should
+// manage, and the initial document state in which this workflow
+// begins.
+//
+// N.B.  Workflow names must be globally-unique.
+func (ws *_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocStateID) (WorkflowID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("name should not be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_workflows(name, doctype_id, docstate_id)
+	VALUES(?, ?, ?)
+	`
+	res, err := tx.Exec(q, name, dtype, state)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return WorkflowID(id), nil
 }
 
 // AddNode maps the given document state to the specified node.  This
 // map is consulted by the workflow when performing a state transition
 // of the system.
-//
-// N.B. This method is not protected by a mutex since this is expected
-// to be exercised only during start-up.  Do not violate that!
-func (w *Workflow) AddNode(state DocState, node *Node) error {
-	if node == nil {
-		return errors.New("node should not be `nil`")
-	}
-	if n, ok := w.nodes[state]; ok {
-		return errors.New("state already mapped to node : " + n.name)
+func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
+	ntype NodeType, state DocStateID, nstates []DocStateID) (NodeID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("name should not be empty")
 	}
 
-	w.nodes[state] = node
-	return nil
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_workflow_nodes(workflow_id, name, type, docstate_id)
+	VALUES(?, ?, ?, ?)
+	`
+	res, err := tx.Exec(q, wid, name, ntype, state)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	q = `
+	INSERT INTO wf_node_next_states(node_id, docstate_id)
+	VALUES(?, ?)
+	`
+	for _, ns := range nstates {
+		_, err := tx.Exec(q, id, ns)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return NodeID(id), nil
 }
 
 // ApplyEvent takes an input user action or a system event, and
@@ -100,18 +191,16 @@ func (w *Workflow) AddNode(state DocState, node *Node) error {
 //
 // Internally, the workflow delegates this method to the appropriate
 // node, if one such is registered.
-func (w *Workflow) ApplyEvent(event *DocEvent, args ...interface{}) error {
+func (w *Workflow) ApplyEvent(event *DocEvent, args ...interface{}) (DocStateID, error) {
 	doc, err := _documents.Get(event.dtype, event.docID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if doc.state != event.state {
-		return fmt.Errorf("document state is : %s, but event is targeting state : %s", doc.state.name, event.state.name)
-	}
-	node, ok := w.nodes[event.state]
-	if !ok {
-		return errors.New("no node is registered for the document state : " + event.state.name)
+		return 0, fmt.Errorf("document state is : %s, but event is targeting state : %s", doc.state.name, event.state.name)
 	}
 
-	return node.applyEvent(event, args...)
+	// TODO(js): implement this
+
+	return 0, nil
 }
