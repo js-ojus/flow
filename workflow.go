@@ -44,6 +44,7 @@ type Workflow struct {
 	name   string     // Globally-unique name of this workflow
 	dtype  DocTypeID  // Document type of which this workflow defines the life cycle
 	bstate DocStateID // Where this flow begins
+	nodes  []*Node    // Nodes comprising this workflow
 }
 
 // ID answers the unique identifier of this workflow.
@@ -66,6 +67,25 @@ func (w *Workflow) DocType() DocTypeID {
 // this workflow begins.
 func (w *Workflow) BeginState() DocStateID {
 	return w.bstate
+}
+
+// Nodes answers a list of the nodes comprising this workflow.
+func (w *Workflow) Nodes(refresh bool) ([]*Node, error) {
+	if len(w.nodes) == 0 {
+		refresh = true
+	}
+
+	if refresh {
+		ns, err := _workflows.Nodes(w.id)
+		if err != nil {
+			return nil, err
+		}
+		w.nodes = ns
+	}
+
+	ary := make([]*Node, len(w.nodes))
+	copy(ary, w.nodes)
+	return ary, nil
 }
 
 // Unexported type, only for convenience methods.
