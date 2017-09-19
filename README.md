@@ -22,11 +22,11 @@
 
 ## `flow`
 
-`flow` is a tiny workflow engine written in Go (golang).
+`flow` is a tiny open source (Apache 2-licensed) workflow engine written in Go (golang).
 
-### What is `flow`?
+### What `flow` is
 
-`flow` is intended to help in defining and driving "front office" <---> "back office" document flows.  Examples of such flows are:
+As a workflow engine, `flow` intends to help in defining and driving "front office" <---> "back office" document flows.  Examples of such flows are:
 
 - customer registration and verification of details,
 - assignment of work to field personnel, and its follow-up,
@@ -37,9 +37,11 @@
 
 `flow` - at least currently - aims to support only graph-like regimes (not hierarchical).
 
-`flow` is a library -- it requires workflow processing to be programmed.  The only "programming in the small" language supported is Go!
-
 ### What `flow` is not
+
+`flow` is a library, not a full-stack solution.  Accordingly, it cannot be downloaded and deployed as a reday-to-use service.  It has to used by an application that programs workflow definitions and processing.  The only "programming in the small" language supported is Go!  Of course, you could employ `flow` in a microservice architecture by wrapping it in a thin service.  That can enable you to use your favourite programming language to drive `flow`.
+
+### Express non-goals
 
 `flow` is intended to be small!  It is expressly **not** intended to be an enterprise-grade workflow engine.  Accordingly, import from - and export to - workflow modelling formats like BPMN/XPDL are not supported.  Similarly, executable specifications like BPEL and Wf-XML are not supported.  True enterprise-grade engines already exist for addressing such complex workflows and interoperability as require high-end engines.
 
@@ -113,8 +115,8 @@ A `DocAction` on a document in a `DocState` may require some processing to be pe
 
 ### Mailboxes and Messages
 
-Every defined user has a mailbox of virtually no size limit.  Documents that transition into specific states trigger notifications for specific users.  These notifications are delivered to the mailboxes of such users.
+Every defined user has a `Mailbox` of virtually no size limit.  Documents that transition into specific states trigger notifications for specific users.  These notifications are delivered to the mailboxes of such users.
 
-The actual content of a notification constitutes a message.  The most essential details include the document reference, the `Node` in the workflow at which the document is, and the time at which the message was sent.
+The actual content of a notification constitutes a `Message`.  The most essential details include the document reference, the `Node` in the workflow at which the document is, and the time at which the message was sent.
 
 Upon getting notified, users open the corresponding documents, and take appropriate actions.
