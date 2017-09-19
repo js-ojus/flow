@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -126,6 +127,71 @@ func (ws *_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocSt
 	}
 
 	return WorkflowID(id), nil
+}
+
+// List answers a subset of the workflows defined in the system,
+// according to the given specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, name, doctype_id, docstate_id
+	FROM wf_workflows
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*Workflow, 0, 10)
+	for rows.Next() {
+		var elem Workflow
+		err = rows.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
+}
+
+// Get retrieves the details of the requested workflow from the
+// database.
+//
+// N.B.  This method retrieves the primary information of the
+// workflow.  Information of the nodes comprising this workflow have
+// to be fetched separately.
+func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
+	q := `
+	SELECT name, doctype_id, docstate_id
+	FROM wf_workflows
+	WHERE id = ?
+	`
+	row := db.QueryRow(q, id)
+	var w Workflow
+	err := row.Scan(&w.name, &w.dtype, &w.bstate)
+	if err != nil {
+		return nil, err
+	}
+
+	w.id = id
+	return &w, nil
 }
 
 // AddNode maps the given document state to the specified node.  This

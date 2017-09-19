@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
 	"strings"
@@ -174,6 +175,50 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 	}
 
 	return DocumentID(id), nil
+}
+
+// List answers a subset of the documents of the given document type,
+// based on the input specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	tbl := _doctypes.docStorName(dtype)
+	q := `
+	SELECT id, user_id, docstate_id, ctime, title, data
+	FROM ` + tbl + `
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*Document, 0, 10)
+	for rows.Next() {
+		var elem Document
+		err = rows.Scan(&elem.id, &elem.user, &elem.state, &elem.ctime, &elem.title, &elem.data)
+		if err != nil {
+			return nil, err
+		}
+		elem.dtype.id = dtype
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
 }
 
 // Get initialises a document by reading from the database.
