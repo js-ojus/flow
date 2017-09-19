@@ -18,11 +18,11 @@ package flow
 type NodeID int64
 
 // NodeFunc defines the type of functions that can be used as
-// processors of documents in workflows.
+// post-processors of documents in workflows.
 //
-// These functions consume document events that are applied to
-// documents to transform them.  Invocation of a `NodeFunc` results in
-// a transformed document, with the state of the system adjusted
+// These functions are triggered by document events that are applied
+// to documents to transform them.  Invocation of a `NodeFunc` results
+// in a transformed document, with the state of the system adjusted
 // accordingly.  It is, of course, possible for an event to not result
 // in a document transformation or a state transition.
 //
@@ -38,13 +38,13 @@ type NodeFunc func(*Document, DocAction, ...interface{}) (DocState, *Message, er
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	id      NodeID                  // Unique identifier of this node
-	wflow   WorkflowID              // Containing flow of this node
-	name    string                  // Unique within its workflow
-	ntype   NodeType                // Topology type of this node
-	state   DocStateID              // A document arriving at this node must be in this state
-	nstates map[DocStateID]struct{} // List of possible states into which a document - currently at this node - can transition
-	nfunc   NodeFunc                // Processing function of this node
+	id          NodeID                     // Unique identifier of this node
+	wflow       WorkflowID                 // Containing flow of this node
+	name        string                     // Unique within its workflow
+	ntype       NodeType                   // Topology type of this node
+	state       DocStateID                 // A document arriving at this node must be in this state
+	transitions map[DocActionID]DocStateID // Possible actions leading to states into which a document - currently at this node - can transition
+	nfunc       NodeFunc                   // Processing function of this node
 }
 
 // ID answers the unique identifier of this workflow node.
@@ -73,34 +73,6 @@ func (n *Node) State() DocStateID {
 	return n.state
 }
 
-// NextStates answers a list of possible document states into which a
-// document - currently at this node - can transition.
-func (n *Node) NextStates() ([]DocStateID, error) {
-	l := len(n.nstates)
-
-	// If we already have them handy, answer straight away.
-	if l > 0 {
-		sts := make([]DocStateID, 0, l)
-		for st := range n.nstates {
-			sts = append(sts, st)
-		}
-		return sts, nil
-	}
-
-	// Else, fetch from the database ...
-	nstates, err := _nodes.NextStates(n.id)
-	if err != nil {
-		return nil, err
-	}
-
-	// ... and cache for future (i.e. for as long as this instance
-	// lives).
-	for _, st := range nstates {
-		n.nstates[st] = struct{}{}
-	}
-	return nstates, nil
-}
-
 // Func answers the processing function registered in this node
 // definition.
 func (n *Node) Func() NodeFunc {
@@ -120,56 +92,4 @@ func init() {
 // this system.
 func Nodes() *_Nodes {
 	return _nodes
-}
-
-// NextStates answers the possible document states into which a
-// document currently at this node can transition.
-func (ns *_Nodes) NextStates(id NodeID) ([]DocStateID, error) {
-	q := `
-	SELECT docstate_id
-	FROM wf_node_next_states
-	WHERE node_id = ?
-	`
-	rows, err := db.Query(q, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ary := make([]DocStateID, 0, 5)
-	for rows.Next() {
-		var elem DocStateID
-		err := rows.Scan(&elem)
-		if err != nil {
-			return nil, err
-		}
-		ary = append(ary, elem)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return ary, nil
-}
-
-// applyEvent takes an input user action or a system event, and
-// applies its document action to the given document.  This results in
-// a possibly new document state.  In addition, a registered
-// processing function is invoked on the document to prepare a message
-// that can be posted to applicable mailboxes.
-func (n *Node) applyEvent(event *DocEvent, args ...interface{}) error {
-	doc, err := _documents.Get(event.dtype, event.docID)
-	if err != nil {
-		return err
-	}
-
-	// nds, msg, err := n.nfunc(event.doc, event.action, args...)
-	_, _, err = n.nfunc(doc, event.action, args...)
-	if err != nil {
-		return err
-	}
-
-	// TODO(js): routing of message
-
-	return nil
 }

@@ -44,7 +44,6 @@ type Workflow struct {
 	name   string     // Globally-unique name of this workflow
 	dtype  DocTypeID  // Document type of which this workflow defines the life cycle
 	bstate DocStateID // Where this flow begins
-	nodes  []*Node    // Nodes comprising this workflow
 }
 
 // ID answers the unique identifier of this workflow.
@@ -69,23 +68,93 @@ func (w *Workflow) BeginState() DocStateID {
 	return w.bstate
 }
 
-// Nodes answers a list of the nodes comprising this workflow.
-func (w *Workflow) Nodes(refresh bool) ([]*Node, error) {
-	if len(w.nodes) == 0 {
-		refresh = true
+// Transitions answers the possible document states into which a
+// document currently in the given state can transition.
+func (w *Workflow) Transitions(state DocStateID) (map[DocActionID]DocStateID, error) {
+	q := `
+	SELECT docaction_id, to_state_id
+	FROM wf_docstate_transitions
+	WHERE doctype_id = ?
+	AND from_state_id = ?
+	`
+	rows, err := db.Query(q, w.dtype, state)
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
 
-	if refresh {
-		ns, err := _workflows.Nodes(w.id)
+	ary := make(map[DocActionID]DocStateID)
+	for rows.Next() {
+		var da DocActionID
+		var ds DocStateID
+		err := rows.Scan(&da, &ds)
 		if err != nil {
 			return nil, err
 		}
-		w.nodes = ns
+		ary[da] = ds
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
-	ary := make([]*Node, len(w.nodes))
-	copy(ary, w.nodes)
 	return ary, nil
+}
+
+// ApplyEvent takes an input user action or a system event, and
+// applies its document action to the given document.  This results in
+// a possibly new document state.  This method also prepares a message
+// that can be posted to applicable mailboxes.
+func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent) (DocStateID, error) {
+	if event == nil {
+		return 0, errors.New("event should be non-nil")
+	}
+	if event.status == EventStatusApplied {
+		return 0, errors.New("event already applied; nothing to do")
+	}
+	if w.dtype != event.dtype {
+		return 0, fmt.Errorf("this workflow's document type : %d, given event's document type : %d", w.dtype, event.dtype)
+	}
+
+	ts, err := w.Transitions(event.state)
+	nstate, ok := ts[event.action]
+	if !ok {
+		return 0, errors.New("given event's action cannot be performed on a document in the specified state")
+	}
+
+	tbl := _doctypes.docStorName(event.dtype)
+	doc, err := _documents.Get(event.dtype, event.docID)
+	if err != nil {
+		return 0, err
+	}
+	if doc.state.id != event.state {
+		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.id, event.state)
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
+	_, err = tx.Exec(q, nstate, event.docID)
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return 0, nil
 }
 
 // Unexported type, only for convenience methods.
@@ -297,27 +366,4 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
 	}
 
 	return NodeID(id), nil
-}
-
-// ApplyEvent takes an input user action or a system event, and
-// applies its document action to the given document.  This results in
-// a possibly new document state.  In addition, a registered
-// processing function, if any, is invoked on the document to perform
-// custom post-processing.  This method also prepares a message that
-// can be posted to applicable mailboxes.
-//
-// Internally, the workflow delegates this method to the appropriate
-// node, if one such is registered.
-func (w *Workflow) ApplyEvent(event *DocEvent, args ...interface{}) (DocStateID, error) {
-	doc, err := _documents.Get(event.dtype, event.docID)
-	if err != nil {
-		return 0, err
-	}
-	if doc.state != event.state {
-		return 0, fmt.Errorf("document state is : %s, but event is targeting state : %s", doc.state.name, event.state.name)
-	}
-
-	// TODO(js): implement this
-
-	return 0, nil
 }

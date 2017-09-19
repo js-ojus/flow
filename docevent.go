@@ -27,8 +27,11 @@ import (
 type EventStatus uint8
 
 const (
+	// EventStatusAll does not filter events.
 	EventStatusAll EventStatus = iota
+	// EventStatusApplied selects only those events that have been successfully applied.
 	EventStatusApplied
+	// EventStatusPending selects only those events that are pending application.
 	EventStatusPending
 )
 
@@ -46,8 +49,8 @@ type DocEvent struct {
 	id     DocEventID  // Unique ID of this event
 	dtype  DocTypeID   // Document type of the document to which this event is to be applied
 	docID  DocumentID  // Document to which this event is to be applied
-	state  DocState    // Current state of the document
-	action DocAction   // Action performed by the user
+	state  DocStateID  // Current state of the document must equal this
+	action DocActionID // Action performed by the user
 	user   UserID      // User who caused this action
 	text   string      // Comment or other content
 	ctime  time.Time   // Time at which the event occurred
@@ -72,12 +75,12 @@ func (e *DocEvent) Document() DocumentID {
 
 // State answers the state of the document as of the time this event
 // occurred.
-func (e *DocEvent) State() DocState {
+func (e *DocEvent) State() DocStateID {
 	return e.state
 }
 
 // Action answers the document action that this event represents.
-func (e *DocEvent) Action() DocAction {
+func (e *DocEvent) Action() DocActionID {
 	return e.action
 }
 

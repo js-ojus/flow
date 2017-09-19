@@ -127,9 +127,16 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 		return 0, errors.New("user ID must be a positive integer")
 	}
 
-	// A child document does not have its own title.
 	if oid > 0 {
+		// A child document does not have its own title.
 		title = ChildDocTitle
+
+		// A child document does not have its own state.
+		doc, err := _documents.Get(otype, oid)
+		if err != nil {
+			return 0, err
+		}
+		state = doc.state.id
 	}
 
 	var tx *sql.Tx
@@ -250,6 +257,39 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	d.id = id
 	d.dtype.id = dtype
 	return &d, nil
+}
+
+// setState sets the new state of the document.
+//
+// This method is not exported.  It is used internally by `Workflow`
+// to move the document along the workflow, into a new document state.
+func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID) error {
+	tbl := _doctypes.docStorName(dtype)
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
+	_, err := tx.Exec(q, state, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetTitle sets the title of the document.

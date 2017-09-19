@@ -7,7 +7,7 @@ CREATE TABLE wf_docevents (
     user_id INT NOT NULL,
     data TEXT,
     ctime TIMESTAMP NOT NULL,
-    status CHAR(1) NOT NULL,
+    status ENUM('A', 'P') NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
