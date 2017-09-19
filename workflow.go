@@ -184,14 +184,44 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	WHERE id = ?
 	`
 	row := db.QueryRow(q, id)
-	var w Workflow
-	err := row.Scan(&w.name, &w.dtype, &w.bstate)
+	var elem Workflow
+	err := row.Scan(&elem.name, &elem.dtype, &elem.bstate)
 	if err != nil {
 		return nil, err
 	}
 
-	w.id = id
-	return &w, nil
+	elem.id = id
+	return &elem, nil
+}
+
+// Nodes answers a list of the nodes comprising the given workflow.
+func (ws *_Workflows) Nodes(id WorkflowID) ([]*Node, error) {
+	q := `
+	SELECT id, name, type, docstate_id
+	FROM wf_workflow_nodes
+	WHERE workflow_id = ?
+	`
+	rows, err := db.Query(q, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*Node, 0, 5)
+	for rows.Next() {
+		var elem Node
+		err = rows.Scan(&elem.id, &elem.name, &elem.ntype, &elem.state)
+		if err != nil {
+			return nil, err
+		}
+		elem.wflow = id
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
 }
 
 // AddNode maps the given document state to the specified node.  This
@@ -252,8 +282,9 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
 // ApplyEvent takes an input user action or a system event, and
 // applies its document action to the given document.  This results in
 // a possibly new document state.  In addition, a registered
-// processing function is invoked on the document to prepare a message
-// that can be posted to applicable mailboxes.
+// processing function, if any, is invoked on the document to perform
+// custom post-processing.  This method also prepares a message that
+// can be posted to applicable mailboxes.
 //
 // Internally, the workflow delegates this method to the appropriate
 // node, if one such is registered.
