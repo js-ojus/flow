@@ -24,10 +24,6 @@ const (
 	// DefACRoleCount is the default number of roles a group can have
 	// in an access context.
 	DefACRoleCount = 1
-
-	// ChildDocTitle is the fixed title that all children documents
-	// have.
-	ChildDocTitle = "__CHILD__"
 )
 
 var db *sql.DB

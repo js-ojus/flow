@@ -129,7 +129,11 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 
 	if oid > 0 {
 		// A child document does not have its own title.
-		title = ChildDocTitle
+		outer, err := _documents.Get(otype, oid)
+		if err != nil {
+			return 0, err
+		}
+		title = outer.title
 
 		// A child document does not have its own state.
 		doc, err := _documents.Get(otype, oid)

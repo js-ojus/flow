@@ -68,66 +68,27 @@ func (w *Workflow) BeginState() DocStateID {
 	return w.bstate
 }
 
-// Transitions answers the possible document states into which a
-// document currently in the given state can transition.
-func (w *Workflow) Transitions(state DocStateID) (map[DocActionID]DocStateID, error) {
-	q := `
-	SELECT docaction_id, to_state_id
-	FROM wf_docstate_transitions
-	WHERE doctype_id = ?
-	AND from_state_id = ?
-	`
-	rows, err := db.Query(q, w.dtype, state)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ary := make(map[DocActionID]DocStateID)
-	for rows.Next() {
-		var da DocActionID
-		var ds DocStateID
-		err := rows.Scan(&da, &ds)
-		if err != nil {
-			return nil, err
-		}
-		ary[da] = ds
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return ary, nil
-}
-
 // ApplyEvent takes an input user action or a system event, and
 // applies its document action to the given document.  This results in
 // a possibly new document state.  This method also prepares a message
-// that can be posted to applicable mailboxes.
-func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent) (DocStateID, error) {
+// that is posted to applicable mailboxes.
+func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
 	if event == nil {
 		return 0, errors.New("event should be non-nil")
+	}
+	if len(recipients) == 0 {
+		return 0, errors.New("list of recipients should have length > 0")
 	}
 	if event.status == EventStatusApplied {
 		return 0, errors.New("event already applied; nothing to do")
 	}
 	if w.dtype != event.dtype {
-		return 0, fmt.Errorf("this workflow's document type : %d, given event's document type : %d", w.dtype, event.dtype)
+		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.dtype, event.dtype)
 	}
 
-	ts, err := w.Transitions(event.state)
-	nstate, ok := ts[event.action]
-	if !ok {
-		return 0, errors.New("given event's action cannot be performed on a document in the specified state")
-	}
-
-	tbl := _doctypes.docStorName(event.dtype)
-	doc, err := _documents.Get(event.dtype, event.docID)
+	n, err := _nodes.GetByState(w.dtype, event.state)
 	if err != nil {
 		return 0, err
-	}
-	if doc.state.id != event.state {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.id, event.state)
 	}
 
 	var tx *sql.Tx
@@ -141,8 +102,7 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent) (DocStateID, error) 
 		tx = otx
 	}
 
-	q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-	_, err = tx.Exec(q, nstate, event.docID)
+	nstate, err := n.applyEvent(tx, event, recipients)
 	if err != nil {
 		return 0, err
 	}
@@ -154,7 +114,7 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent) (DocStateID, error) 
 		}
 	}
 
-	return 0, nil
+	return nstate, nil
 }
 
 // Unexported type, only for convenience methods.
@@ -283,44 +243,17 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	return &elem, nil
 }
 
-// Nodes answers a list of the nodes comprising the given workflow.
-func (ws *_Workflows) Nodes(id WorkflowID) ([]*Node, error) {
-	q := `
-	SELECT id, name, type, docstate_id
-	FROM wf_workflow_nodes
-	WHERE workflow_id = ?
-	`
-	rows, err := db.Query(q, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ary := make([]*Node, 0, 5)
-	for rows.Next() {
-		var elem Node
-		err = rows.Scan(&elem.id, &elem.name, &elem.ntype, &elem.state)
-		if err != nil {
-			return nil, err
-		}
-		elem.wflow = id
-		ary = append(ary, &elem)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return ary, nil
-}
-
 // AddNode maps the given document state to the specified node.  This
 // map is consulted by the workflow when performing a state transition
 // of the system.
-func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
-	ntype NodeType, state DocStateID, nstates []DocStateID) (NodeID, error) {
+func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wid WorkflowID,
+	name string, ntype NodeType, hash map[DocActionID]DocStateID) (NodeID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name should not be empty")
+	}
+	if len(hash) == 0 {
+		return 0, errors.New("transitions map should have length > 0")
 	}
 
 	var tx *sql.Tx
@@ -335,10 +268,10 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
 	}
 
 	q := `
-	INSERT INTO wf_workflow_nodes(workflow_id, name, type, docstate_id)
-	VALUES(?, ?, ?, ?)
+	INSERT INTO wf_workflow_nodes(doctype_id, docstate_id, workflow_id, name, type)
+	VALUES(?, ?, ?, ?, ?)
 	`
-	res, err := tx.Exec(q, wid, name, ntype, state)
+	res, err := tx.Exec(q, dtype, state, wid, name, ntype)
 	if err != nil {
 		return 0, err
 	}
@@ -348,11 +281,11 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, wid WorkflowID, name string,
 	}
 
 	q = `
-	INSERT INTO wf_node_next_states(node_id, docstate_id)
-	VALUES(?, ?)
+	INSERT INTO wf_docstate_transitions(doctype_id, from_state_id, docaction_id, to_state_id)
+	VALUES(?, ?, ?, ?)
 	`
-	for _, ns := range nstates {
-		_, err := tx.Exec(q, id, ns)
+	for da, ds := range hash {
+		_, err := tx.Exec(q, dtype, state, da, ds)
 		if err != nil {
 			return 0, err
 		}
