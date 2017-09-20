@@ -1,4 +1,4 @@
-// (c) Copyright 2015 JONNALAGADDA Srinivas
+// (c) Copyright 2015-2017 JONNALAGADDA Srinivas
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,13 @@
 
 package flow
 
-import "fmt"
+import (
+	"errors"
+	"math"
+)
+
+// UserID is the type of unique user identifiers.
+type UserID int64
 
 // User represents any kind of a user invoking or otherwise
 // participating in a defined workflow in the system.
@@ -23,30 +29,13 @@ import "fmt"
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	id     uint64   // must be globally-unique
-	name   string   // for display purposes only
-	active bool     // status of the user account
-	roles  []*Role  // all roles assigned to this user
-	groups []*Group // all groups this user is a part of
-}
-
-// NewUser instantiates a user instance in the system.
-//
-// In most cases, this should be done upon the corresponding user's
-// first action in the system.
-func NewUser(id uint64, name string) (*User, error) {
-	if id == 0 || name == "" {
-		return nil, fmt.Errorf("invalid user data -- id: %d, name: %s", id, name)
-	}
-
-	u := &User{id: id, name: name}
-	u.roles = make([]*Role, 0, 1)
-	u.groups = make([]*Group, 0, 1)
-	return u, nil
+	id    UserID // Must be globally-unique
+	name  string // For display purposes only
+	email string // E-mail address of this user
 }
 
 // ID answers this user's ID.
-func (u *User) ID() uint64 {
+func (u *User) ID() UserID {
 	return u.id
 }
 
@@ -55,94 +44,139 @@ func (u *User) Name() string {
 	return u.name
 }
 
-// Active answers if this user's account is enabled.
-func (u *User) Active() bool {
-	return u.active
+// Email answers this user's e-mail address.
+func (u *User) Email() string {
+	return u.email
 }
 
-// SetStatus can be used to enable or disable a user account
-// dynamically.
-func (u *User) SetStatus(active bool) {
-	u.active = active
+// Unexported type, only for convenience methods.
+type _Users struct{}
+
+var _users *_Users
+
+func init() {
+	_users = &_Users{}
 }
 
-// AssignRole adds the given role to this user, if it is not assigned
-// already.
-func (u *User) AssignRole(r *Role) bool {
-	for _, el := range u.roles {
-		if el.id == r.id {
-			return false
+// Users provides a resource-like interface to users in the system.
+func Users() *_Users {
+	return _users
+}
+
+// List answers a subset of the users, based on the input
+// specification.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (us *_Users) List(offset, limit int64) ([]*User, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, fname, lname, email
+	FROM wf_users_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var fname, lname string
+	ary := make([]*User, 0, 10)
+	for rows.Next() {
+		var elem User
+		err = rows.Scan(&elem.id, &fname, &lname, &elem.email)
+		if err != nil {
+			return nil, err
 		}
+		elem.name = fname + " " + lname
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
-	u.roles = append(u.roles, r)
-	return true
+	return ary, nil
 }
 
-// UnassignRole removes the given role from this user, if it is
-// assigned currently.
-func (u *User) UnassignRole(r *Role) bool {
-	found := false
-	idx := -1
-	for i, el := range u.roles {
-		if el.id == r.id {
-			found = true
-			idx = i
-			break
+// Get instantiates a user instance by reading the database.
+func (us *_Users) Get(uid UserID) (*User, error) {
+	if uid <= 0 {
+		return nil, errors.New("user ID should be a positive integer")
+	}
+
+	var elem User
+	var fname, lname string
+	row := db.QueryRow("SELECT id, first_name, last_name, email FROM wf_users_master_v WHERE id = ?", uid)
+	err := row.Scan(&elem.id, &fname, &lname, &elem.email)
+	if err != nil {
+		return nil, err
+	}
+
+	elem.name = fname + " " + lname
+	return &elem, nil
+}
+
+// IsActive answers `true` if the given user's account is enabled.
+func (us *_Users) IsActive(uid UserID) (bool, error) {
+	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", uid)
+	var status bool
+	err := row.Scan(&status)
+	if err != nil {
+		return false, err
+	}
+
+	return status, nil
+}
+
+// GroupsOf answers a list of groups that the given user is a member
+// of.
+func (us *_Users) GroupsOf(uid UserID) ([]GroupID, error) {
+	rows, err := db.Query("SELECT group_id FROM wf_group_users WHERE user_id = ?", uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	gids := make([]GroupID, 0, 1)
+	var gid GroupID
+	for rows.Next() {
+		err = rows.Scan(&gid)
+		if err != nil {
+			return nil, err
 		}
+		gids = append(gids, gid)
 	}
-	if !found {
-		return false
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
-	u.roles = append(u.roles[:idx], u.roles[idx+1:]...)
-	return true
+	return gids, nil
 }
 
-// Roles answers a copy of the roles currently assigned to this user.
-func (u *User) Roles() []*Role {
-	rs := make([]*Role, 0, len(u.roles))
-	copy(rs, u.roles)
-	return rs
-}
-
-// AddToGroup records that this user participates in the given group,
-// if (s)he does not already.
-func (u *User) AddToGroup(g *Group) bool {
-	for _, el := range u.groups {
-		if el.id == g.id {
-			return false
-		}
+// SingletonGroupOf answers the ID of the given user's singleton
+// group.
+func (us *_Users) SingletonGroupOf(uid UserID) (GroupID, error) {
+	q := `
+	SELECT gm.id FROM wf_groups_master gm
+	JOIN wf_users_master um ON gm.name = um.email
+	WHERE um.id = ?
+	`
+	var gid GroupID
+	row := db.QueryRow(q, uid)
+	err := row.Scan(&gid)
+	if err != nil {
+		return 0, err
 	}
 
-	u.groups = append(u.groups, g)
-	return true
-}
-
-// RemoveFromGroup records that this user no longer participates in
-// the given group, if (s)he does currently.
-func (u *User) RemoveFromGroup(g *Group) bool {
-	found := false
-	idx := -1
-	for i, el := range u.groups {
-		if el.id == g.id {
-			found = true
-			idx = i
-			break
-		}
-	}
-	if !found {
-		return false
-	}
-
-	u.groups = append(u.groups[:idx], u.groups[idx+1:]...)
-	return true
-}
-
-// Groups answers a copy of the groups to which this user currently
-// belongs.
-func (u *User) Groups() []*Group {
-	gs := make([]*Group, 0, len(u.groups))
-	copy(gs, u.groups)
-	return gs
+	return gid, nil
 }

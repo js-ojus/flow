@@ -1,4 +1,4 @@
-// (c) Copyright 2015 JONNALAGADDA Srinivas
+// (c) Copyright 2015-2017 JONNALAGADDA Srinivas
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,72 +14,315 @@
 
 package flow
 
-import "fmt"
+import (
+	"database/sql"
+	"errors"
+	"math"
+	"strings"
+)
+
+// RoleID is the type of unique role identifiers.
+type RoleID int64
 
 // Role represents a collection of privileges.
 //
-// Each user in the system has one or more roles assigned.
+// Each group in the system can have one or more roles assigned.
 type Role struct {
-	id    uint16
-	name  string
-	privs []*Privilege
+	id   RoleID // globally-unique ID of this role
+	name string // name of this role
 }
 
-// NewRole creates and initialises a role.
+// ID answers this role's identifier.
+func (r *Role) ID() RoleID {
+	return r.id
+}
+
+// Name answers this role's name.
+func (r *Role) Name() string {
+	return r.name
+}
+
+// Unexported type, only for convenience methods.
+type _Roles struct{}
+
+var _roles *_Roles
+
+func init() {
+	_roles = &_Roles{}
+}
+
+// Roles provides a resource-like interface to roles in the system.
+func Roles() *_Roles {
+	return _roles
+}
+
+// New creates a role with the given name.
+func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("name cannot not be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	res, err := tx.Exec("INSERT INTO wf_roles_master(name) VALUES(?)", name)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return RoleID(id), nil
+}
+
+// List answers a subset of the roles, based on the input
+// specification.
 //
-// Usually, all available roles should be loaded during system
-// initialization.  Only roles created during runtime should be added
-// dynamically.
-func NewRole(id uint16, name string) (*Role, error) {
-	if id == 0 || name == "" {
-		return nil, fmt.Errorf("invalid role data -- id: %d, name: %s", id, name)
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (rs *_Roles) List(offset, limit int64) ([]*Role, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit must be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
 	}
 
-	r := &Role{id: id, name: name}
-	r.privs = make([]*Privilege, 0, 1)
-	return r, nil
+	q := `
+	SELECT id, name
+	FROM wf_roles_master
+	ORDER BY id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*Role, 0, 10)
+	for rows.Next() {
+		var elem Role
+		err = rows.Scan(&elem.id, &elem.name)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
 }
 
-// AddPrivilege includes the given privilege in the set of privileges
-// assigned to this role.
-func (r *Role) AddPrivilege(p *Privilege) bool {
-	for _, el := range r.privs {
-		if el.IsOnSameTargetAs(p) {
-			return false
+// Get loads the role object corresponding to the given role ID from
+// the database, and answers that.
+func (rs *_Roles) Get(id RoleID) (*Role, error) {
+	if id <= 0 {
+		return nil, errors.New("ID must be a positive integer")
+	}
+
+	var elem Role
+	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE id = ?", id)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
+// Rename renames the given role.
+func (rs *_Roles) Rename(otx *sql.Tx, elem *Role, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("name cannot be empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, elem.id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
 		}
 	}
 
-	r.privs = append(r.privs, p)
-	return true
+	return nil
 }
 
-// RemovePrivilegesOn removes the privileges that this role has on the
-// given target.
-func (r *Role) RemovePrivilegesOn(res *Resource, doc *Document) bool {
-	found := false
-	idx := -1
-	for i, el := range r.privs {
-		if el.IsOnTarget(res, doc) {
-			found = true
-			idx = i
-			break
+// AddPermission adds the given action to this role, for the given
+// document type.
+func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
+	if rid <= 0 {
+		return errors.New("role ID must be a positive integer")
+	}
+	if dt == nil || da == nil {
+		return errors.New("document type and document action should not be `nil`")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_role_docactions(role_id, doctype_id, docaction_id)
+	VALUES(?, ?, ?)
+	`
+	_, err := tx.Exec(q, rid, dt.id, da.id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
 		}
 	}
-	if !found {
-		return false
-	}
-
-	r.privs = append(r.privs[:idx], r.privs[idx+1:]...)
-	return true
+	return nil
 }
 
-// ReplacePrivilege any current privilege on the given target, with
-// the given privilege.
-func (r *Role) ReplacePrivilege(p *Privilege) bool {
-	if !r.RemovePrivilegesOn(p.resource, p.doc) {
-		return false
+// RemovePermission removes all permissions from this role, for the
+// given document type.
+func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
+	if rid <= 0 {
+		return errors.New("role ID must be a positive integer")
+	}
+	if dt == nil || da == nil {
+		return errors.New("document type and document action should not be `nil`")
 	}
 
-	r.privs = append(r.privs, p)
-	return true
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	DELETE FROM wf_role_docactions
+	WHERE role_id = ?
+	AND doctype_id = ?
+	AND docaction_id = ?
+	`
+	_, err := tx.Exec(q, rid, dt.id, da.id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Permissions answers the current set of permissions this role has.
+// It answers `nil` in case the given document type does not have any
+// permissions set in this role.
+func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
+	q := `
+	SELECT dtm.id, dtm.name, dam.id, dam.name
+	FROM wf_doctypes_master dtm, wf_docactions_master dam
+	JOIN wf_role_docactions rdas ON dtm.id = rdas.doctype_id
+	JOIN ON dam.id = rdas.docaction_id
+	WHERE rdas.role_id = ?
+	`
+	rows, err := db.Query(q, rid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	das := make(map[DocType][]*DocAction)
+	for rows.Next() {
+		var dt DocType
+		var da DocAction
+		err = rows.Scan(&dt.id, &dt.name, &da.id, &da.name)
+		if err != nil {
+			return nil, err
+		}
+		ary, ok := das[dt]
+		if !ok {
+			ary = make([]*DocAction, 0, 1)
+		}
+		ary = append(ary, &da)
+		das[dt] = ary
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return das, nil
+}
+
+// HasPermission answers `true` if this role has the queried
+// permission for the given document type.
+func (rs *_Roles) HasPermission(rid RoleID, dt *DocType, da *DocAction) (bool, error) {
+	q := `
+	SELECT rdas.id FROM wf_role_docactions rdas
+	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
+	JOIN wf_docactions_master dam ON rdas.docaction_id = dam.id
+	WHERE rdas.role_id = ?
+	AND dtm.name = ?
+	AND dam.name = ?
+	ORDER BY rdas.id
+	LIMIT 1
+	`
+	row := db.QueryRow(q, rid, dt.id, da.id)
+	var n int64
+	err := row.Scan(&n)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
