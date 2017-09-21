@@ -110,7 +110,7 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	}
 
 	q := `
-	CREATE TABLE ` + _doctypes.docStorName(DocTypeID(id)) + `(
+	CREATE TABLE IF NOT EXISTS ` + _doctypes.docStorName(DocTypeID(id)) + `(
 		id INT NOT NULL AUTO_INCREMENT,
 		user_id INT NOT NULL,
 		docstate_id INT NOT NULL,
