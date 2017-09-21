@@ -1,6 +1,10 @@
-CREATE TABLE IF NOT EXISTS wf_roles_master (
+DROP TABLE IF EXISTS wf_roles_master;
+
+--
+
+CREATE TABLE wf_roles_master (
     id INT NOT NULL AUTO_INCREMENT,
-    name TEXT NOT NULL,
+    name VARCHAR(50) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (name)
 );

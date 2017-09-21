@@ -1,6 +1,10 @@
-CREATE TABLE IF NOT EXISTS wf_doctypes_master (
+DROP TABLE IF EXISTS wf_doctypes_master;
+
+--
+
+CREATE TABLE wf_doctypes_master (
     id INT NOT NULL AUTO_INCREMENT,
-    name TEXT NOT NULL,
+    name VARCHAR(100) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (name)
 );

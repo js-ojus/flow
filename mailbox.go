@@ -45,7 +45,7 @@ func (mb *Mailbox) Count(unread bool) (int64, error) {
 	WHERE group_id = ?
 	`
 	if unread {
-		q = q + "AND read = false"
+		q = q + "AND unread = 1"
 	}
 	q = q + `
 	ORDER BY id
@@ -83,7 +83,7 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	WHERE mbs.group_id = ?
 	`
 	if unread {
-		q = q + "AND mbs.read = false"
+		q = q + "AND mbs.unread = 1"
 	}
 	q = q + `
 	ORDER BY msgs.id
@@ -127,7 +127,7 @@ func (mb *Mailbox) ReassignMessage(otx *sql.Tx, msgID MessageID, gid GroupID) er
 	}
 
 	q := `
-	UPDATE wf_mailboxes SET group_id = ?
+	UPDATE wf_mailboxes SET group_id = ?, unread = 1
 	WHERE group_id = ?
 	AND message_id = ?
 	`

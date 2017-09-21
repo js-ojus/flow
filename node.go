@@ -277,8 +277,8 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 	// Post it into applicable mailboxes.
 
 	q = `
-	INSERT INTO wf_mailboxes(group_id, message_id)
-	VALUES(?, ?)
+	INSERT INTO wf_mailboxes(group_id, message_id, unread)
+	VALUES(?, ?, 1)
 	`
 	for _, gid := range recipients {
 		res, err = otx.Exec(q, gid, msgid)

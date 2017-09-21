@@ -1,4 +1,8 @@
-CREATE TABLE IF NOT EXISTS wf_docstate_transitions (
+DROP TABLE IF EXISTS wf_docstate_transitions;
+
+--
+
+CREATE TABLE wf_docstate_transitions (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     from_state_id INT NOT NULL,
