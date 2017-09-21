@@ -1,4 +1,4 @@
-CREATE TABLE wf_docevent_application (
+CREATE TABLE IF NOT EXISTS wf_docevent_application (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,

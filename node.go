@@ -242,7 +242,13 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, nstate DocStateID) erro
 	INSERT INTO wf_docevent_application(doctype_id, doc_id, from_state_id, docevent_id, to_state_id)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	_, err := otx.Exec(q, event.dtype, event.docID, event.state, event.action, nstate)
+	_, err := otx.Exec(q, event.dtype, event.docID, event.state, event.id, nstate)
+	if err != nil {
+		return err
+	}
+
+	q = `UPDATE wf_docevents SET status = 'A' WHERE id = ?`
+	_, err = otx.Exec(q, event.id)
 	if err != nil {
 		return err
 	}

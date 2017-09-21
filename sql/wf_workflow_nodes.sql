@@ -1,4 +1,4 @@
-CREATE TABLE wf_workflow_nodes (
+CREATE TABLE IF NOT EXISTS wf_workflow_nodes (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     docstate_id INT NOT NULL,

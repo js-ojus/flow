@@ -1,4 +1,4 @@
-CREATE TABLE wf_group_users (
+CREATE TABLE IF NOT EXISTS wf_group_users (
     id INT NOT NULL AUTO_INCREMENT,
     group_id INT NOT NULL,
     user_id INT NOT NULL,

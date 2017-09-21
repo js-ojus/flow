@@ -1,4 +1,4 @@
-CREATE TABLE wf_mailboxes (
+CREATE TABLE IF NOT EXISTS wf_mailboxes (
     id INT NOT NULL AUTO_INCREMENT,
     group_id INT NOT NULL,
     message_id INT NOT NULL,

@@ -1,4 +1,4 @@
-CREATE TABLE wf_messages (
+CREATE TABLE IF NOT EXISTS wf_messages (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,
