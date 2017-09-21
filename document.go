@@ -243,7 +243,7 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	q := `
 	SELECT docs.user_id, docs.docstate_id, docs.ctime, docs.title, docs.data, states.name
 	FROM ` + tbl + ` AS docs
-	JOIN wf_docstates_master AS states ON docs.docstate_id = states.id
+	JOIN wf_docstates_master states ON docs.docstate_id = states.id
 	WHERE docs.id = ?
 	`
 	row := db.QueryRow(q, id, dtype)
