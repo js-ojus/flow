@@ -1,4 +1,8 @@
-CREATE TABLE IF NOT EXISTS wf_workflows (
+DROP TABLE IF EXISTS wf_workflows;
+
+--
+
+CREATE TABLE wf_workflows (
     id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     doctype_id INT NOT NULL,

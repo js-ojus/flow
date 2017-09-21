@@ -1,4 +1,4 @@
--- CREATE TABLE IF NOT EXISTS wf_documents_<DOCTYPE_ID> (
+-- CREATE TABLE wf_documents_<DOCTYPE_ID> (
 --     id INT NOT NULL AUTO_INCREMENT,
 --     user_id INT NOT NULL,
 --     docstate_id INT NOT NULL,
@@ -11,7 +11,9 @@
 
 --
 
-CREATE TABLE IF NOT EXISTS wf_document_children (
+DROP TABLE IF EXISTS wf_document_children;
+
+CREATE TABLE wf_document_children (
     id INT NOT NULL AUTO_INCREMENT,
     parent_doctype_id INT NOT NULL,
     parent_id INT NOT NULL,
@@ -25,7 +27,9 @@ CREATE TABLE IF NOT EXISTS wf_document_children (
 
 --
 
-CREATE TABLE IF NOT EXISTS wf_document_blobs (
+DROP TABLE IF EXISTS wf_document_blobs;
+
+CREATE TABLE wf_document_blobs (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,
@@ -39,7 +43,9 @@ CREATE TABLE IF NOT EXISTS wf_document_blobs (
 
 --
 
-CREATE TABLE IF NOT EXISTS wf_document_tags (
+DROP TABLE IF EXISTS wf_document_tags;
+
+CREATE TABLE wf_document_tags (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,

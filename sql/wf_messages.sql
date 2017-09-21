@@ -1,4 +1,8 @@
-CREATE TABLE IF NOT EXISTS wf_messages (
+DROP TABLE IF EXISTS wf_messages;
+
+--
+
+CREATE TABLE wf_messages (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     doc_id INT NOT NULL,

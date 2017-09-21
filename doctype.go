@@ -109,8 +109,14 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		return 0, err
 	}
 
-	q := `
-	CREATE TABLE IF NOT EXISTS ` + _doctypes.docStorName(DocTypeID(id)) + `(
+	tbl := _doctypes.docStorName(DocTypeID(id))
+	q := `DROP TABLE IF EXISTS ` + tbl
+	res, err = tx.Exec(q)
+	if err != nil {
+		return 0, err
+	}
+	q = `
+	CREATE TABLE ` + tbl + ` (
 		id INT NOT NULL AUTO_INCREMENT,
 		user_id INT NOT NULL,
 		docstate_id INT NOT NULL,
