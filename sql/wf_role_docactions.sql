@@ -1,4 +1,4 @@
-CREATE TABLE wf_role_docactions (
+CREATE TABLE IF NOT EXISTS wf_role_docactions (
     id INT NOT NULL AUTO_INCREMENT,
     role_id INT NOT NULL,
     doctype_id INT NOT NULL,

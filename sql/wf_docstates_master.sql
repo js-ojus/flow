@@ -1,4 +1,4 @@
-CREATE TABLE wf_docstates_master (
+CREATE TABLE IF NOT EXISTS wf_docstates_master (
     id INT NOT NULL AUTO_INCREMENT,
     doctype_id INT NOT NULL,
     name TEXT NOT NULL,

@@ -1,4 +1,4 @@
-CREATE TABLE wf_access_contexts (
+CREATE TABLE IF NOT EXISTS wf_access_contexts (
     id INT NOT NULL AUTO_INCREMENT,
     ns_id INT NOT NULL,
     group_id INT NOT NULL,
