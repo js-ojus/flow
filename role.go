@@ -271,9 +271,9 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt *DocType, da *Doc
 func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 	q := `
 	SELECT dtm.id, dtm.name, dam.id, dam.name
-	FROM wf_doctypes_master dtm, wf_docactions_master dam
+	FROM wf_doctypes_master dtm
 	JOIN wf_role_docactions rdas ON dtm.id = rdas.doctype_id
-	JOIN ON dam.id = rdas.docaction_id
+	JOIN wf_docactions_master dam ON dam.id = rdas.docaction_id
 	WHERE rdas.role_id = ?
 	`
 	rows, err := db.Query(q, rid)
