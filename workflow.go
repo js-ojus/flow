@@ -228,18 +228,39 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 // to be fetched separately.
 func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	q := `
-	SELECT name, doctype_id, docstate_id
+	SELECT id, name, doctype_id, docstate_id
 	FROM wf_workflows
 	WHERE id = ?
 	`
 	row := db.QueryRow(q, id)
 	var elem Workflow
-	err := row.Scan(&elem.name, &elem.dtype, &elem.bstate)
+	err := row.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
 	if err != nil {
 		return nil, err
 	}
 
-	elem.id = id
+	return &elem, nil
+}
+
+// Get retrieves the details of the requested workflow from the
+// database.
+//
+// N.B.  This method retrieves the primary information of the
+// workflow.  Information of the nodes comprising this workflow have
+// to be fetched separately.
+func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
+	q := `
+	SELECT id, name, doctype_id, docstate_id
+	FROM wf_workflows
+	WHERE name = ?
+	`
+	row := db.QueryRow(q, name)
+	var elem Workflow
+	err := row.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
+	if err != nil {
+		return nil, err
+	}
+
 	return &elem, nil
 }
 
