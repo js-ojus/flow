@@ -4,7 +4,7 @@ go:
     - 1.x
 
 addons:
-    - mariadb : "10.1"
+    mariadb: '10.1'
 
 before_script:
     - ./sql/setup_db.sh -t
