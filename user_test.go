@@ -59,6 +59,16 @@ func TestUsers01(t *testing.T) {
 		fmt.Printf("%#v\n", u)
 	})
 
+	// Retrieve a specified user.
+	t.Run("GetByEmail", func(t *testing.T) {
+		u, err := Users().GetByEmail("js@js")
+		if err != nil {
+			t.Errorf("error getting user : %v\n", err)
+		}
+
+		fmt.Printf("%#v\n", u)
+	})
+
 	// Check the status of a user.
 	t.Run("IsActive", func(t *testing.T) {
 		status, err := Users().IsActive(1)

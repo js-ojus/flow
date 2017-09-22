@@ -17,6 +17,7 @@ package flow
 import (
 	"errors"
 	"math"
+	"strings"
 )
 
 // UserID is the type of unique user identifiers.
@@ -122,6 +123,26 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 	var elem User
 	var fname, lname string
 	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE id = ?", uid)
+	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
+	if err != nil {
+		return nil, err
+	}
+
+	elem.name = fname + " " + lname
+	return &elem, nil
+}
+
+// GetByEmail retrieves user information from the database, by looking
+// up the given e-mail address.
+func (us *_Users) GetByEmail(email string) (*User, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, errors.New("e-mail address should be non-empty")
+	}
+
+	var elem User
+	var fname, lname string
+	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE email = ?", email)
 	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
 	if err != nil {
 		return nil, err
