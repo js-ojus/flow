@@ -152,8 +152,26 @@ func (rs *_Roles) Get(id RoleID) (*Role, error) {
 	return &elem, nil
 }
 
+// GetByName answers the role, if one with the given name is
+// registered; `nil` and the error, otherwise.
+func (dts *_Roles) GetByName(name string) (*Role, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("role cannot be empty")
+	}
+
+	var elem Role
+	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE name = ?", name)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
 // Rename renames the given role.
-func (rs *_Roles) Rename(otx *sql.Tx, elem *Role, name string) error {
+func (rs *_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -170,7 +188,7 @@ func (rs *_Roles) Rename(otx *sql.Tx, elem *Role, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}

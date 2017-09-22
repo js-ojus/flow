@@ -23,10 +23,10 @@ import (
 )
 
 // Driver test function.
-func TestDocTypes01(t *testing.T) {
+func TestRoles01(t *testing.T) {
 	const (
-		dtypeStorReq = "DATA_PLAT:STOR_REQ"
-		dtypeStorRel = "DATA_PLAT:STOR_REL"
+		roleAdmin = "ADMIN"
+		roleUser  = "USER"
 	)
 
 	// Connect to the database.
@@ -42,9 +42,9 @@ func TestDocTypes01(t *testing.T) {
 	}
 	RegisterDB(db)
 
-	// List document types.
+	// List roles.
 	t.Run("List", func(t *testing.T) {
-		dts, err := DocTypes().List(0, 0)
+		dts, err := Roles().List(0, 0)
 		if err != nil {
 			t.Errorf("error : %v", err)
 		}
@@ -54,7 +54,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Register a few new document types.
+	// Register a few new roles.
 	t.Run("New", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -62,13 +62,13 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		_, err = DocTypes().New(tx, dtypeStorReq)
+		_, err = Roles().New(tx, roleAdmin)
 		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorReq, err)
+			t.Errorf("error creating role '%s' : %v\n", roleAdmin, err)
 		}
-		_, err = DocTypes().New(tx, dtypeStorRel)
+		_, err = Roles().New(tx, roleUser)
 		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorRel, err)
+			t.Errorf("error creating role '%s' : %v\n", roleUser, err)
 		}
 
 		if err == nil {
@@ -79,37 +79,37 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Retrieve a specified document type.
+	// Retrieve a specified role.
 	t.Run("GetByID", func(t *testing.T) {
-		dt, err := DocTypes().Get(3)
+		dt, err := Roles().Get(2)
 		if err != nil {
-			t.Errorf("error getting document type '3' : %v\n", err)
+			t.Errorf("error getting role '2' : %v\n", err)
 		}
 
 		fmt.Printf("%#v\n", dt)
 	})
 
-	// Verify existence of a specified document type.
+	// Verify existence of a specified role.
 	t.Run("GetByName", func(t *testing.T) {
-		dt, err := DocTypes().GetByName(dtypeStorRel)
+		dt, err := Roles().GetByName(roleAdmin)
 		if err != nil {
-			t.Errorf("error getting document type '%s' : %v\n", dtypeStorRel, err)
+			t.Errorf("error getting role '%s' : %v\n", roleAdmin, err)
 		}
 
 		fmt.Printf("%#v\n", dt)
 	})
 
-	// Rename the given document type to the specified new name.
-	t.Run("RenameType", func(t *testing.T) {
+	// Rename the given role to the specified new name.
+	t.Run("RenameRole", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Errorf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_DEL")
+		err = Roles().Rename(tx, 1, "Administrator")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming role '3' : %v\n", err)
 		}
 
 		if err == nil {
@@ -120,7 +120,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Rename the given document type to the specified old name.
+	// Rename the given role to the specified old name.
 	t.Run("UndoRename", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -128,9 +128,9 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_REQ")
+		err = Roles().Rename(tx, 1, roleAdmin)
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming role '3' : %v\n", err)
 		}
 
 		if err == nil {
