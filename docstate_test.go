@@ -22,13 +22,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const (
-	dtypeStorReqID = 3
-	dtypeStorRelID = 4
-)
-
 // Driver test function.
 func TestDocStates01(t *testing.T) {
+	const (
+		dtypeStorReqID = 3
+		dtypeStorRelID = 4
+	)
 	var (
 		storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
 		storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
@@ -118,7 +117,7 @@ func TestDocStates01(t *testing.T) {
 
 		err = DocStates().Rename(tx, 1, "INITIAL")
 		if err != nil {
-			t.Errorf("error renaming document state '3' : %v\n", err)
+			t.Errorf("error renaming document state '1' : %v\n", err)
 		}
 
 		if err == nil {
@@ -139,7 +138,7 @@ func TestDocStates01(t *testing.T) {
 
 		err = DocStates().Rename(tx, 1, "REQ_PENDING")
 		if err != nil {
-			t.Errorf("error renaming document state '3' : %v\n", err)
+			t.Errorf("error renaming document state '1' : %v\n", err)
 		}
 
 		if err == nil {
