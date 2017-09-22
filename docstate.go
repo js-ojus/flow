@@ -74,7 +74,7 @@ func DocStates() *_DocStates {
 
 // New creates an enumerated state as defined by the consuming
 // application.
-func (dss *_DocStates) New(otx *sql.Tx, dtype *DocType, name string) (DocStateID, error) {
+func (dss *_DocStates) New(otx *sql.Tx, dtype DocTypeID, name string) (DocStateID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name cannot be empty")
@@ -91,7 +91,7 @@ func (dss *_DocStates) New(otx *sql.Tx, dtype *DocType, name string) (DocStateID
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_docstates_master(doctype_id, name) VALUES(?, ?)", dtype.id, name)
+	res, err := tx.Exec("INSERT INTO wf_docstates_master(doctype_id, name) VALUES(?, ?)", dtype, name)
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +126,7 @@ func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
 	}
 
 	q := `
-	SELECT *
+	SELECT id, doctype_id, name
 	FROM wf_docstates_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -140,7 +140,7 @@ func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
 	ary := make([]*DocState, 0, 10)
 	for rows.Next() {
 		var elem DocState
-		err = rows.Scan(&elem.id, &elem.dtype, &elem.name)
+		err = rows.Scan(&elem.id, &elem.dtype.id, &elem.name)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,25 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 
 	var elem DocState
 	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.dtype, &elem.name)
+	err := row.Scan(&elem.id, &elem.dtype.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
+// GetByName answers the document state, if one with the given name is
+// registered; `nil` and the error, otherwise.
+func (dss *_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("document state cannot be empty")
+	}
+
+	var elem DocState
+	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE doctype_id = ? AND name = ?", dtype, name)
+	err := row.Scan(&elem.id, &elem.dtype.id, &elem.name)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +188,7 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 }
 
 // Rename renames the given document state.
-func (dss *_DocStates) Rename(otx *sql.Tx, elem *DocState, name string) error {
+func (dss *_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -187,7 +205,7 @@ func (dss *_DocStates) Rename(otx *sql.Tx, elem *DocState, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -200,25 +218,4 @@ func (dss *_DocStates) Rename(otx *sql.Tx, elem *DocState, name string) error {
 	}
 
 	return nil
-}
-
-// Exists answers its unique ID, if a document state with the given
-// name is registered; `0` and the error, otherwise.
-func (dss *_DocStates) Exists(dtype *DocType, name string) (DocStateID, error) {
-	if dtype == nil {
-		return 0, errors.New("document type should not be `nil`")
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return 0, errors.New("document state cannot be empty")
-	}
-
-	row := db.QueryRow("SELECT id FROM wf_docstates_master WHERE doctype_id = ? AND name = ?", dtype.id, name)
-	var n int64
-	err := row.Scan(&n)
-	if err != nil {
-		return 0, err
-	}
-
-	return DocStateID(n), nil
 }
