@@ -67,7 +67,7 @@ func Groups() *_Groups {
 // NewSingleton creates a singleton group associated with the given
 // user.  The e-mail address of the user is used as the name of the
 // group.  This serves as the linking identifier.
-func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID, email string) (GroupID, error) {
+func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID) (GroupID, error) {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -79,7 +79,13 @@ func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID, email string) (GroupID,
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_groups_master(name, group_type) VALUES(?, ?)", email, "S")
+	q := `
+	INSERT INTO wf_groups_master(name, group_type)
+	SELECT u.email, 'S'
+	FROM wf_users_master u
+	WHERE u.id = ?
+	`
+	res, err := tx.Exec(q, uid)
 	if err != nil {
 		return 0, err
 	}
@@ -210,7 +216,7 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 	}
 	if elem.gtype == "S" {
 		q := `
-		SELECT status FROM wf_users_master_v
+		SELECT status FROM wf_users_master
 		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
 		`
 		var active bool
@@ -234,7 +240,7 @@ func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
 		return errors.New("group ID must be a positive integer")
 	}
 
-	row := db.QueryRow("SELECT group_type FROM wf_groups_master WHERE group_id = ?", id)
+	row := db.QueryRow("SELECT group_type FROM wf_groups_master WHERE id = ?", id)
 	var gtype string
 	err := row.Scan(&gtype)
 	if err != nil {
@@ -315,7 +321,7 @@ func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
 func (gs *_Groups) SingletonUser(gid GroupID) (UserID, error) {
 	q := `
 	SELECT gus.user_id FROM wf_group_users gus
-	JOIN wf_groups_master gm ON gus.group_id = gm.group_id
+	JOIN wf_groups_master gm ON gus.group_id = gm.id
 	WHERE gm.id = ?
 	AND gm.group_type = 'S'
 	ORDER BY gus.id
@@ -326,7 +332,7 @@ func (gs *_Groups) SingletonUser(gid GroupID) (UserID, error) {
 	err := row.Scan(&uid)
 	switch {
 	case err == sql.ErrNoRows:
-		return 0, errors.New("given group may not be a singleton group")
+		return 0, errors.New("given group is not a singleton group")
 
 	case err != nil:
 		return 0, err

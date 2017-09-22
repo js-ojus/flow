@@ -7,6 +7,5 @@ CREATE TABLE wf_groups_master (
     name VARCHAR(100) NOT NULL,
     group_type ENUM('G', 'S'),
     PRIMARY KEY (id),
-    FOREIGN KEY (name) REFERENCES users_master(email),
     UNIQUE (name)
 );

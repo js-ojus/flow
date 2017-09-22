@@ -167,8 +167,26 @@ func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
 	return &elem, nil
 }
 
+// GetByName answers the document action, if one such with the given
+// name is registered; `nil` and the error, otherwise.
+func (das *_DocActions) GetByName(name string) (*DocAction, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("document action cannot be empty")
+	}
+
+	var elem DocAction
+	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE name = ?", name)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
 // Rename renames the given document action.
-func (das *_DocActions) Rename(otx *sql.Tx, elem *DocAction, name string) error {
+func (das *_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -185,7 +203,7 @@ func (das *_DocActions) Rename(otx *sql.Tx, elem *DocAction, name string) error 
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -198,22 +216,4 @@ func (das *_DocActions) Rename(otx *sql.Tx, elem *DocAction, name string) error 
 	}
 
 	return nil
-}
-
-// Exists answers its unique ID, if a document action with the given
-// name is registered; `0` and the error, otherwise.
-func (das *_DocActions) Exists(name string) (DocActionID, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return 0, errors.New("document action cannot be empty")
-	}
-
-	row := db.QueryRow("SELECT id FROM wf_docactions_master WHERE name = ?", name)
-	var n int64
-	err := row.Scan(&n)
-	if err != nil {
-		return 0, err
-	}
-
-	return DocActionID(n), nil
 }

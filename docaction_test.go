@@ -23,10 +23,9 @@ import (
 )
 
 // Driver test function.
-func TestDocTypes01(t *testing.T) {
-	const (
-		dtypeStorReq = "DATA_PLAT:STOR_REQ"
-		dtypeStorRel = "DATA_PLAT:STOR_REL"
+func TestDocActions01(t *testing.T) {
+	var (
+		actions = []string{"CREATE", "APPROVE", "REJECT", "RET_WITH_COMMENTS", "DISCARD"}
 	)
 
 	// Connect to the database.
@@ -42,19 +41,19 @@ func TestDocTypes01(t *testing.T) {
 	}
 	RegisterDB(db)
 
-	// List document types.
+	// List document actions.
 	t.Run("List", func(t *testing.T) {
-		dts, err := DocTypes().List(0, 0)
+		das, err := DocActions().List(0, 0)
 		if err != nil {
 			t.Errorf("error : %v", err)
 		}
 
-		for _, dt := range dts {
-			fmt.Printf("%#v\n", dt)
+		for _, da := range das {
+			fmt.Printf("%#v\n", da)
 		}
 	})
 
-	// Register a few new document types.
+	// Register a few new document actions.
 	t.Run("New", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -62,13 +61,11 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		_, err = DocTypes().New(tx, dtypeStorReq)
-		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorReq, err)
-		}
-		_, err = DocTypes().New(tx, dtypeStorRel)
-		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorRel, err)
+		for _, name := range actions {
+			_, err = DocActions().New(tx, name)
+			if err != nil {
+				t.Errorf("error creating document action '%s' : %v\n", name, err)
+			}
 		}
 
 		if err == nil {
@@ -79,37 +76,37 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Retrieve a specified document type.
+	// Retrieve a specified document action.
 	t.Run("GetByID", func(t *testing.T) {
-		dt, err := DocTypes().Get(3)
+		da, err := DocActions().Get(1)
 		if err != nil {
-			t.Errorf("error getting document type '3' : %v\n", err)
+			t.Errorf("error getting document action '1' : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", dt)
+		fmt.Printf("%#v\n", da)
 	})
 
-	// Verify existence of a specified document type.
+	// Verify existence of a specified document action.
 	t.Run("GetByName", func(t *testing.T) {
-		dt, err := DocTypes().GetByName(dtypeStorRel)
+		da, err := DocActions().GetByName(actions[1])
 		if err != nil {
-			t.Errorf("error getting document type '%s' : %v\n", dtypeStorRel, err)
+			t.Errorf("error getting document action '%s' : %v\n", actions[1], err)
 		}
 
-		fmt.Printf("%#v\n", dt)
+		fmt.Printf("%#v\n", da)
 	})
 
-	// Rename the given document type to the specified new name.
-	t.Run("RenameType", func(t *testing.T) {
+	// Rename the given document action to the specified new name.
+	t.Run("RenameAction", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Errorf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_DEL")
+		err = DocActions().Rename(tx, 1, "INITIALISE")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming document action '1' : %v\n", err)
 		}
 
 		if err == nil {
@@ -120,7 +117,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Rename the given document type to the specified old name.
+	// Rename the given document action to the specified old name.
 	t.Run("UndoRename", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -128,9 +125,9 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_REQ")
+		err = DocActions().Rename(tx, 1, "CREATE")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming document action '1' : %v\n", err)
 		}
 
 		if err == nil {

@@ -23,10 +23,14 @@ import (
 )
 
 // Driver test function.
-func TestDocTypes01(t *testing.T) {
+func TestDocStates01(t *testing.T) {
 	const (
-		dtypeStorReq = "DATA_PLAT:STOR_REQ"
-		dtypeStorRel = "DATA_PLAT:STOR_REL"
+		dtypeStorReqID = 3
+		dtypeStorRelID = 4
+	)
+	var (
+		storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
+		storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
 	)
 
 	// Connect to the database.
@@ -42,19 +46,19 @@ func TestDocTypes01(t *testing.T) {
 	}
 	RegisterDB(db)
 
-	// List document types.
+	// List document states.
 	t.Run("List", func(t *testing.T) {
-		dts, err := DocTypes().List(0, 0)
+		dss, err := DocStates().List(0, 0)
 		if err != nil {
 			t.Errorf("error : %v", err)
 		}
 
-		for _, dt := range dts {
-			fmt.Printf("%#v\n", dt)
+		for _, ds := range dss {
+			fmt.Printf("%#v\n", ds)
 		}
 	})
 
-	// Register a few new document types.
+	// Register a few new document states.
 	t.Run("New", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -62,13 +66,17 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		_, err = DocTypes().New(tx, dtypeStorReq)
-		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorReq, err)
+		for _, name := range storReqStates {
+			_, err = DocStates().New(tx, dtypeStorReqID, name)
+			if err != nil {
+				t.Errorf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
+			}
 		}
-		_, err = DocTypes().New(tx, dtypeStorRel)
-		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorRel, err)
+		for _, name := range storRelStates {
+			_, err = DocStates().New(tx, dtypeStorRelID, name)
+			if err != nil {
+				t.Errorf("error creating document type:state '%d:%s' : %v\n", dtypeStorRelID, name, err)
+			}
 		}
 
 		if err == nil {
@@ -79,37 +87,37 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Retrieve a specified document type.
+	// Retrieve a specified document state.
 	t.Run("GetByID", func(t *testing.T) {
-		dt, err := DocTypes().Get(3)
+		ds, err := DocStates().Get(1)
 		if err != nil {
-			t.Errorf("error getting document type '3' : %v\n", err)
+			t.Errorf("error getting document state '1' : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", dt)
+		fmt.Printf("%#v\n", ds)
 	})
 
-	// Verify existence of a specified document type.
+	// Verify existence of a specified document state.
 	t.Run("GetByName", func(t *testing.T) {
-		dt, err := DocTypes().GetByName(dtypeStorRel)
+		ds, err := DocStates().GetByName(dtypeStorReqID, storReqStates[1])
 		if err != nil {
-			t.Errorf("error getting document type '%s' : %v\n", dtypeStorRel, err)
+			t.Errorf("error getting document type:state '%d:%s' : %v\n", dtypeStorReqID, storReqStates[1], err)
 		}
 
-		fmt.Printf("%#v\n", dt)
+		fmt.Printf("%#v\n", ds)
 	})
 
-	// Rename the given document type to the specified new name.
-	t.Run("RenameType", func(t *testing.T) {
+	// Rename the given document state to the specified new name.
+	t.Run("RenameState", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Errorf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_DEL")
+		err = DocStates().Rename(tx, 1, "INITIAL")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming document state '1' : %v\n", err)
 		}
 
 		if err == nil {
@@ -120,7 +128,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 	})
 
-	// Rename the given document type to the specified old name.
+	// Rename the given document state to the specified old name.
 	t.Run("UndoRename", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
@@ -128,9 +136,9 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_REQ")
+		err = DocStates().Rename(tx, 1, "REQ_PENDING")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Errorf("error renaming document state '1' : %v\n", err)
 		}
 
 		if err == nil {

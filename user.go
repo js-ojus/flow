@@ -17,6 +17,7 @@ package flow
 import (
 	"errors"
 	"math"
+	"strings"
 )
 
 // UserID is the type of unique user identifiers.
@@ -29,9 +30,10 @@ type UserID int64
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	id    UserID // Must be globally-unique
-	name  string // For display purposes only
-	email string // E-mail address of this user
+	id     UserID // Must be globally-unique
+	name   string // For display purposes only
+	email  string // E-mail address of this user
+	status bool   // Is this user account active?
 }
 
 // ID answers this user's ID.
@@ -47,6 +49,11 @@ func (u *User) Name() string {
 // Email answers this user's e-mail address.
 func (u *User) Email() string {
 	return u.email
+}
+
+// Status answers `true` if this user's account is active.
+func (u *User) Status() bool {
+	return u.status
 }
 
 // Unexported type, only for convenience methods.
@@ -78,7 +85,7 @@ func (us *_Users) List(offset, limit int64) ([]*User, error) {
 	}
 
 	q := `
-	SELECT id, fname, lname, email
+	SELECT id, first_name, last_name, email, status
 	FROM wf_users_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -93,7 +100,7 @@ func (us *_Users) List(offset, limit int64) ([]*User, error) {
 	ary := make([]*User, 0, 10)
 	for rows.Next() {
 		var elem User
-		err = rows.Scan(&elem.id, &fname, &lname, &elem.email)
+		err = rows.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
 		if err != nil {
 			return nil, err
 		}
@@ -115,8 +122,28 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 
 	var elem User
 	var fname, lname string
-	row := db.QueryRow("SELECT id, first_name, last_name, email FROM wf_users_master_v WHERE id = ?", uid)
-	err := row.Scan(&elem.id, &fname, &lname, &elem.email)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE id = ?", uid)
+	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
+	if err != nil {
+		return nil, err
+	}
+
+	elem.name = fname + " " + lname
+	return &elem, nil
+}
+
+// GetByEmail retrieves user information from the database, by looking
+// up the given e-mail address.
+func (us *_Users) GetByEmail(email string) (*User, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, errors.New("e-mail address should be non-empty")
+	}
+
+	var elem User
+	var fname, lname string
+	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE email = ?", email)
+	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +154,7 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 
 // IsActive answers `true` if the given user's account is enabled.
 func (us *_Users) IsActive(uid UserID) (bool, error) {
-	row := db.QueryRow("SELECT status FROM wf_users_master_v WHERE id = ?", uid)
+	row := db.QueryRow("SELECT status FROM wf_users_master WHERE id = ?", uid)
 	var status bool
 	err := row.Scan(&status)
 	if err != nil {
