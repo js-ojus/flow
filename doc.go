@@ -40,7 +40,7 @@ func init() {
 //
 // N.B. This method **MUST** be called before anything else in `flow`.
 func RegisterDB(sdb *sql.DB) error {
-	if db == nil {
+	if sdb == nil {
 		log.Fatal("given database handle is `nil`")
 	}
 	db = sdb
