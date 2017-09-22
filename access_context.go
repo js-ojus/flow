@@ -210,7 +210,7 @@ func (ac *AccessContext) RemoveGroupRole(gid GroupID, rid RoleID) error {
 
 // HasPermission answers `true` if the given group has the requested
 // action enabled on the specified document type; `false` otherwise.
-func (ac *AccessContext) HasPermission(gid GroupID, dt *DocType, da *DocAction) bool {
+func (ac *AccessContext) HasPermission(gid GroupID, dtype DocTypeID, action DocActionID) bool {
 	if gid == 0 {
 		return false
 	}
@@ -224,7 +224,7 @@ func (ac *AccessContext) HasPermission(gid GroupID, dt *DocType, da *DocAction) 
 	}
 
 	for _, el := range rs {
-		if ok, _ := Roles().HasPermission(el, dt, da); ok {
+		if ok, _ := Roles().HasPermission(el, dtype, action); ok {
 			return true
 		}
 	}
