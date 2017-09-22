@@ -124,7 +124,6 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		title VARCHAR(250) NOT NULL,
 		data BLOB NOT NULL,
 		PRIMARY KEY (id),
-		FOREIGN KEY (outer_doctype_id) REFERENCES wf_doctypes_master(id),
 		FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id)
 	)
 	`
@@ -157,7 +156,7 @@ func (dts *_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 	}
 
 	q := `
-	SELECT name
+	SELECT id, name
 	FROM wf_doctypes_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -200,8 +199,26 @@ func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
 	return &elem, nil
 }
 
+// GetByName answers the document type, if one with the given name is
+// registered; `nil` and the error, otherwise.
+func (dts *_DocTypes) GetByName(name string) (*DocType, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("document type cannot be empty")
+	}
+
+	var elem DocType
+	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE name = ?", name)
+	err := row.Scan(&elem.id, &elem.name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
 // Rename renames the given document type.
-func (dts *_DocTypes) Rename(otx *sql.Tx, elem *DocType, name string) error {
+func (dts *_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -218,7 +235,7 @@ func (dts *_DocTypes) Rename(otx *sql.Tx, elem *DocType, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, elem.id)
+	_, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -231,22 +248,4 @@ func (dts *_DocTypes) Rename(otx *sql.Tx, elem *DocType, name string) error {
 	}
 
 	return nil
-}
-
-// Exists answers its unique ID, if a document type with the given
-// name is registered; `0` and the error, otherwise.
-func (dts *_DocTypes) Exists(name string) (DocTypeID, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return 0, errors.New("document type cannot be empty")
-	}
-
-	row := db.QueryRow("SELECT id FROM wf_doctypes_master WHERE name = ?", name)
-	var n int64
-	err := row.Scan(&n)
-	if err != nil {
-		return 0, err
-	}
-
-	return DocTypeID(n), nil
 }
