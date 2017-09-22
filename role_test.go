@@ -140,4 +140,71 @@ func TestRoles01(t *testing.T) {
 			}
 		}
 	})
+
+	// List permissions.
+	t.Run("Permissions", func(t *testing.T) {
+		perms, err := Roles().Permissions(1)
+		if err != nil {
+			t.Errorf("unable to query permissions : %v\n", err)
+		}
+
+		for dtype, das := range perms {
+			fmt.Printf("document type : %s\n", dtype.name)
+			for _, da := range das {
+				fmt.Printf("\taction : %s\n", da.name)
+			}
+		}
+	})
+
+	// Add a permission.
+	t.Run("AddPermission", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Errorf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Roles().AddPermission(tx, 1, 3, 1)
+		if err != nil {
+			t.Errorf("error adding permission : %v\n", err)
+		}
+
+		if err == nil {
+			err = tx.Commit()
+			if err != nil {
+				t.Errorf("error committing transaction : %v\n", err)
+			}
+		}
+	})
+
+	// Remove a permission.
+	t.Run("RemovePermission", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Errorf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Roles().RemovePermission(tx, 1, 3, 1)
+		if err != nil {
+			t.Errorf("error removing permission : %v\n", err)
+		}
+
+		if err == nil {
+			err = tx.Commit()
+			if err != nil {
+				t.Errorf("error committing transaction : %v\n", err)
+			}
+		}
+	})
+
+	// Has a permission.
+	t.Run("HasPermission", func(t *testing.T) {
+		ok, err := Roles().HasPermission(1, 3, 1)
+		if err != nil {
+			t.Errorf("unable to query permission : %v\n", err)
+		}
+
+		fmt.Printf("has permission : %v\n", ok)
+	})
 }

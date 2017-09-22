@@ -205,14 +205,7 @@ func (rs *_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 
 // AddPermission adds the given action to this role, for the given
 // document type.
-func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
-	if rid <= 0 {
-		return errors.New("role ID must be a positive integer")
-	}
-	if dt == nil || da == nil {
-		return errors.New("document type and document action should not be `nil`")
-	}
-
+func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -228,7 +221,7 @@ func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAct
 	INSERT INTO wf_role_docactions(role_id, doctype_id, docaction_id)
 	VALUES(?, ?, ?)
 	`
-	_, err := tx.Exec(q, rid, dt.id, da.id)
+	_, err := tx.Exec(q, rid, dtype, action)
 	if err != nil {
 		return err
 	}
@@ -244,14 +237,7 @@ func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAct
 
 // RemovePermission removes all permissions from this role, for the
 // given document type.
-func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt *DocType, da *DocAction) error {
-	if rid <= 0 {
-		return errors.New("role ID must be a positive integer")
-	}
-	if dt == nil || da == nil {
-		return errors.New("document type and document action should not be `nil`")
-	}
-
+func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -269,7 +255,7 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dt *DocType, da *Doc
 	AND doctype_id = ?
 	AND docaction_id = ?
 	`
-	_, err := tx.Exec(q, rid, dt.id, da.id)
+	_, err := tx.Exec(q, rid, dtype, action)
 	if err != nil {
 		return err
 	}
@@ -324,18 +310,18 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 
 // HasPermission answers `true` if this role has the queried
 // permission for the given document type.
-func (rs *_Roles) HasPermission(rid RoleID, dt *DocType, da *DocAction) (bool, error) {
+func (rs *_Roles) HasPermission(rid RoleID, dtype DocTypeID, action DocActionID) (bool, error) {
 	q := `
 	SELECT rdas.id FROM wf_role_docactions rdas
 	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
 	JOIN wf_docactions_master dam ON rdas.docaction_id = dam.id
 	WHERE rdas.role_id = ?
-	AND dtm.name = ?
-	AND dam.name = ?
+	AND dtm.id = ?
+	AND dam.id = ?
 	ORDER BY rdas.id
 	LIMIT 1
 	`
-	row := db.QueryRow(q, rid, dt.id, da.id)
+	row := db.QueryRow(q, rid, dtype, action)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
