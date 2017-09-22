@@ -3,7 +3,8 @@
 chars=$(echo "0 1 2 3 4 5 6 7 8 9 a b c d e f" | cut -d' ' -f 1-)
 
 if [ "$1" = "" ]; then
-    basedir="."
+    mkdir ./data
+    basedir="./data"
 else
     basedir=$1
 fi

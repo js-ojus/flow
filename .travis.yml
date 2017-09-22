@@ -3,6 +3,13 @@ language: go
 go:
     - 1.x
 
+addons:
+    - mariadb : "10.1"
+
+before_script:
+    - ./sql/setup_db.sh -t
+    - ./sql/setup_blob_dirs.sh
+
 notifications:
     email:
         recipients:
