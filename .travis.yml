@@ -3,8 +3,8 @@ language: go
 go:
     - 1.x
 
-addons:
-    mariadb: '10.1'
+services:
+    - mysql
 
 before_script:
     - ./sql/setup_db.sh -t

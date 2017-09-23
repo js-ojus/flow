@@ -34,7 +34,7 @@ func TestDocStates01(t *testing.T) {
 	)
 
 	// Connect to the database.
-	driver, connStr := "mysql", "js@/flow"
+	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
 		t.Errorf("could not connect to database : %v\n", err)
