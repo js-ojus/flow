@@ -22,13 +22,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+const (
+	dtypeStorReq = "DATA_PLAT:STOR_REQ"
+	dtypeStorRel = "DATA_PLAT:STOR_REL"
+)
+
 // Driver test function.
 func TestDocTypes01(t *testing.T) {
-	const (
-		dtypeStorReq = "DATA_PLAT:STOR_REQ"
-		dtypeStorRel = "DATA_PLAT:STOR_REL"
-	)
-
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
@@ -58,24 +58,22 @@ func TestDocTypes01(t *testing.T) {
 	t.Run("New", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
 		_, err = DocTypes().New(tx, dtypeStorReq)
 		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorReq, err)
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
 		_, err = DocTypes().New(tx, dtypeStorRel)
 		if err != nil {
-			t.Errorf("error creating document type '%s' : %v\n", dtypeStorRel, err)
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorRel, err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Errorf("error committing transaction : %v\n", err)
 		}
 	})
 

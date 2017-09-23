@@ -24,10 +24,9 @@ import (
 
 // Driver test function.
 func TestDocStates01(t *testing.T) {
-	const (
-		dtypeStorReqID = 3
-		dtypeStorRelID = 4
-	)
+	var dtypeStorReqID DocTypeID
+	var dtypeStorRelID DocTypeID
+
 	var (
 		storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
 		storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
@@ -60,12 +59,23 @@ func TestDocStates01(t *testing.T) {
 
 	// Register a few new document states.
 	t.Run("New", func(t *testing.T) {
+		// Insert the required document types.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
+		dtypeStorReqID, err = DocTypes().New(tx, dtypeStorReq)
+		if err != nil {
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
+		}
+		dtypeStorRelID, err = DocTypes().New(tx, dtypeStorRel)
+		if err != nil {
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorRel, err)
+		}
+
+		// Add document states.
 		for _, name := range storReqStates {
 			_, err = DocStates().New(tx, dtypeStorReqID, name)
 			if err != nil {
@@ -82,7 +92,7 @@ func TestDocStates01(t *testing.T) {
 		if err == nil {
 			err = tx.Commit()
 			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
+				t.Fatalf("error committing transaction : %v\n", err)
 			}
 		}
 	})
