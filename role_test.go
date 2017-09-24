@@ -16,195 +16,205 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var (
+	roles = []string{"ADMIN", "USER"}
+)
+
 // Driver test function.
 func TestRoles01(t *testing.T) {
-	const (
-		roleAdmin = "ADMIN"
-		roleUser  = "USER"
-	)
-
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List roles.
-	t.Run("List", func(t *testing.T) {
-		dts, err := Roles().List(0, 0)
+	// Tear down.
+	defer func() {
+		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error : %v", err)
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec(`DELETE FROM wf_role_docactions`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
 		}
 
-		for _, dt := range dts {
-			fmt.Printf("%#v\n", dt)
+		_, err = tx.Exec(`DELETE FROM wf_roles_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
 		}
-	})
 
-	// Register a few new roles.
+		_, err = tx.Exec(`DELETE FROM wf_docactions_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
+	// Test local state.
+	var adminID RoleID
+	var userID RoleID
+
+	// Test create operations.
 	t.Run("New", func(t *testing.T) {
+		// Create a couple of roles.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		_, err = Roles().New(tx, roleAdmin)
+		adminID, err = Roles().New(tx, roles[0])
 		if err != nil {
-			t.Errorf("error creating role '%s' : %v\n", roleAdmin, err)
+			t.Fatalf("error creating role '%s' : %v\n", roles[0], err)
 		}
-		_, err = Roles().New(tx, roleUser)
+		userID, err = Roles().New(tx, roles[1])
 		if err != nil {
-			t.Errorf("error creating role '%s' : %v\n", roleUser, err)
+			t.Fatalf("error creating role '%s' : %v\n", roles[1], err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 
-	// Retrieve a specified role.
-	t.Run("GetByID", func(t *testing.T) {
-		dt, err := Roles().Get(2)
+	// Test reading.
+	t.Run("Read", func(t *testing.T) {
+		_, err := Roles().List(0, 0)
 		if err != nil {
-			t.Errorf("error getting role '2' : %v\n", err)
+			t.Fatalf("error : %v", err)
 		}
 
-		fmt.Printf("%#v\n", dt)
-	})
-
-	// Verify existence of a specified role.
-	t.Run("GetByName", func(t *testing.T) {
-		dt, err := Roles().GetByName(roleAdmin)
+		_, err = Roles().Get(adminID)
 		if err != nil {
-			t.Errorf("error getting role '%s' : %v\n", roleAdmin, err)
+			t.Fatalf("error getting role '%d' : %v\n", adminID, err)
 		}
 
-		fmt.Printf("%#v\n", dt)
+		_, err = Roles().GetByName(roles[1])
+		if err != nil {
+			t.Fatalf("error getting role '%s' : %v\n", roles[1], err)
+		}
 	})
 
-	// Rename the given role to the specified new name.
-	t.Run("RenameRole", func(t *testing.T) {
+	// Test renaming.
+	t.Run("Update", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Roles().Rename(tx, 1, "Administrator")
+		err = Roles().Rename(tx, adminID, "Administrator")
 		if err != nil {
-			t.Errorf("error renaming role '3' : %v\n", err)
+			t.Fatalf("error renaming role '%d' : %v\n", adminID, err)
+		}
+		err = Roles().Rename(tx, adminID, roles[0])
+		if err != nil {
+			t.Fatalf("error renaming role '%d' : %v\n", adminID, err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 
-	// Rename the given role to the specified old name.
-	t.Run("UndoRename", func(t *testing.T) {
-		tx, err := db.Begin()
-		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
-		}
-		defer tx.Rollback()
-
-		err = Roles().Rename(tx, 1, roleAdmin)
-		if err != nil {
-			t.Errorf("error renaming role '3' : %v\n", err)
-		}
-
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// List permissions.
+	// Test permissions operations.
 	t.Run("Permissions", func(t *testing.T) {
-		perms, err := Roles().Permissions(1)
-		if err != nil {
-			t.Errorf("unable to query permissions : %v\n", err)
-		}
-
-		for dtype, das := range perms {
-			fmt.Printf("document type : %s\n", dtype.name)
-			for _, da := range das {
-				fmt.Printf("\taction : %s\n", da.name)
-			}
-		}
-	})
-
-	// Add a permission.
-	t.Run("AddPermission", func(t *testing.T) {
+		// Add a permission.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Roles().AddPermission(tx, 1, 3, 1)
+		dtypeStorReqID, err := DocTypes().New(tx, dtypeStorReq)
 		if err != nil {
-			t.Errorf("error adding permission : %v\n", err)
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
-
-		if err == nil {
-			err = tx.Commit()
+		var da DocActionID
+		for _, name := range actions {
+			da, err = DocActions().New(tx, name)
 			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
+				t.Fatalf("error creating document action '%s' : %v\n", name, err)
 			}
 		}
-	})
 
-	// Remove a permission.
-	t.Run("RemovePermission", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = Roles().AddPermission(tx, adminID, dtypeStorReqID, da)
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error adding permission : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		// List permissions.
+		perms, err := Roles().Permissions(adminID)
+		if err != nil {
+			t.Fatalf("unable to query permissions : %v\n", err)
+		}
+		if len(perms) != 1 {
+			t.Fatalf("permission doctype count -- expected : 1, got : %d\n", len(perms))
+		}
+
+		ok, err := Roles().HasPermission(adminID, dtypeStorReqID, da)
+		if err != nil {
+			t.Fatalf("unable to query permission : %v\n", err)
+		}
+		if !ok {
+			t.Fatalf("permission on doctype '%d' for action '%d' -- extected : true, got : %v\n", dtypeStorReqID, da, ok)
+		}
+
+		// Remove a permission.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Roles().RemovePermission(tx, 1, 3, 1)
+		err = Roles().RemovePermission(tx, adminID, dtypeStorReqID, da)
 		if err != nil {
-			t.Errorf("error removing permission : %v\n", err)
+			t.Fatalf("error removing permission : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Has a permission.
-	t.Run("HasPermission", func(t *testing.T) {
-		ok, err := Roles().HasPermission(1, 3, 1)
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("unable to query permission : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("has permission : %v\n", ok)
+		// Verify removal.
+		ok, err = Roles().HasPermission(adminID, dtypeStorReqID, da)
+		if err != nil {
+			t.Fatalf("unable to query permission : %v\n", err)
+		}
+		if ok {
+			t.Fatalf("permission on doctype '%d' for action '%d' -- extected : false, got : %v\n", dtypeStorReqID, da, ok)
+		}
 	})
 }

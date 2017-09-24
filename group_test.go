@@ -90,17 +90,6 @@ func TestGroups01(t *testing.T) {
 		}
 		u1, _ = res.LastInsertId()
 
-		err = tx.Commit()
-		if err != nil {
-			t.Fatalf("error committing transaction : %v\n", err)
-		}
-
-		tx, err = db.Begin()
-		if err != nil {
-			t.Fatalf("error starting transaction : %v\n", err)
-		}
-		defer tx.Rollback()
-
 		q = `
 		INSERT INTO users_master(first_name, last_name, email, status)
 		VALUES(?, ?, ?, ?)
@@ -116,7 +105,7 @@ func TestGroups01(t *testing.T) {
 			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		// Create required singleton groups.
+		// Create required groups.
 		tx, err = db.Begin()
 		if err != nil {
 			t.Fatalf("error starting transaction : %v\n", err)
@@ -131,19 +120,6 @@ func TestGroups01(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error adding singleton group for user '%d' : %v\n", u2, err)
 		}
-
-		err = tx.Commit()
-		if err != nil {
-			t.Fatalf("error committing transaction : %v\n", err)
-		}
-
-		// Create required general group.
-		tx, err = db.Begin()
-		if err != nil {
-			t.Fatalf("error starting transaction : %v\n", err)
-		}
-		defer tx.Rollback()
-
 		_, err = Groups().New(tx, genGrp, "G")
 		if err != nil {
 			t.Fatalf("error adding group '%s' : %v\n", genGrp, err)

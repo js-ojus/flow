@@ -21,12 +21,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var (
+	actions = []string{"CREATE", "APPROVE", "REJECT", "RET_WITH_COMMENTS", "DISCARD"}
+)
+
 // Driver test function.
 func TestDocActions01(t *testing.T) {
-	var (
-		actions = []string{"CREATE", "APPROVE", "REJECT", "RET_WITH_COMMENTS", "DISCARD"}
-	)
-
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
