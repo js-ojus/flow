@@ -16,7 +16,6 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -36,29 +35,41 @@ func TestDocStates01(t *testing.T) {
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List document states.
-	t.Run("List", func(t *testing.T) {
-		dss, err := DocStates().List(0, 0)
+	// Tear down.
+	defer func() {
+		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error : %v", err)
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec(`DELETE FROM wf_docstates_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
 		}
 
-		for _, ds := range dss {
-			fmt.Printf("%#v\n", ds)
+		_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
 		}
-	})
 
-	// Register a few new document states.
-	t.Run("New", func(t *testing.T) {
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
+	// Test life cycle.
+	t.Run("CRUL", func(t *testing.T) {
 		// Insert the required document types.
 		tx, err := db.Begin()
 		if err != nil {
@@ -76,86 +87,72 @@ func TestDocStates01(t *testing.T) {
 		}
 
 		// Add document states.
+		var ds DocStateID
 		for _, name := range storReqStates {
 			_, err = DocStates().New(tx, dtypeStorReqID, name)
 			if err != nil {
-				t.Errorf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
+				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
 			}
 		}
 		for _, name := range storRelStates {
-			_, err = DocStates().New(tx, dtypeStorRelID, name)
+			ds, err = DocStates().New(tx, dtypeStorRelID, name)
 			if err != nil {
-				t.Errorf("error creating document type:state '%d:%s' : %v\n", dtypeStorRelID, name, err)
+				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorRelID, name, err)
 			}
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Fatalf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Retrieve a specified document state.
-	t.Run("GetByID", func(t *testing.T) {
-		ds, err := DocStates().Get(1)
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error getting document state '1' : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", ds)
-	})
-
-	// Verify existence of a specified document state.
-	t.Run("GetByName", func(t *testing.T) {
-		ds, err := DocStates().GetByName(dtypeStorReqID, storReqStates[1])
+		// Test reading.
+		_, err = DocStates().Get(ds)
 		if err != nil {
-			t.Errorf("error getting document type:state '%d:%s' : %v\n", dtypeStorReqID, storReqStates[1], err)
+			t.Fatalf("error getting document state '1' : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", ds)
-	})
-
-	// Rename the given document state to the specified new name.
-	t.Run("RenameState", func(t *testing.T) {
-		tx, err := db.Begin()
+		_, err = DocStates().GetByName(dtypeStorReqID, storReqStates[1])
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error getting document type:state '%d:%s' : %v\n", dtypeStorReqID, storReqStates[1], err)
+		}
+
+		_, err = DocStates().List(0, 0)
+		if err != nil {
+			t.Fatalf("error listing document types : %v\n", err)
+		}
+
+		// Rename the given document state to the specified new name.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocStates().Rename(tx, 1, "INITIAL")
+		err = DocStates().Rename(tx, ds, "INITIAL")
 		if err != nil {
-			t.Errorf("error renaming document state '1' : %v\n", err)
+			t.Fatalf("error renaming document state '1' : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Rename the given document state to the specified old name.
-	t.Run("UndoRename", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocStates().Rename(tx, 1, "REQ_PENDING")
+		err = DocStates().Rename(tx, ds, storRelStates[len(storRelStates)-1])
 		if err != nil {
-			t.Errorf("error renaming document state '1' : %v\n", err)
+			t.Fatalf("error renaming document state '1' : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 }
