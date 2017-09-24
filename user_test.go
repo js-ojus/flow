@@ -16,88 +16,110 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var users = []struct {
+	fname  string
+	lname  string
+	email  string
+	status byte
+}{
+	{"Fname1", "Lname1", "user1@domain.com", 1},
+	{"Fname2", "Lname2", "user2@domain.com", 1},
+}
+
 // Driver test function.
 func TestUsers01(t *testing.T) {
 	// Connect to the database.
-	driver, connStr := "mysql", "js@/flow"
+	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List users.
-	t.Run("List", func(t *testing.T) {
-		us, err := Users().List(0, 0)
+	// Tear down.
+	defer func() {
+		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error : %v", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
+		defer tx.Rollback()
 
-		for _, u := range us {
-			fmt.Printf("%#v\n", u)
-		}
-	})
-
-	// Retrieve a specified user.
-	t.Run("GetByID", func(t *testing.T) {
-		u, err := Users().Get(1)
+		_, err = tx.Exec(`DELETE FROM users_master`)
 		if err != nil {
-			t.Errorf("error getting user '1' : %v\n", err)
+			t.Fatalf("error running transaction : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", u)
-	})
-
-	// Retrieve a specified user.
-	t.Run("GetByEmail", func(t *testing.T) {
-		u, err := Users().GetByEmail("js@js")
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error getting user : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
+	}()
 
-		fmt.Printf("%#v\n", u)
-	})
-
-	// Check the status of a user.
-	t.Run("IsActive", func(t *testing.T) {
-		status, err := Users().IsActive(1)
+	// Test CRL operations.
+	t.Run("CRL", func(t *testing.T) {
+		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error geting status of user '1' : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
+		defer tx.Rollback()
 
-		fmt.Printf("%#v\n", status)
-	})
-
-	// Fetch groups a user is a member of.
-	t.Run("GroupsOf", func(t *testing.T) {
-		gs, err := Users().GroupsOf(1)
+		var u1, u2 int64
+		q := `
+		INSERT INTO users_master(first_name, last_name, email, status)
+		VALUES(?, ?, ?, ?)
+		`
+		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].status)
 		if err != nil {
-			t.Errorf("error querying groups of user '%d' : %v\n", 1, err)
+			t.Fatalf("error running transaction : %v\n", err)
 		}
-
-		for _, g := range gs {
-			fmt.Printf("group : %d\n", g)
-		}
-	})
-
-	// Fetch singleton group of a user.
-	t.Run("SingletonGroupOf", func(t *testing.T) {
-		g, err := Users().SingletonGroupOf(2)
+		u1, _ = res.LastInsertId()
+		q = `
+		INSERT INTO users_master(first_name, last_name, email, status)
+		VALUES(?, ?, ?, ?)
+		`
+		_, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].status)
 		if err != nil {
-			t.Errorf("error querying groups of user '%d' : %v\n", 1, err)
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+		u2, _ = res.LastInsertId()
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("group : %d\n", g)
+		// Test reading.
+		_, err = Users().Get(UserID(u1))
+		if err != nil {
+			t.Fatalf("error getting user : %v\n", err)
+		}
+
+		_, err = Users().GetByEmail(users[1].email)
+		if err != nil {
+			t.Fatalf("error getting user : %v\n", err)
+		}
+
+		_, err = Users().List(0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
+
+		status, err := Users().IsActive(UserID(u2))
+		if err != nil {
+			t.Fatalf("error geting status of user : %v\n", err)
+		}
+		if !status {
+			t.Fatalf("user status -- expected : 1, got : %v\n", status)
+		}
 	})
 }

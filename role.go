@@ -154,7 +154,7 @@ func (rs *_Roles) Get(id RoleID) (*Role, error) {
 
 // GetByName answers the role, if one with the given name is
 // registered; `nil` and the error, otherwise.
-func (dts *_Roles) GetByName(name string) (*Role, error) {
+func (rs *_Roles) GetByName(name string) (*Role, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("role cannot be empty")
@@ -325,7 +325,13 @@ func (rs *_Roles) HasPermission(rid RoleID, dtype DocTypeID, action DocActionID)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
-		return false, err
+		switch err {
+		case sql.ErrNoRows:
+			return false, nil
+
+		default:
+			return false, err
+		}
 	}
 
 	return true, nil
