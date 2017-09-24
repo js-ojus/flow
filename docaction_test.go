@@ -16,7 +16,6 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -32,109 +31,102 @@ func TestDocActions01(t *testing.T) {
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List document actions.
-	t.Run("List", func(t *testing.T) {
-		das, err := DocActions().List(0, 0)
-		if err != nil {
-			t.Errorf("error : %v", err)
-		}
-
-		for _, da := range das {
-			fmt.Printf("%#v\n", da)
-		}
-	})
-
-	// Register a few new document actions.
-	t.Run("New", func(t *testing.T) {
+	// Tear down.
+	defer func() {
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
+		_, err = tx.Exec(`DELETE FROM wf_docactions_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
+	// Test CRUL operations.
+	t.Run("CRUL", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		var da DocActionID
 		for _, name := range actions {
-			_, err = DocActions().New(tx, name)
+			da, err = DocActions().New(tx, name)
 			if err != nil {
-				t.Errorf("error creating document action '%s' : %v\n", name, err)
+				t.Fatalf("error creating document action '%s' : %v\n", name, err)
 			}
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Retrieve a specified document action.
-	t.Run("GetByID", func(t *testing.T) {
-		da, err := DocActions().Get(1)
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error getting document action '1' : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", da)
-	})
-
-	// Verify existence of a specified document action.
-	t.Run("GetByName", func(t *testing.T) {
-		da, err := DocActions().GetByName(actions[1])
+		// Test read operations.
+		_, err = DocActions().Get(da)
 		if err != nil {
-			t.Errorf("error getting document action '%s' : %v\n", actions[1], err)
+			t.Fatalf("error getting document action : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", da)
-	})
-
-	// Rename the given document action to the specified new name.
-	t.Run("RenameAction", func(t *testing.T) {
-		tx, err := db.Begin()
+		_, err = DocActions().GetByName(actions[1])
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error getting document action '%s' : %v\n", actions[1], err)
+		}
+
+		_, err = DocActions().List(0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
+
+		// Test renaming.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocActions().Rename(tx, 1, "INITIALISE")
+		err = DocActions().Rename(tx, da, "INITIALISE")
 		if err != nil {
-			t.Errorf("error renaming document action '1' : %v\n", err)
+			t.Fatalf("error renaming document action : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Rename the given document action to the specified old name.
-	t.Run("UndoRename", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocActions().Rename(tx, 1, "CREATE")
+		err = DocActions().Rename(tx, da, actions[len(actions)-1])
 		if err != nil {
-			t.Errorf("error renaming document action '1' : %v\n", err)
+			t.Fatalf("error renaming document action : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 }
