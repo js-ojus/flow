@@ -16,7 +16,6 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -33,36 +32,44 @@ func TestDocTypes01(t *testing.T) {
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List document types.
-	t.Run("List", func(t *testing.T) {
-		dts, err := DocTypes().List(0, 0)
-		if err != nil {
-			t.Errorf("error : %v", err)
-		}
-
-		for _, dt := range dts {
-			fmt.Printf("%#v\n", dt)
-		}
-	})
-
-	// Register a few new document types.
-	t.Run("New", func(t *testing.T) {
+	// Tear down.
+	defer func() {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		_, err = DocTypes().New(tx, dtypeStorReq)
+		_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
+	// Test life cycle.
+	t.Run("CRUL", func(t *testing.T) {
+		// Test creation.
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		dtypeStorReqID, err := DocTypes().New(tx, dtypeStorReq)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
@@ -73,69 +80,61 @@ func TestDocTypes01(t *testing.T) {
 
 		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error committing transaction : %v\n", err)
-		}
-	})
-
-	// Retrieve a specified document type.
-	t.Run("GetByID", func(t *testing.T) {
-		dt, err := DocTypes().Get(3)
-		if err != nil {
-			t.Errorf("error getting document type '3' : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", dt)
-	})
-
-	// Verify existence of a specified document type.
-	t.Run("GetByName", func(t *testing.T) {
-		dt, err := DocTypes().GetByName(dtypeStorRel)
+		// Test reading.
+		_, err = DocTypes().Get(dtypeStorReqID)
 		if err != nil {
-			t.Errorf("error getting document type '%s' : %v\n", dtypeStorRel, err)
+			t.Fatalf("error getting document type : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", dt)
-	})
-
-	// Rename the given document type to the specified new name.
-	t.Run("RenameType", func(t *testing.T) {
-		tx, err := db.Begin()
+		_, err = DocTypes().GetByName(dtypeStorRel)
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error getting document type '%s' : %v\n", dtypeStorRel, err)
+		}
+
+		_, err = DocTypes().List(0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
+
+		_, err = DocStates().List(0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
+
+		// Test renaming.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_DEL")
+		err = DocTypes().Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_DEL")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Fatalf("error renaming document type : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Rename the given document type to the specified old name.
-	t.Run("UndoRename", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, 3, "DATA_PLAT:STOR_REQ")
+		err = DocTypes().Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_REQ")
 		if err != nil {
-			t.Errorf("error renaming document type '3' : %v\n", err)
+			t.Fatalf("error renaming document type : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 }
