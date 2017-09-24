@@ -40,6 +40,35 @@ func TestWorkflows01(t *testing.T) {
 	}
 	RegisterDB(db)
 
+	// Tear down.
+	defer func() {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		_, err = tx.Exec(`DELETE FROM wf_workflows`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		_, err = tx.Exec(`DELETE FROM wf_docstates_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
 	// Test-local state.
 	var dtypeStorReqID DocTypeID
 	var dstateID DocStateID
@@ -89,31 +118,4 @@ func TestWorkflows01(t *testing.T) {
 			t.Fatalf("error : %v", err)
 		}
 	})
-
-	// Tear down.
-	tx, err := db.Begin()
-	if err != nil {
-		t.Fatalf("error starting transaction : %v\n", err)
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec(`DELETE FROM wf_workflows`)
-	if err != nil {
-		t.Fatalf("error running transaction : %v\n", err)
-	}
-
-	_, err = tx.Exec(`DELETE FROM wf_docstates_master`)
-	if err != nil {
-		t.Fatalf("error running transaction : %v\n", err)
-	}
-
-	_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
-	if err != nil {
-		t.Fatalf("error running transaction : %v\n", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		t.Fatalf("error committing transaction : %v\n", err)
-	}
 }
