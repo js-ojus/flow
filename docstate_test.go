@@ -22,15 +22,15 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var (
+	storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
+	storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
+)
+
 // Driver test function.
 func TestDocStates01(t *testing.T) {
 	var dtypeStorReqID DocTypeID
 	var dtypeStorRelID DocTypeID
-
-	var (
-		storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
-		storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
-	)
 
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"

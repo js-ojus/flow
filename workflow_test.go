@@ -16,82 +16,104 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
+const (
+	wflowName = "DATA_PLAT:STOR_REQ"
+)
+
 // Driver test function.
 func TestWorkflows01(t *testing.T) {
-	const (
-		wflowName = "DATA_PLAT:STOR_REQ"
-	)
-
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List workflows.
-	t.Run("List", func(t *testing.T) {
-		ws, err := Workflows().List(0, 0)
-		if err != nil {
-			t.Errorf("error : %v", err)
-		}
-
-		for _, w := range ws {
-			fmt.Printf("%#v\n", w)
-		}
-	})
+	// Test-local state.
+	var dtypeStorReqID DocTypeID
+	var dstateID DocStateID
+	var wid WorkflowID
 
 	// Register a few new workflows.
-	t.Run("New", func(t *testing.T) {
+	t.Run("CRL", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		_, err = Workflows().New(tx, wflowName, 3, 1)
+		dtypeStorReqID, err = DocTypes().New(tx, dtypeStorReq)
 		if err != nil {
-			t.Errorf("error creating workflow : %v\n", err)
+			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
-
-		if err == nil {
-			err = tx.Commit()
+		for _, name := range storReqStates {
+			dstateID, err = DocStates().New(tx, dtypeStorReqID, name)
 			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
+				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
 			}
 		}
-	})
 
-	// Retrieve a specified workflow.
-	t.Run("GetByID", func(t *testing.T) {
-		w, err := Workflows().Get(1)
+		wid, err = Workflows().New(tx, wflowName, dtypeStorReqID, dstateID)
 		if err != nil {
-			t.Errorf("error getting workflow '1' : %v\n", err)
+			t.Fatalf("error creating workflow : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", w)
-	})
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
 
-	// Verify existence of a specified workflow.
-	t.Run("GetByName", func(t *testing.T) {
-		w, err := Workflows().GetByName(wflowName)
+		_, err = Workflows().Get(wid)
+		if err != nil {
+			t.Fatalf("error getting workflow : %v\n", err)
+		}
+
+		_, err = Workflows().GetByName(wflowName)
 		if err != nil {
 			t.Errorf("error getting workflow : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", w)
+		_, err = Workflows().List(0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
 	})
 
+	// Tear down.
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error starting transaction : %v\n", err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`DELETE FROM wf_workflows`)
+	if err != nil {
+		t.Fatalf("error running transaction : %v\n", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM wf_docstates_master`)
+	if err != nil {
+		t.Fatalf("error running transaction : %v\n", err)
+	}
+
+	_, err = tx.Exec(`DELETE FROM wf_doctypes_master`)
+	if err != nil {
+		t.Fatalf("error running transaction : %v\n", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("error committing transaction : %v\n", err)
+	}
 }
