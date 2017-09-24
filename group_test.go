@@ -16,7 +16,6 @@ package flow
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -30,253 +29,248 @@ func TestGroups01(t *testing.T) {
 	driver, connStr := "mysql", "travis@/flow"
 	db, err := sql.Open(driver, connStr)
 	if err != nil {
-		t.Errorf("could not connect to database : %v\n", err)
+		t.Fatalf("could not connect to database : %v\n", err)
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		t.Errorf("could not ping the database : %v\n", err)
+		t.Fatalf("could not ping the database : %v\n", err)
 	}
 	RegisterDB(db)
 
-	// List groups.
-	t.Run("List", func(t *testing.T) {
-		gs, err := Groups().List(0, 0)
-		if err != nil {
-			t.Errorf("error : %v", err)
-		}
-
-		for _, g := range gs {
-			fmt.Printf("%#v\n", g)
-		}
-	})
-
-	// Create a singleton group.
-	t.Run("CreateSingleton", func(t *testing.T) {
+	// Tear down.
+	defer func() {
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		_, err = Groups().NewSingleton(tx, 1)
+		_, err = tx.Exec(`DELETE FROM wf_group_users`)
 		if err != nil {
-			t.Errorf("error adding singleton group for user '%d' : %v\n", 1, err)
+			t.Fatalf("error running transaction : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		_, err = tx.Exec(`DELETE FROM wf_groups_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
 		}
-	})
 
-	// Create a general group.
-	t.Run("CreateGeneral", func(t *testing.T) {
+		_, err = tx.Exec(`DELETE FROM users_master`)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	}()
+
+	// Test local state.
+	var u1, u2 int64
+	var gs []*Group
+
+	// Test CRL operations.
+	t.Run("CRL", func(t *testing.T) {
+		// Create required users.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		q := `
+		INSERT INTO users_master(first_name, last_name, email, status)
+		VALUES(?, ?, ?, ?)
+		`
+		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].status)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+		u1, _ = res.LastInsertId()
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		q = `
+		INSERT INTO users_master(first_name, last_name, email, status)
+		VALUES(?, ?, ?, ?)
+		`
+		res, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].status)
+		if err != nil {
+			t.Fatalf("error running transaction : %v\n", err)
+		}
+		u2, _ = res.LastInsertId()
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		// Create required singleton groups.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		_, err = Groups().NewSingleton(tx, UserID(u1))
+		if err != nil {
+			t.Fatalf("error adding singleton group for user '%d' : %v\n", u1, err)
+		}
+		_, err = Groups().NewSingleton(tx, UserID(u2))
+		if err != nil {
+			t.Fatalf("error adding singleton group for user '%d' : %v\n", u2, err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		// Create required general group.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
 		_, err = Groups().New(tx, genGrp, "G")
 		if err != nil {
-			t.Errorf("error adding group '%s' : %v\n", genGrp, err)
+			t.Fatalf("error adding group '%s' : %v\n", genGrp, err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Retrieve a specified group.
-	t.Run("GetByID", func(t *testing.T) {
-		g, err := Groups().Get(3)
+		err = tx.Commit()
 		if err != nil {
-			t.Errorf("error getting group '1' : %v\n", err)
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 
-		fmt.Printf("%#v\n", g)
-	})
-
-	// Delete a singleton group.
-	t.Run("DeleteSingleton", func(t *testing.T) {
-		tx, err := db.Begin()
+		// List groups.
+		gs, err = Groups().List(0, 0)
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error : %v", err)
 		}
-		defer tx.Rollback()
-
-		err = Groups().Delete(tx, 3)
-		if err == nil {
-			t.Errorf("error deleting singleton group : %d\n", 3)
+		if len(gs) != 3 {
+			t.Fatalf("listing groups -- expected : 3, got : %d\n", len(gs))
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Delete a singleton group.
-	t.Run("DeleteGeneral1", func(t *testing.T) {
-		tx, err := db.Begin()
+		_, err = Groups().Get(gs[0].ID())
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
-		}
-		defer tx.Rollback()
-
-		err = Groups().Delete(tx, 3)
-		if err == nil {
-			t.Errorf("error deleting general group '%d' : %v\n", 3, err)
+			t.Fatalf("error getting group '1' : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Delete a singleton group.
-	t.Run("DeleteGeneral2", func(t *testing.T) {
-		tx, err := db.Begin()
+		_, err = Users().SingletonGroupOf(UserID(u1))
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error querying groups of user '%d' : %v\n", u1, err)
 		}
-		defer tx.Rollback()
 
-		err = Groups().Delete(tx, 5)
+		_, err = Groups().SingletonUser(gs[1].ID())
 		if err != nil {
-			t.Errorf("error deleting general group '%d' : %v\n", 5, err)
+			t.Fatalf("error querying singleton group '%d' : %v\n", gs[1].ID(), err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Query if a user is part of the given group.
-	t.Run("HasUser", func(t *testing.T) {
-		ok, err := Groups().HasUser(3, 1)
+		// Test membership.
+		ok, err := Groups().HasUser(gs[0].ID(), UserID(u1))
 		if err != nil {
-			t.Errorf("error querying group users : %v\n", err)
+			t.Fatalf("error querying group users : %v\n", err)
 		}
 
 		if !ok {
-			t.Errorf("singleton user must be a part of its group")
+			t.Fatalf("singleton user must be a part of its group")
 		}
 	})
 
-	// Query singleton user.
-	t.Run("SingletonUser", func(t *testing.T) {
-		uid, err := Groups().SingletonUser(3)
-		if err != nil {
-			t.Errorf("error querying singleton user : %v\n", err)
-		}
-
-		fmt.Printf("single user : %d\n", uid)
-	})
-
-	// Add a user to a group.
-	t.Run("AddUser1", func(t *testing.T) {
+	// Test update operations.
+	t.Run("Update", func(t *testing.T) {
+		// Test adding users.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Groups().AddUser(tx, 3, 2)
+		err = Groups().AddUser(tx, gs[0].ID(), UserID(u2))
 		if err == nil {
-			t.Errorf("should have failed because group is singleton")
+			t.Fatalf("should have failed because group is singleton")
 		}
-
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Add a user to a group.
-	t.Run("AddUser2", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = Groups().AddUser(tx, gs[2].ID(), UserID(u1))
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error adding user to general group : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		// Fetch groups a user is a member of.
+		gids, err := Users().GroupsOf(UserID(u1))
+		if err != nil {
+			t.Fatalf("error querying groups of user '%d' : %v\n", 1, err)
+		}
+		if len(gids) != 2 {
+			t.Fatalf("listing groups -- expected : 2, got : %d\n", len(gids))
+		}
+		gids, err = Users().GroupsOf(UserID(u2))
+		if err != nil {
+			t.Fatalf("error querying groups of user '%d' : %v\n", 1, err)
+		}
+		if len(gids) != 1 {
+			t.Fatalf("listing groups -- expected : 1, got : %d\n", len(gids))
+		}
+
+		// Testing removing users.
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Groups().AddUser(tx, 6, 1)
-		if err != nil {
-			t.Errorf("error adding user to general group : %v\n", err)
+		err = Groups().RemoveUser(tx, gs[0].ID(), UserID(u1))
+		if err == nil {
+			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().AddUser(tx, 6, 2)
+		err = Groups().RemoveUser(tx, gs[2].ID(), UserID(u1))
 		if err != nil {
-			t.Errorf("error adding user to general group : %v\n", err)
+			t.Fatalf("error removing user from general group : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 
-	// Remove a user from a group.
-	t.Run("RemoveUser1", func(t *testing.T) {
+	// Test delete operations.
+	t.Run("Delete", func(t *testing.T) {
+		// Test deleting a singleton group.
 		tx, err := db.Begin()
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
+			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		err = Groups().RemoveUser(tx, 3, 1)
+		err = Groups().Delete(tx, gs[1].ID())
 		if err == nil {
-			t.Errorf("should have failed because group is singleton")
+			t.Fatalf("should have failed because group is singleton")
 		}
-
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
-		}
-	})
-
-	// Remove a user from a group.
-	t.Run("RemoveUser2", func(t *testing.T) {
-		tx, err := db.Begin()
+		err = Groups().Delete(tx, gs[2].ID())
 		if err != nil {
-			t.Errorf("error starting transaction : %v\n", err)
-		}
-		defer tx.Rollback()
-
-		err = Groups().RemoveUser(tx, 6, 1)
-		if err != nil {
-			t.Errorf("error removing user from general group : %v\n", err)
-		}
-		err = Groups().RemoveUser(tx, 6, 2)
-		if err != nil {
-			t.Errorf("error removing user from general group : %v\n", err)
+			t.Fatalf("error deleting general group : %v\n", err)
 		}
 
-		if err == nil {
-			err = tx.Commit()
-			if err != nil {
-				t.Errorf("error committing transaction : %v\n", err)
-			}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 }
