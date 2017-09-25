@@ -81,20 +81,20 @@ func TestGroups01(t *testing.T) {
 		defer tx.Rollback()
 
 		q := `
-		INSERT INTO users_master(first_name, last_name, email, status)
+		INSERT INTO users_master(first_name, last_name, email, active)
 		VALUES(?, ?, ?, ?)
 		`
-		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].status)
+		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].active)
 		if err != nil {
 			t.Fatalf("error running transaction : %v\n", err)
 		}
 		u1, _ = res.LastInsertId()
 
 		q = `
-		INSERT INTO users_master(first_name, last_name, email, status)
+		INSERT INTO users_master(first_name, last_name, email, active)
 		VALUES(?, ?, ?, ?)
 		`
-		res, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].status)
+		res, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].active)
 		if err != nil {
 			t.Fatalf("error running transaction : %v\n", err)
 		}
@@ -141,7 +141,7 @@ func TestGroups01(t *testing.T) {
 
 		_, err = Groups().Get(gs[0].ID())
 		if err != nil {
-			t.Fatalf("error getting group '1' : %v\n", err)
+			t.Fatalf("error getting group : %v\n", err)
 		}
 
 		_, err = Users().SingletonGroupOf(UserID(u1))

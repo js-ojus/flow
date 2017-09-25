@@ -4,5 +4,5 @@
 -- appropriately, depending on your application and database design.
 
 CREATE OR REPLACE VIEW wf_users_master AS
-SELECT id, first_name, last_name, email, status
+SELECT id, first_name, last_name, email, active
 FROM users_master;

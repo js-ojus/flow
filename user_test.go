@@ -25,7 +25,7 @@ var users = []struct {
 	fname  string
 	lname  string
 	email  string
-	status byte
+	active byte
 }{
 	{"Fname1", "Lname1", "user1@domain.com", 1},
 	{"Fname2", "Lname2", "user2@domain.com", 1},
@@ -75,19 +75,19 @@ func TestUsers01(t *testing.T) {
 
 		var u1, u2 int64
 		q := `
-		INSERT INTO users_master(first_name, last_name, email, status)
+		INSERT INTO users_master(first_name, last_name, email, active)
 		VALUES(?, ?, ?, ?)
 		`
-		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].status)
+		res, err := tx.Exec(q, users[0].fname, users[0].lname, users[0].email, users[0].active)
 		if err != nil {
 			t.Fatalf("error running transaction : %v\n", err)
 		}
 		u1, _ = res.LastInsertId()
 		q = `
-		INSERT INTO users_master(first_name, last_name, email, status)
+		INSERT INTO users_master(first_name, last_name, email, active)
 		VALUES(?, ?, ?, ?)
 		`
-		_, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].status)
+		_, err = tx.Exec(q, users[1].fname, users[1].lname, users[1].email, users[1].active)
 		if err != nil {
 			t.Fatalf("error running transaction : %v\n", err)
 		}
@@ -114,12 +114,12 @@ func TestUsers01(t *testing.T) {
 			t.Fatalf("error : %v", err)
 		}
 
-		status, err := Users().IsActive(UserID(u2))
+		active, err := Users().IsActive(UserID(u2))
 		if err != nil {
 			t.Fatalf("error geting status of user : %v\n", err)
 		}
-		if !status {
-			t.Fatalf("user status -- expected : 1, got : %v\n", status)
+		if !active {
+			t.Fatalf("user status -- expected : 1, got : %v\n", active)
 		}
 	})
 }
