@@ -75,7 +75,7 @@ func TestWorkflows01(t *testing.T) {
 	var wid WorkflowID
 
 	// Register a few new workflows.
-	t.Run("CRL", func(t *testing.T) {
+	t.Run("Create", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Fatalf("error starting transaction : %v\n", err)
@@ -102,7 +102,10 @@ func TestWorkflows01(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error committing transaction : %v\n", err)
 		}
+	})
 
+	// Test reading.
+	t.Run("Read", func(t *testing.T) {
 		_, err = Workflows().Get(wid)
 		if err != nil {
 			t.Fatalf("error getting workflow : %v\n", err)
@@ -110,12 +113,58 @@ func TestWorkflows01(t *testing.T) {
 
 		_, err = Workflows().GetByName(wflowName)
 		if err != nil {
-			t.Errorf("error getting workflow : %v\n", err)
+			t.Fatalf("error getting workflow : %v\n", err)
 		}
 
 		_, err = Workflows().List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
+		}
+	})
+
+	// Test renaming.
+	t.Run("Rename", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Workflows().Rename(tx, wid, "TEST_WFLOW")
+		if err != nil {
+			t.Fatalf("error renaming workflow : %v\n", err)
+		}
+		err = Workflows().Rename(tx, wid, wflowName)
+		if err != nil {
+			t.Fatalf("error renaming workflow : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	})
+
+	// Test activation and inactivation.
+	t.Run("Active", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Workflows().SetActive(tx, wid, false)
+		if err != nil {
+			t.Fatalf("error inactivating workflow : %v\n", err)
+		}
+		err = Workflows().SetActive(tx, wid, true)
+		if err != nil {
+			t.Fatalf("error activating workflow : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
 		}
 	})
 }

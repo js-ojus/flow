@@ -156,8 +156,8 @@ func (ws *_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocSt
 	}
 
 	q := `
-	INSERT INTO wf_workflows(name, doctype_id, docstate_id)
-	VALUES(?, ?, ?)
+	INSERT INTO wf_workflows(name, doctype_id, docstate_id, active)
+	VALUES(?, ?, ?, 1)
 	`
 	res, err := tx.Exec(q, name, dtype, state)
 	if err != nil {
@@ -262,6 +262,80 @@ func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
 	}
 
 	return &elem, nil
+}
+
+// Rename assigns a new name to the given workflow.
+func (ws *_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("name should be non-empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_workflows SET name = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, name, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// SetActive sets the status of the workflow as either active or
+// inactive, helping in workflow management and deprecation.
+func (ws *_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	var flag int
+	if active {
+		flag = 1
+	}
+	q := `
+	UPDATE wf_workflows SET active = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, flag, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // AddNode maps the given document state to the specified node.  This
