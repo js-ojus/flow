@@ -139,7 +139,7 @@ func TestGroups01(t *testing.T) {
 			t.Fatalf("listing groups -- expected : 3, got : %d\n", len(gs))
 		}
 
-		_, err = Groups().Get(gs[0].ID())
+		_, err = Groups().Get(gs[0].ID)
 		if err != nil {
 			t.Fatalf("error getting group : %v\n", err)
 		}
@@ -149,13 +149,13 @@ func TestGroups01(t *testing.T) {
 			t.Fatalf("error querying groups of user '%d' : %v\n", u1, err)
 		}
 
-		_, err = Groups().SingletonUser(gs[1].ID())
+		_, err = Groups().SingletonUser(gs[1].ID)
 		if err != nil {
-			t.Fatalf("error querying singleton group '%d' : %v\n", gs[1].ID(), err)
+			t.Fatalf("error querying singleton group '%d' : %v\n", gs[1].ID, err)
 		}
 
 		// Test membership.
-		ok, err := Groups().HasUser(gs[0].ID(), UserID(u1))
+		ok, err := Groups().HasUser(gs[0].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error querying group users : %v\n", err)
 		}
@@ -174,11 +174,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().AddUser(tx, gs[0].ID(), UserID(u2))
+		err = Groups().AddUser(tx, gs[0].ID, UserID(u2))
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().AddUser(tx, gs[2].ID(), UserID(u1))
+		err = Groups().AddUser(tx, gs[2].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error adding user to general group : %v\n", err)
 		}
@@ -211,11 +211,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().RemoveUser(tx, gs[0].ID(), UserID(u1))
+		err = Groups().RemoveUser(tx, gs[0].ID, UserID(u1))
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().RemoveUser(tx, gs[2].ID(), UserID(u1))
+		err = Groups().RemoveUser(tx, gs[2].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error removing user from general group : %v\n", err)
 		}
@@ -235,11 +235,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().Delete(tx, gs[1].ID())
+		err = Groups().Delete(tx, gs[1].ID)
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().Delete(tx, gs[2].ID())
+		err = Groups().Delete(tx, gs[2].ID)
 		if err != nil {
 			t.Fatalf("error deleting general group : %v\n", err)
 		}

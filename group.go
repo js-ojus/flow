@@ -28,26 +28,9 @@ type GroupID int64
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	id    GroupID // Globally-unique ID
-	name  string  // Globally-unique name
-	gtype string  // Is this a user-specific group? Etc.
-}
-
-// ID answers this group's identifier.
-func (g *Group) ID() GroupID {
-	return g.id
-}
-
-// Name answers this group's name.
-func (g *Group) Name() string {
-	return g.name
-}
-
-// GroupType answers the nature of this group.  For instance, if this
-// group was auto-created as the native group of a user account, or is
-// a collection of users, etc.
-func (g *Group) GroupType() string {
-	return g.gtype
+	ID        GroupID `json:"id"`        // Globally-unique ID
+	Name      string  `json:"name"`      // Globally-unique name
+	GroupType string  `json:"groupType"` // Is this a user-specific group? Etc.
 }
 
 // Unexported type, only for convenience methods.
@@ -189,7 +172,7 @@ func (gs *_Groups) List(offset, limit int64) ([]*Group, error) {
 	ary := make([]*Group, 0, 10)
 	for rows.Next() {
 		var g Group
-		err = rows.Scan(&g.id, &g.name, &g.gtype)
+		err = rows.Scan(&g.ID, &g.Name, &g.GroupType)
 		if err != nil {
 			return nil, err
 		}
@@ -210,11 +193,11 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 
 	var elem Group
 	row := db.QueryRow("SELECT id, name, group_type FROM wf_groups_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.name, &elem.gtype)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.GroupType)
 	if err != nil {
 		return nil, err
 	}
-	if elem.gtype == "S" {
+	if elem.GroupType == "S" {
 		q := `
 		SELECT active FROM wf_users_master
 		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
@@ -289,6 +272,36 @@ func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
 	}
 
 	return nil
+}
+
+// Users answers a list of the given group's users.
+func (gs *_Groups) Users(gid GroupID) ([]*User, error) {
+	q := `
+	SELECT um.id, um.first_name, um.last_name, um.email, um.active
+	FROM wf_users_master um
+	JOIN wf_group_users gu ON gu.user_id = um.id
+	WHERE gu.group_id = ?
+	`
+	rows, err := db.Query(q, gid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*User, 0, 2)
+	for rows.Next() {
+		var elem User
+		err = rows.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, &elem)
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+
+	return ary, nil
 }
 
 // HasUser answers `true` if this group includes the given user;
