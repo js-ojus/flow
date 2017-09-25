@@ -13,5 +13,6 @@ CREATE TABLE wf_workflow_nodes (
     FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
     FOREIGN KEY (workflow_id) REFERENCES wf_workflows(id),
     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
-    UNIQUE (doctype_id, docstate_id)
+    UNIQUE (doctype_id, docstate_id),
+    UNIQUE (workflow_id, name)
 );

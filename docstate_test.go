@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	storReqStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
-	storRelStates = []string{"REQ_PENDING", "APPROVED", "REJECTED", "RET_WITH_COMMENTS"}
+	storReqStates = []string{"DRAFT", "REQ_PENDING", "APPROVED", "REJECTED"}
+	storRelStates = []string{"DRAFT", "REQ_PENDING", "APPROVED", "REJECTED"}
 )
 
 // Driver test function.
