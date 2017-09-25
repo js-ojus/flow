@@ -30,30 +30,11 @@ type UserID int64
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	id     UserID // Must be globally-unique
-	name   string // For display purposes only
-	email  string // E-mail address of this user
-	status bool   // Is this user account active?
-}
-
-// ID answers this user's ID.
-func (u *User) ID() UserID {
-	return u.id
-}
-
-// Name answers this user's name.
-func (u *User) Name() string {
-	return u.name
-}
-
-// Email answers this user's e-mail address.
-func (u *User) Email() string {
-	return u.email
-}
-
-// Status answers `true` if this user's account is active.
-func (u *User) Status() bool {
-	return u.status
+	ID        UserID `json:"id"`               // Must be globally-unique
+	FirstName string `json:"firstName"`        // For display purposes only
+	LastName  string `json:"lastName"`         // For display purposes only
+	Email     string `json:"email"`            // E-mail address of this user
+	Active    bool   `json:"active,omitempty"` // Is this user account active?
 }
 
 // Unexported type, only for convenience methods.
@@ -85,7 +66,7 @@ func (us *_Users) List(offset, limit int64) ([]*User, error) {
 	}
 
 	q := `
-	SELECT id, first_name, last_name, email, status
+	SELECT id, first_name, last_name, email, active
 	FROM wf_users_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -96,15 +77,13 @@ func (us *_Users) List(offset, limit int64) ([]*User, error) {
 	}
 	defer rows.Close()
 
-	var fname, lname string
 	ary := make([]*User, 0, 10)
 	for rows.Next() {
 		var elem User
-		err = rows.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
+		err = rows.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 		if err != nil {
 			return nil, err
 		}
-		elem.name = fname + " " + lname
 		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
@@ -121,14 +100,12 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 	}
 
 	var elem User
-	var fname, lname string
-	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE id = ?", uid)
-	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users_master WHERE id = ?", uid)
+	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
 
-	elem.name = fname + " " + lname
 	return &elem, nil
 }
 
@@ -141,27 +118,25 @@ func (us *_Users) GetByEmail(email string) (*User, error) {
 	}
 
 	var elem User
-	var fname, lname string
-	row := db.QueryRow("SELECT id, first_name, last_name, email, status FROM wf_users_master WHERE email = ?", email)
-	err := row.Scan(&elem.id, &fname, &lname, &elem.email, &elem.status)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users_master WHERE email = ?", email)
+	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
 
-	elem.name = fname + " " + lname
 	return &elem, nil
 }
 
 // IsActive answers `true` if the given user's account is enabled.
 func (us *_Users) IsActive(uid UserID) (bool, error) {
-	row := db.QueryRow("SELECT status FROM wf_users_master WHERE id = ?", uid)
-	var status bool
-	err := row.Scan(&status)
+	row := db.QueryRow("SELECT active FROM wf_users_master WHERE id = ?", uid)
+	var active bool
+	err := row.Scan(&active)
 	if err != nil {
 		return false, err
 	}
 
-	return status, nil
+	return active, nil
 }
 
 // GroupsOf answers a list of groups that the given user is a member

@@ -216,7 +216,7 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 	}
 	if elem.gtype == "S" {
 		q := `
-		SELECT status FROM wf_users_master
+		SELECT active FROM wf_users_master
 		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
 		`
 		var active bool
