@@ -31,9 +31,9 @@ import (
 // user-supplied name of the binary object, the path of the stored
 // binary object, and its SHA1 checksum.
 type Blob struct {
-	Name    string // User-given name to the binary object
-	Path    string // Path to the stored binary object
-	Sha1Sum string // SHA1 checksum of the binary object
+	Name    string `json:"name"`    // User-given name to the binary object
+	Path    string `json:"path"`    // Path to the stored binary object
+	Sha1Sum string `json:"sha1sum"` // SHA1 checksum of the binary object
 }
 
 // DocumentID is the type of unique document identifiers.
@@ -51,52 +51,15 @@ type DocumentID int64
 // documents.  Most applications should embed `Document` in their
 // document structures rather than use this directly.
 type Document struct {
-	dtype DocType    // For namespacing
-	id    DocumentID // Globally-unique identifier of this document
+	ID      DocumentID `json:"id"`      // Globally-unique identifier of this document
+	DocType DocType    `json:"docType"` // For namespacing
 
-	user  UserID    // Creator of this document
-	state DocState  // Current state
-	ctime time.Time // Creation time of this revision
+	User  UserID    `json:"user"`     // Creator of this document
+	State DocState  `json:"docState"` // Current state
+	Ctime time.Time `json:"ctime"`    // Creation time of this revision
 
-	title string // Human-readable title; applicable only for top-level documents
-	data  []byte // Primary content of the document
-}
-
-// Type answers this document's type.
-func (d *Document) Type() DocType {
-	return d.dtype
-}
-
-// ID answers this document's globally-unique ID.
-func (d *Document) ID() DocumentID {
-	return d.id
-}
-
-// User answers the user who created this document.
-func (d *Document) User() UserID {
-	return d.user
-}
-
-// Ctime answers the creation time of this document.
-func (d *Document) Ctime() time.Time {
-	return d.ctime
-}
-
-// State answer this document's current state.
-func (d *Document) State() DocState {
-	return d.state
-}
-
-// Title answers this document's title.
-func (d *Document) Title() string {
-	return d.title
-}
-
-// Data answers this document's primary data content.
-func (d *Document) Data() []byte {
-	dt := make([]byte, len(d.data))
-	copy(dt, d.data)
-	return dt
+	Title string `json:"title"` // Human-readable title; applicable only for top-level documents
+	Data  []byte `json:"data"`  // Primary content of the document
 }
 
 // Unexported type, only for convenience methods.
@@ -133,14 +96,14 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 		if err != nil {
 			return 0, err
 		}
-		title = outer.title
+		title = outer.Title
 
 		// A child document does not have its own state.
 		doc, err := _documents.Get(otype, oid)
 		if err != nil {
 			return 0, err
 		}
-		state = doc.state.ID
+		state = doc.State.ID
 	}
 
 	var tx *sql.Tx
@@ -218,11 +181,11 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 	ary := make([]*Document, 0, 10)
 	for rows.Next() {
 		var elem Document
-		err = rows.Scan(&elem.id, &elem.user, &elem.state, &elem.ctime, &elem.title, &elem.data)
+		err = rows.Scan(&elem.ID, &elem.User, &elem.State, &elem.Ctime, &elem.Title, &elem.Data)
 		if err != nil {
 			return nil, err
 		}
-		elem.dtype.ID = dtype
+		elem.DocType.ID = dtype
 		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
@@ -247,19 +210,19 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	WHERE docs.id = ?
 	`
 	row := db.QueryRow(q, id, dtype)
-	err := row.Scan(&d.user, &d.state.ID, &d.ctime, &d.title, &d.data, &d.state.Name)
+	err := row.Scan(&d.User, &d.State.ID, &d.Ctime, &d.Title, &d.Data, &d.State.Name)
 	if err != nil {
 		return nil, err
 	}
 	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
 	row = db.QueryRow(q, dtype)
-	err = row.Scan(&d.dtype.Name)
+	err = row.Scan(&d.DocType.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	d.id = id
-	d.dtype.ID = dtype
+	d.ID = id
+	d.DocType.ID = dtype
 	return &d, nil
 }
 

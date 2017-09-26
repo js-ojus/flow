@@ -51,7 +51,7 @@ type DocEvent struct {
 	DocID   DocumentID  `json:"docID"`     // Document to which this event is to be applied
 	State   DocStateID  `json:"docState"`  // Current state of the document must equal this
 	Action  DocActionID `json:"docAction"` // Action performed by the user
-	User    UserID      `json:"userID"`    // User who caused this action
+	User    UserID      `json:"user"`      // User who caused this action
 	Text    string      `json:"text"`      // Comment or other content
 	Ctime   time.Time   `json:"ctime"`     // Time at which the event occurred
 	Status  EventStatus `json:"status"`    // Status of this event

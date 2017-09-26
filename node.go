@@ -45,10 +45,10 @@ type NodeFunc func(*Document, *DocEvent) *Message
 // applicable mailboces.
 func defNodeFunc(d *Document, event *DocEvent) *Message {
 	return &Message{
-		dtype: d.dtype.ID,
-		docID: d.id,
+		dtype: d.DocType.ID,
+		docID: d.ID,
 		event: event.ID,
-		title: d.title,
+		title: d.Title,
 		data:  event.Text,
 	}
 }
@@ -158,8 +158,8 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 	if err != nil {
 		return 0, err
 	}
-	if doc.state.ID != event.State && doc.state.ID != nstate {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.ID, event.State)
+	if doc.State.ID != event.State && doc.State.ID != nstate {
+		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.State.ID, event.State)
 	}
 
 	var tx *sql.Tx
@@ -185,7 +185,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Multiple 'in's, but any one suffices.
 
 		// Document has already transitioned; nothing to do.
-		if doc.state.ID == nstate {
+		if doc.State.ID == nstate {
 			return nstate, nil
 		}
 
