@@ -232,9 +232,6 @@ func (gs *_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
 	if elem.GroupType == "S" {
 		return errors.New("cannot rename a singleton group")
 	}
-	if elem.Name == name {
-		return errors.New("new name should not be the same as existing name")
-	}
 
 	var tx *sql.Tx
 	if otx == nil {

@@ -217,4 +217,23 @@ func TestRoles01(t *testing.T) {
 			t.Fatalf("permission on doctype '%d' for action '%d' -- extected : false, got : %v\n", dtypeStorReqID, da, ok)
 		}
 	})
+
+	// Test deleting.
+	t.Run("Delete", func(t *testing.T) {
+		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Roles().Delete(tx, userID)
+		if err != nil {
+			t.Fatalf("error deleting role '%d' : %v\n", adminID, err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+	})
 }
