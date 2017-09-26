@@ -158,8 +158,8 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 	if err != nil {
 		return 0, err
 	}
-	if doc.state.id != event.state && doc.state.id != nstate {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.id, event.state)
+	if doc.state.ID != event.state && doc.state.ID != nstate {
+		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.ID, event.state)
 	}
 
 	var tx *sql.Tx
@@ -185,7 +185,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Multiple 'in's, but any one suffices.
 
 		// Document has already transitioned; nothing to do.
-		if doc.state.id == nstate {
+		if doc.state.ID == nstate {
 			return nstate, nil
 		}
 

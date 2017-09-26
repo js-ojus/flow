@@ -140,7 +140,7 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 		if err != nil {
 			return 0, err
 		}
-		state = doc.state.id
+		state = doc.state.ID
 	}
 
 	var tx *sql.Tx
@@ -247,7 +247,7 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	WHERE docs.id = ?
 	`
 	row := db.QueryRow(q, id, dtype)
-	err := row.Scan(&d.user, &d.state.id, &d.ctime, &d.title, &d.data, &d.state.name)
+	err := row.Scan(&d.user, &d.state.ID, &d.ctime, &d.title, &d.data, &d.state.Name)
 	if err != nil {
 		return nil, err
 	}
