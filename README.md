@@ -39,7 +39,7 @@ As a workflow engine, `flow` intends to help in defining and driving "front offi
 
 ### What `flow` is not
 
-`flow` is a library, not a full-stack solution.  Accordingly, it cannot be downloaded and deployed as a reday-to-use service.  It has to used by an application that programs workflow definitions and processing.  The only "programming in the small" language supported is Go!  Of course, you could employ `flow` in a microservice architecture by wrapping it in a thin service.  That can enable you to use your favourite programming language to drive `flow`.
+`flow` is a library, not a full-stack solution.  Accordingly, it cannot be downloaded and deployed as a reday-to-use service.  It has to be used by an application that programs workflow definitions and processing.  The only "programming in the small" language supported is Go!  Of course, you could employ `flow` in a microservice architecture by wrapping it in a thin service.  That can enable you to use your favourite programming language to drive `flow`.
 
 ### Express non-goals
 
@@ -47,7 +47,7 @@ As a workflow engine, `flow` intends to help in defining and driving "front offi
 
 ## `flow` Concepts
 
-Let us familiarise ourselves with the most important concepts and moving parts of `flow`.
+Let us familiarise ourselves with the most important concepts and moving parts of `flow`.  Even as you read the following, it is highly recommended that you read the database table definitions in `sql` directory, as well as the corresponding object definitions in their respective `*.go` files.  That should help you in forming a mental model of `flow` faster.
 
 ### Users
 
@@ -64,6 +64,8 @@ In addition, arbitrary general (non-singleton) groups can be defined by includin
 ### Roles
 
 Sets of document actions permitted for a given document type, can be grouped into roles.  For instance, some users should be able to raise a request, but not approve it.  Some others should be able to, in turn, approve or reject it.  Roles make it convenient to group logically related sets of permissions.
+
+See `Document Types` and `Document Actions` for more details.
 
 ### Access Contexts
 
@@ -91,17 +93,31 @@ Every document has various stages in its life.  The possible stages in the life 
 
 A document state is just a string.  `flow` does not assume anything about the specifics of any document state.
 
-### Workflows
-
-Each `DocType` defined in `flow` should have an associated `Workflow` defined.  This workflow handles the lifecycle of documents of that type.
-
-A workflow is begun when a document of a particular type is created.  This workflow then tracks the document as it transitions from one document state to another, in reponse to either user actions or system events.  These document states and their transitions constitute the defining graph of this workflow.
-
 ### Document Actions
 
 Given a document in a particular state, each legal (for that state) action on the document could result in a new state.  `DocAction`s enumerate possible actions that affect documents.
 
 A document action is just a string.  `flow` does not assume anything about the specifics of any document action.
+
+### Documents
+
+A document comprises:
+
+- title,
+- body (usually, text),
+- enclosures/attachments (optional),
+- tags (optional) and
+- children documents (optional).
+
+Thus, `Document` is a recursive structure.  As a document transitions from state to state, a child document is created and attached to it.  Thus, documents form a hierarchy, much like an e-mail thread, a discussion forum thread or a trouble ticket thread.
+
+Only root documents have their own titles.  Similarly, only root documents participate in workflows.  Children documents follow their root documents along.
+
+### Workflows
+
+Each `DocType` defined in `flow` should have an associated `Workflow` defined.  This workflow handles the lifecycle of documents of that type.
+
+A workflow is begun when a document of a particular type is created.  This workflow then tracks the document as it transitions from one document state to another, in reponse to either user actions or system events.  These document states and their transitions constitute the defining graph of this workflow.
 
 ### Document Events
 
@@ -111,7 +127,7 @@ A `DocEvent` represents a user (or system) `DocAction` on a particular document 
 
 A document in a particular state in its workflow, is sent to a `Node`.  There, it awaits an action to take place that moves it along the workflow, to a different state.  Thus, nodes are receivers of document events.
 
-A `DocAction` on a document in a `DocState` may require some processing to be performed before a possible state transition.  Accordingly, applications register custom processing functions with nodes.  Such functions are invoked by the respective nodes when an action is received by them.  These `NodeFunc`s determine the next states assumed by the documents that they process.
+A `DocAction` on a document in a `DocState` may require some processing to be performed before a possible state transition.  Accordingly, applications can register custom processing functions with nodes.  Such functions are invoked by the respective nodes when an action is received by them.  These `NodeFunc`s generate the messages that are dispatched to applicable mailboxes.
 
 ### Mailboxes and Messages
 
