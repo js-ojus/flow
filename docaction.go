@@ -42,18 +42,8 @@ type DocActionID int64
 //
 // N.B. All document actions must be defined as constant strings.
 type DocAction struct {
-	id   DocActionID // Unique identifier of this action
-	name string
-}
-
-// ID answers the unique identifier of this document action.
-func (da *DocAction) ID() DocActionID {
-	return da.id
-}
-
-// Name answers the name of this document action.
-func (da *DocAction) Name() string {
-	return da.name
+	ID   DocActionID `json:"id"`   // Unique identifier of this action
+	Name string      `json:"name"` // Globally-unique name of this action
 }
 
 // Unexported type, only for convenience methods.
@@ -138,7 +128,7 @@ func (das *_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 	ary := make([]*DocAction, 0, 10)
 	for rows.Next() {
 		var elem DocAction
-		err = rows.Scan(&elem.id, &elem.name)
+		err = rows.Scan(&elem.ID, &elem.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +149,7 @@ func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
 
 	var elem DocAction
 	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +167,7 @@ func (das *_DocActions) GetByName(name string) (*DocAction, error) {
 
 	var elem DocAction
 	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE name = ?", name)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}

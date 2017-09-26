@@ -280,7 +280,7 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 	for rows.Next() {
 		var dt DocType
 		var da DocAction
-		err = rows.Scan(&dt.id, &dt.name, &da.id, &da.name)
+		err = rows.Scan(&dt.id, &dt.name, &da.ID, &da.Name)
 		if err != nil {
 			return nil, err
 		}
