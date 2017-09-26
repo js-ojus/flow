@@ -216,6 +216,52 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 	return &elem, nil
 }
 
+// Rename renames the given group.
+func (gs *_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("name cannot be empty")
+	}
+
+	var elem Group
+	row := db.QueryRow("SELECT id, name, group_type FROM wf_groups_master WHERE id = ?", id)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.GroupType)
+	if err != nil {
+		return err
+	}
+	if elem.GroupType == "S" {
+		return errors.New("cannot rename a singleton group")
+	}
+	if elem.Name == name {
+		return errors.New("new name should not be the same as existing name")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err = tx.Exec("UPDATE wf_groups_master SET name = ? WHERE id = ?", name, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Delete deletes the given group from the system, if no access
 // context is actively using it.
 func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
