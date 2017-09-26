@@ -28,12 +28,7 @@ import (
 // and out of mailboxes to facilitate reassignments under specific or
 // extraordinary conditions.
 type Mailbox struct {
-	groupID GroupID // Group (or singleton user) owner of this mailbox
-}
-
-// Group answers the recipient group of this mailbox.
-func (mb *Mailbox) Group() GroupID {
-	return mb.groupID
+	GroupID GroupID `json:"groupID"` // Group (or singleton user) owner of this mailbox
 }
 
 // Count answers the number of messages in this mailbox.  Specifying
@@ -52,7 +47,7 @@ func (mb *Mailbox) Count(unread bool) (int64, error) {
 	LIMIT ? OFFSET ?
 	`
 
-	row := db.QueryRow(q, mb.groupID)
+	row := db.QueryRow(q, mb.GroupID)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
@@ -99,7 +94,7 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	ary := make([]*Message, 0, 10)
 	for rows.Next() {
 		var elem Message
-		err = rows.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.event, &elem.title, &elem.data)
+		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +126,7 @@ func (mb *Mailbox) ReassignMessage(otx *sql.Tx, msgID MessageID, gid GroupID) er
 	WHERE group_id = ?
 	AND message_id = ?
 	`
-	_, err := tx.Exec(q, gid, mb.groupID, msgID)
+	_, err := tx.Exec(q, gid, mb.GroupID, msgID)
 	if err != nil {
 		return err
 	}

@@ -46,79 +46,37 @@ type DocEventID int64
 // from one state to another, usually in response to user actions.  It
 // is possible for system events to cause state transitions, as well.
 type DocEvent struct {
-	id     DocEventID  // Unique ID of this event
-	dtype  DocTypeID   // Document type of the document to which this event is to be applied
-	docID  DocumentID  // Document to which this event is to be applied
-	state  DocStateID  // Current state of the document must equal this
-	action DocActionID // Action performed by the user
-	user   UserID      // User who caused this action
-	text   string      // Comment or other content
-	ctime  time.Time   // Time at which the event occurred
-	status EventStatus // Status of this event
+	ID      DocEventID  `json:"id"`        // Unique ID of this event
+	DocType DocTypeID   `json:"docType"`   // Document type of the document to which this event is to be applied
+	DocID   DocumentID  `json:"docID"`     // Document to which this event is to be applied
+	State   DocStateID  `json:"docState"`  // Current state of the document must equal this
+	Action  DocActionID `json:"docAction"` // Action performed by the user
+	User    UserID      `json:"user"`      // User who caused this action
+	Text    string      `json:"text"`      // Comment or other content
+	Ctime   time.Time   `json:"ctime"`     // Time at which the event occurred
+	Status  EventStatus `json:"status"`    // Status of this event
 }
 
-// ID answers the unique identifier of this document event.
-func (e *DocEvent) ID() DocEventID {
-	return e.id
-}
-
-// DocumentType answers the document type of the document to which
-// this event is to be applied.
-func (e *DocEvent) DocumentType() DocTypeID {
-	return e.dtype
-}
-
-// Document answers the document to which this event is to be applied.
-func (e *DocEvent) Document() DocumentID {
-	return e.docID
-}
-
-// State answers the state of the document as of the time this event
-// occurred.
-func (e *DocEvent) State() DocStateID {
-	return e.state
-}
-
-// Action answers the document action that this event represents.
-func (e *DocEvent) Action() DocActionID {
-	return e.action
-}
-
-// User answers the user who caused this event to occur.
-func (e *DocEvent) User() UserID {
-	return e.user
-}
-
-// Text answers the comment or other content enclosed in this event.
-func (e *DocEvent) Text() string {
-	return e.text
-}
-
-// Time answers the time at which this event occurred.
-func (e *DocEvent) Time() time.Time {
-	return e.ctime
-}
-
-// Status answers the status of this event.
-func (e *DocEvent) Status() (EventStatus, error) {
+// StatusInDB answers the status of this event.
+func (e *DocEvent) StatusInDB() (EventStatus, error) {
 	var dstatus string
-	row := db.QueryRow("SELECT status FROM wf_docevents WHERE id = ?", e.id)
+	row := db.QueryRow("SELECT status FROM wf_docevents WHERE id = ?", e.ID)
 	err := row.Scan(&dstatus)
 	if err != nil {
 		return 0, err
 	}
 	switch dstatus {
 	case "A":
-		e.status = EventStatusApplied
+		e.Status = EventStatusApplied
 
 	case "P":
-		e.status = EventStatusPending
+		e.Status = EventStatusPending
 
 	default:
 		return 0, fmt.Errorf("unknown event status : %s", dstatus)
 	}
 
-	return e.status, nil
+	return e.Status, nil
 }
 
 // Unexported type, only for convenience methods.
@@ -225,19 +183,19 @@ func (des *_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEven
 	ary := make([]*DocEvent, 0, 10)
 	for rows.Next() {
 		var elem DocEvent
-		err = rows.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.state, &elem.action, &elem.user, &text, &elem.ctime, &dstatus)
+		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.User, &text, &elem.Ctime, &dstatus)
 		if err != nil {
 			return nil, err
 		}
 		if text.Valid {
-			elem.text = text.String
+			elem.Text = text.String
 		}
 		switch dstatus {
 		case "A":
-			elem.status = EventStatusApplied
+			elem.Status = EventStatusApplied
 
 		case "P":
-			elem.status = EventStatusPending
+			elem.Status = EventStatusPending
 
 		default:
 			return nil, fmt.Errorf("unknown event status : %s", dstatus)
@@ -262,19 +220,19 @@ func (des *_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
 	var dstatus string
 	var elem DocEvent
 	row := db.QueryRow("SELECT * FROM wf_docevents WHERE id = ?", eid)
-	err := row.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.state, &elem.action, &elem.user, &text, &elem.ctime, &dstatus)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.User, &text, &elem.Ctime, &dstatus)
 	if err != nil {
 		return nil, err
 	}
 	if text.Valid {
-		elem.text = text.String
+		elem.Text = text.String
 	}
 	switch dstatus {
 	case "A":
-		elem.status = EventStatusApplied
+		elem.Status = EventStatusApplied
 
 	case "P":
-		elem.status = EventStatusPending
+		elem.Status = EventStatusPending
 
 	default:
 		return nil, fmt.Errorf("unknown event status : %s", dstatus)

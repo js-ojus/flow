@@ -45,50 +45,24 @@ type NodeFunc func(*Document, *DocEvent) *Message
 // applicable mailboces.
 func defNodeFunc(d *Document, event *DocEvent) *Message {
 	return &Message{
-		dtype: d.dtype.id,
-		docID: d.id,
-		event: event.id,
-		title: d.title,
-		data:  event.text,
+		DocType: d.DocType.ID,
+		DocID:   d.ID,
+		Event:   event.ID,
+		Title:   d.Title,
+		Data:    event.Text,
 	}
 }
 
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	id    NodeID     // Unique identifier of this node
-	dtype DocTypeID  // Document type which this node's workflow manages
-	state DocStateID // A document arriving at this node must be in this state
-	wflow WorkflowID // Containing flow of this node
-	name  string     // Unique within its workflow
-	ntype NodeType   // Topology type of this node
-	nfunc NodeFunc   // Processing function of this node
-}
-
-// ID answers the unique identifier of this workflow node.
-func (n *Node) ID() NodeID {
-	return n.id
-}
-
-// Workflow answers this node definition's containing workflow.
-func (n *Node) Workflow() WorkflowID {
-	return n.wflow
-}
-
-// State answers the state that any document arriving at this node
-// must be in.
-func (n *Node) State() DocStateID {
-	return n.state
-}
-
-// Name answers the descriptive title of this node.
-func (n *Node) Name() string {
-	return n.name
-}
-
-// Type answers the type of this node.
-func (n *Node) Type() NodeType {
-	return n.ntype
+	ID       NodeID     `json:"id"`       // Unique identifier of this node
+	DocType  DocTypeID  `json:"docType"`  // Document type which this node's workflow manages
+	State    DocStateID `json:"docState"` // A document arriving at this node must be in this state
+	Wflow    WorkflowID `json:"wflow"`    // Containing flow of this node
+	Name     string     `json:"name"`     // Unique within its workflow
+	NodeType NodeType   `json:"nodeType"` // Topology type of this node
+	nfunc    NodeFunc   // Processing function of this node
 }
 
 // Transitions answers the possible document states into which a
@@ -100,7 +74,7 @@ func (n *Node) Transitions() (map[DocActionID]DocStateID, error) {
 	WHERE doctype_id = ?
 	AND from_state_id = ?
 	`
-	rows, err := db.Query(q, n.dtype, n.state)
+	rows, err := db.Query(q, n.DocType, n.State)
 	if err != nil {
 		return nil, err
 	}
@@ -149,17 +123,17 @@ func (n *Node) Func() NodeFunc {
 // registered node function, and posts it to applicable mailboxes.
 func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
 	ts, err := n.Transitions()
-	nstate, ok := ts[event.action]
+	nstate, ok := ts[event.Action]
 	if !ok {
-		return 0, fmt.Errorf("given event's action '%d' cannot be performed on a document in the state '%d'", event.action, n.state)
+		return 0, fmt.Errorf("given event's action '%d' cannot be performed on a document in the state '%d'", event.Action, n.State)
 	}
 
-	doc, err := _documents.Get(event.dtype, event.docID)
+	doc, err := _documents.Get(event.DocType, event.DocID)
 	if err != nil {
 		return 0, err
 	}
-	if doc.state.id != event.state && doc.state.id != nstate {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.id, event.state)
+	if doc.State.ID != event.State && doc.State.ID != nstate {
+		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.State.ID, event.State)
 	}
 
 	var tx *sql.Tx
@@ -175,17 +149,17 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 
 	// Process state transition according to the target node type.
 
-	tnode, err := _nodes.GetByState(n.dtype, nstate)
+	tnode, err := _nodes.GetByState(n.DocType, nstate)
 	if err != nil {
 		return 0, err
 	}
 
-	switch tnode.ntype {
+	switch tnode.NodeType {
 	case NodeTypeJoinAny:
 		// Multiple 'in's, but any one suffices.
 
 		// Document has already transitioned; nothing to do.
-		if doc.state.id == nstate {
+		if doc.State.ID == nstate {
 			return nstate, nil
 		}
 
@@ -196,9 +170,9 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Any node type having a single 'in'.
 
 		// Update the document to transition the state.
-		tbl := _doctypes.docStorName(event.dtype)
+		tbl := _doctypes.docStorName(event.DocType)
 		q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-		_, err = tx.Exec(q, nstate, event.docID)
+		_, err = tx.Exec(q, nstate, event.DocID)
 		if err != nil {
 			return 0, err
 		}
@@ -222,7 +196,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// TODO(js)
 
 	default:
-		return 0, fmt.Errorf("unknown node type encountered : %s", tnode.ntype)
+		return 0, fmt.Errorf("unknown node type encountered : %s", tnode.NodeType)
 	}
 
 	if otx == nil {
@@ -242,13 +216,13 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, nstate DocStateID) erro
 	INSERT INTO wf_docevent_application(doctype_id, doc_id, from_state_id, docevent_id, to_state_id)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	_, err := otx.Exec(q, event.dtype, event.docID, event.state, event.id, nstate)
+	_, err := otx.Exec(q, event.DocType, event.DocID, event.State, event.ID, nstate)
 	if err != nil {
 		return err
 	}
 
 	q = `UPDATE wf_docevents SET status = 'A' WHERE id = ?`
-	_, err = otx.Exec(q, event.id)
+	_, err = otx.Exec(q, event.ID)
 	if err != nil {
 		return err
 	}
@@ -265,7 +239,7 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 	INSERT INTO wf_messages(doctype_id, doc_id, docevent_id, title, data)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	res, err := otx.Exec(q, msg.dtype, msg.docID, msg.event, msg.title, msg.data)
+	res, err := otx.Exec(q, msg.DocType, msg.DocID, msg.Event, msg.Title, msg.Data)
 	if err != nil {
 		return err
 	}
@@ -321,7 +295,7 @@ func (ns *_Nodes) Nodes(id WorkflowID) ([]*Node, error) {
 	ary := make([]*Node, 0, 5)
 	for rows.Next() {
 		var elem Node
-		err = rows.Scan(&elem.id, &elem.dtype, &elem.state, &elem.wflow, &elem.name, &elem.ntype)
+		err = rows.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -348,7 +322,7 @@ func (ns *_Nodes) Get(id NodeID) (*Node, error) {
 	WHERE id = ?
 	`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&elem.id, &elem.dtype, &elem.state, &elem.wflow, &elem.name, &elem.ntype)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +342,7 @@ func (ns *_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
 	AND docstate_id = ?
 	`
 	row := db.QueryRow(q, dtype, state)
-	err := row.Scan(&elem.id, &elem.dtype, &elem.state, &elem.wflow, &elem.name, &elem.ntype)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
 	if err != nil {
 		return nil, err
 	}

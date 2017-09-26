@@ -37,24 +37,9 @@ type DocStateID int64
 // altering the corresponding workflow definition to use the new one
 // instead.
 type DocState struct {
-	id    DocStateID // Unique identifier of this document state
-	dtype DocType    // For namespace purposes
-	name  string     // Unique identifier of this state in its workflow
-}
-
-// ID answers the unique identifier of this document state.
-func (s *DocState) ID() DocStateID {
-	return s.id
-}
-
-// Type answers the document type for which this defines a state.
-func (s *DocState) Type() DocType {
-	return s.dtype
-}
-
-// Name answers this state's name.
-func (s *DocState) Name() string {
-	return s.name
+	ID      DocStateID `json:"id"`      // Unique identifier of this document state
+	DocType DocType    `json:"docType"` // For namespace purposes
+	Name    string     `json:"name"`    // Unique identifier of this state in its workflow
 }
 
 // Unexported type, only for convenience methods.
@@ -140,7 +125,7 @@ func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
 	ary := make([]*DocState, 0, 10)
 	for rows.Next() {
 		var elem DocState
-		err = rows.Scan(&elem.id, &elem.dtype.id, &elem.name)
+		err = rows.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +146,7 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 
 	var elem DocState
 	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.dtype.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +164,7 @@ func (dss *_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error
 
 	var elem DocState
 	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE doctype_id = ? AND name = ?", dtype, name)
-	err := row.Scan(&elem.id, &elem.dtype.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}

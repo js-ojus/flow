@@ -28,18 +28,8 @@ type RoleID int64
 //
 // Each group in the system can have one or more roles assigned.
 type Role struct {
-	id   RoleID // globally-unique ID of this role
-	name string // name of this role
-}
-
-// ID answers this role's identifier.
-func (r *Role) ID() RoleID {
-	return r.id
-}
-
-// Name answers this role's name.
-func (r *Role) Name() string {
-	return r.name
+	ID   RoleID `json:"id"`   // globally-unique ID of this role
+	Name string `json:"name"` // name of this role
 }
 
 // Unexported type, only for convenience methods.
@@ -122,7 +112,7 @@ func (rs *_Roles) List(offset, limit int64) ([]*Role, error) {
 	ary := make([]*Role, 0, 10)
 	for rows.Next() {
 		var elem Role
-		err = rows.Scan(&elem.id, &elem.name)
+		err = rows.Scan(&elem.ID, &elem.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +134,7 @@ func (rs *_Roles) Get(id RoleID) (*Role, error) {
 
 	var elem Role
 	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +152,7 @@ func (rs *_Roles) GetByName(name string) (*Role, error) {
 
 	var elem Role
 	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE name = ?", name)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +280,7 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 	for rows.Next() {
 		var dt DocType
 		var da DocAction
-		err = rows.Scan(&dt.id, &dt.name, &da.id, &da.name)
+		err = rows.Scan(&dt.ID, &dt.Name, &da.ID, &da.Name)
 		if err != nil {
 			return nil, err
 		}
