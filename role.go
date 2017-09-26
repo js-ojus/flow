@@ -17,6 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 )
@@ -181,6 +182,54 @@ func (rs *_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Delete deletes the given role from the system, if no access context
+// is actively using it.
+func (rs *_Roles) Delete(otx *sql.Tx, id RoleID) error {
+	if id <= 0 {
+		return errors.New("role ID must be a positive integer")
+	}
+
+	row := db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE role_id = ?", id)
+	var n int64
+	err := row.Scan(&n)
+	if n > 0 {
+		return errors.New("role is being used in at least one access context; cannot delete")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	_, err = tx.Exec("DELETE FROM wf_role_docactions WHERE role_id = ?", id)
+	if err != nil {
+		return err
+	}
+	res, err := tx.Exec("DELETE FROM wf_roles_master WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	n, err = res.RowsAffected()
+	if n != 1 {
+		return fmt.Errorf("expected number of affected rows : 1; actual affected : %d", n)
 	}
 
 	if otx == nil {
