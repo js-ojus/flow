@@ -46,18 +46,8 @@ type DocTypeID int64
 //
 // N.B. All document types must be defined as constant strings.
 type DocType struct {
-	id   DocTypeID // Unique identifier of this document type
-	name string    // Unique name of this document type
-}
-
-// ID answers the unique identifier of this document type.
-func (s *DocType) ID() DocTypeID {
-	return s.id
-}
-
-// Name answers this type's name.
-func (s *DocType) Name() string {
-	return s.name
+	ID   DocTypeID `json:"id"`   // Unique identifier of this document type
+	Name string    `json:"name"` // Unique name of this document type
 }
 
 // Unexported type, only for convenience methods.
@@ -170,7 +160,7 @@ func (dts *_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 	ary := make([]*DocType, 0, 10)
 	for rows.Next() {
 		var elem DocType
-		err = rows.Scan(&elem.id, &elem.name)
+		err = rows.Scan(&elem.ID, &elem.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +181,7 @@ func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
 
 	var elem DocType
 	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE id = ?", id)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +199,7 @@ func (dts *_DocTypes) GetByName(name string) (*DocType, error) {
 
 	var elem DocType
 	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE name = ?", name)
-	err := row.Scan(&elem.id, &elem.name)
+	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}

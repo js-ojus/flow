@@ -125,7 +125,7 @@ func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
 	ary := make([]*DocState, 0, 10)
 	for rows.Next() {
 		var elem DocState
-		err = rows.Scan(&elem.ID, &elem.DocType.id, &elem.Name)
+		err = rows.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +146,7 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 
 	var elem DocState
 	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE id = ?", id)
-	err := row.Scan(&elem.ID, &elem.DocType.id, &elem.Name)
+	err := row.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (dss *_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error
 
 	var elem DocState
 	row := db.QueryRow("SELECT id, doctype_id, name FROM wf_docstates_master WHERE doctype_id = ? AND name = ?", dtype, name)
-	err := row.Scan(&elem.ID, &elem.DocType.id, &elem.Name)
+	err := row.Scan(&elem.ID, &elem.DocType.ID, &elem.Name)
 	if err != nil {
 		return nil, err
 	}

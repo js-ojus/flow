@@ -222,7 +222,7 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 		if err != nil {
 			return nil, err
 		}
-		elem.dtype.id = dtype
+		elem.dtype.ID = dtype
 		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
@@ -253,13 +253,13 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	}
 	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
 	row = db.QueryRow(q, dtype)
-	err = row.Scan(&d.dtype.name)
+	err = row.Scan(&d.dtype.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	d.id = id
-	d.dtype.id = dtype
+	d.dtype.ID = dtype
 	return &d, nil
 }
 
