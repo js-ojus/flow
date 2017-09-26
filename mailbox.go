@@ -94,7 +94,7 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	ary := make([]*Message, 0, 10)
 	for rows.Next() {
 		var elem Message
-		err = rows.Scan(&elem.id, &elem.dtype, &elem.docID, &elem.event, &elem.title, &elem.data)
+		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
 		if err != nil {
 			return nil, err
 		}

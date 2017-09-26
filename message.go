@@ -24,37 +24,10 @@ type MessageID int64
 // contains a reference to the document that began the current
 // workflow, as well as the event that triggered this message.
 type Message struct {
-	id    MessageID  // Globally-unique identifier of this message
-	dtype DocTypeID  // Document type of the associated document
-	docID DocumentID // Document in the workflow
-	event DocEventID // Event that triggered this message
-	title string     // Subject of this message
-	data  string     // Body of this message
-}
-
-// ID answers the unique identifier of this message.
-func (m *Message) ID() MessageID {
-	return m.id
-}
-
-// Document answers the document type and identifier of the document
-// in whose context this message was generated.
-func (m *Message) Document() (DocTypeID, DocumentID) {
-	return m.dtype, m.docID
-}
-
-// Event answers the event that triggered the generation of this
-// message.
-func (m *Message) Event() DocEventID {
-	return m.event
-}
-
-// Title answers the subject of this message.
-func (m *Message) Title() string {
-	return m.title
-}
-
-// Data answers the body of this message.
-func (m *Message) Data() string {
-	return m.data
+	ID      MessageID  `json:"id"`       // Globally-unique identifier of this message
+	DocType DocTypeID  `json:"docType"`  // Document type of the associated document
+	DocID   DocumentID `json:"docID"`    // Document in the workflow
+	Event   DocEventID `json:"docEvent"` // Event that triggered this message
+	Title   string     `json:"title"`    // Subject of this message
+	Data    string     `json:"data"`     // Body of this message
 }

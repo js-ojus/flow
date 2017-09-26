@@ -45,11 +45,11 @@ type NodeFunc func(*Document, *DocEvent) *Message
 // applicable mailboces.
 func defNodeFunc(d *Document, event *DocEvent) *Message {
 	return &Message{
-		dtype: d.DocType.ID,
-		docID: d.ID,
-		event: event.ID,
-		title: d.Title,
-		data:  event.Text,
+		DocType: d.DocType.ID,
+		DocID:   d.ID,
+		Event:   event.ID,
+		Title:   d.Title,
+		Data:    event.Text,
 	}
 }
 
@@ -265,7 +265,7 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 	INSERT INTO wf_messages(doctype_id, doc_id, docevent_id, title, data)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	res, err := otx.Exec(q, msg.dtype, msg.docID, msg.event, msg.title, msg.data)
+	res, err := otx.Exec(q, msg.DocType, msg.DocID, msg.Event, msg.Title, msg.Data)
 	if err != nil {
 		return err
 	}
