@@ -40,32 +40,10 @@ type WorkflowID int64
 // N.B. It is highly recommended, but not necessary, that workflow
 // names be defined in a system of hierarchical namespaces.
 type Workflow struct {
-	id     WorkflowID // Globally-unique identifier of this workflow
-	name   string     // Globally-unique name of this workflow
-	dtype  DocTypeID  // Document type of which this workflow defines the life cycle
-	bstate DocStateID // Where this flow begins
-}
-
-// ID answers the unique identifier of this workflow.
-func (w *Workflow) ID() WorkflowID {
-	return w.id
-}
-
-// Name answers the globally-unique name of this workflow.
-func (w *Workflow) Name() string {
-	return w.name
-}
-
-// DocType answers the document type for which this defines the
-// workflow.
-func (w *Workflow) DocType() DocTypeID {
-	return w.dtype
-}
-
-// BeginState answers the document state in which the execution of
-// this workflow begins.
-func (w *Workflow) BeginState() DocStateID {
-	return w.bstate
+	ID         WorkflowID `json:"id"`         // Globally-unique identifier of this workflow
+	Name       string     `json:"name"`       // Globally-unique name of this workflow
+	DocType    DocTypeID  `json:"docType"`    // Document type of which this workflow defines the life cycle
+	BeginState DocStateID `json:"beginState"` // Where this flow begins
 }
 
 // ApplyEvent takes an input user action or a system event, and
@@ -82,11 +60,11 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 	if event.Status == EventStatusApplied {
 		return 0, errors.New("event already applied; nothing to do")
 	}
-	if w.dtype != event.DocType {
-		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.dtype, event.DocType)
+	if w.DocType != event.DocType {
+		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.DocType, event.DocType)
 	}
 
-	n, err := _nodes.GetByState(w.dtype, event.State)
+	n, err := _nodes.GetByState(w.DocType, event.State)
 	if err != nil {
 		return 0, err
 	}
@@ -207,7 +185,7 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 	ary := make([]*Workflow, 0, 10)
 	for rows.Next() {
 		var elem Workflow
-		err = rows.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +212,7 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	`
 	row := db.QueryRow(q, id)
 	var elem Workflow
-	err := row.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +234,7 @@ func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
 	`
 	row := db.QueryRow(q, name)
 	var elem Workflow
-	err := row.Scan(&elem.id, &elem.name, &elem.dtype, &elem.bstate)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
 	if err != nil {
 		return nil, err
 	}
