@@ -167,8 +167,41 @@ func TestGroups01(t *testing.T) {
 
 	// Test update operations.
 	t.Run("Update", func(t *testing.T) {
-		// Test adding users.
+		// Rename group.
 		tx, err := db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Groups().Rename(tx, gs[len(gs)-1].ID, "TestName")
+		if err != nil {
+			t.Fatalf("error renaming group : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		tx, err = db.Begin()
+		if err != nil {
+			t.Fatalf("error starting transaction : %v\n", err)
+		}
+		defer tx.Rollback()
+
+		err = Groups().Rename(tx, gs[len(gs)-1].ID, genGrp)
+		if err != nil {
+			t.Fatalf("error renaming group : %v\n", err)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			t.Fatalf("error committing transaction : %v\n", err)
+		}
+
+		// Test adding users.
+		tx, err = db.Begin()
 		if err != nil {
 			t.Fatalf("error starting transaction : %v\n", err)
 		}
