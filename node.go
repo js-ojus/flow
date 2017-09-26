@@ -47,9 +47,9 @@ func defNodeFunc(d *Document, event *DocEvent) *Message {
 	return &Message{
 		dtype: d.dtype.ID,
 		docID: d.id,
-		event: event.id,
+		event: event.ID,
 		title: d.title,
-		data:  event.text,
+		data:  event.Text,
 	}
 }
 
@@ -149,17 +149,17 @@ func (n *Node) Func() NodeFunc {
 // registered node function, and posts it to applicable mailboxes.
 func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
 	ts, err := n.Transitions()
-	nstate, ok := ts[event.action]
+	nstate, ok := ts[event.Action]
 	if !ok {
-		return 0, fmt.Errorf("given event's action '%d' cannot be performed on a document in the state '%d'", event.action, n.state)
+		return 0, fmt.Errorf("given event's action '%d' cannot be performed on a document in the state '%d'", event.Action, n.state)
 	}
 
-	doc, err := _documents.Get(event.dtype, event.docID)
+	doc, err := _documents.Get(event.DocType, event.DocID)
 	if err != nil {
 		return 0, err
 	}
-	if doc.state.ID != event.state && doc.state.ID != nstate {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.ID, event.state)
+	if doc.state.ID != event.State && doc.state.ID != nstate {
+		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.state.ID, event.State)
 	}
 
 	var tx *sql.Tx
@@ -196,9 +196,9 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Any node type having a single 'in'.
 
 		// Update the document to transition the state.
-		tbl := _doctypes.docStorName(event.dtype)
+		tbl := _doctypes.docStorName(event.DocType)
 		q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-		_, err = tx.Exec(q, nstate, event.docID)
+		_, err = tx.Exec(q, nstate, event.DocID)
 		if err != nil {
 			return 0, err
 		}
@@ -242,13 +242,13 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, nstate DocStateID) erro
 	INSERT INTO wf_docevent_application(doctype_id, doc_id, from_state_id, docevent_id, to_state_id)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	_, err := otx.Exec(q, event.dtype, event.docID, event.state, event.id, nstate)
+	_, err := otx.Exec(q, event.DocType, event.DocID, event.State, event.ID, nstate)
 	if err != nil {
 		return err
 	}
 
 	q = `UPDATE wf_docevents SET status = 'A' WHERE id = ?`
-	_, err = otx.Exec(q, event.id)
+	_, err = otx.Exec(q, event.ID)
 	if err != nil {
 		return err
 	}

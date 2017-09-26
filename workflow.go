@@ -79,14 +79,14 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 	if len(recipients) == 0 {
 		return 0, errors.New("list of recipients should have length > 0")
 	}
-	if event.status == EventStatusApplied {
+	if event.Status == EventStatusApplied {
 		return 0, errors.New("event already applied; nothing to do")
 	}
-	if w.dtype != event.dtype {
-		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.dtype, event.dtype)
+	if w.dtype != event.DocType {
+		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.dtype, event.DocType)
 	}
 
-	n, err := _nodes.GetByState(w.dtype, event.state)
+	n, err := _nodes.GetByState(w.dtype, event.State)
 	if err != nil {
 		return 0, err
 	}

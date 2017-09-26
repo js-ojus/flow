@@ -37,9 +37,9 @@ type DocStateID int64
 // altering the corresponding workflow definition to use the new one
 // instead.
 type DocState struct {
-	ID      DocStateID `json:"id"`           // Unique identifier of this document state
-	DocType DocType    `json:"documentType"` // For namespace purposes
-	Name    string     `json:"name"`         // Unique identifier of this state in its workflow
+	ID      DocStateID `json:"id"`      // Unique identifier of this document state
+	DocType DocType    `json:"docType"` // For namespace purposes
+	Name    string     `json:"name"`    // Unique identifier of this state in its workflow
 }
 
 // Unexported type, only for convenience methods.
