@@ -204,3 +204,143 @@ func (dss *_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 
 	return nil
 }
+
+// Transitions answers the possible document states into which a
+// document currently in the given state can transition.
+func (dss *_DocStates) Transitions(dtype DocTypeID, state DocStateID) (map[DocAction]DocState, error) {
+	q := `
+	SELECT dst.docaction_id, dam.name, dst.to_state_id, dsm.name, dtm.name
+	FROM wf_docstate_transitions dst
+	JOIN wf_docstates_master dsm ON dst.to_state_id = dsm.id
+	JOIN wf_docactions_master dam ON dst.docaction_id = dam.id
+	JOIN wf_doctypes_master dtm ON dst.doctype_id = dtm.id
+	WHERE dst.doctype_id = ?
+	AND dst.from_state_id = ?
+	`
+	rows, err := db.Query(q, dtype, state)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	hash := make(map[DocAction]DocState)
+	for rows.Next() {
+		var da DocAction
+		var ds DocState
+		err := rows.Scan(&da.ID, &da.Name, &ds.ID, &ds.Name, &ds.DocType.Name)
+		if err != nil {
+			return nil, err
+		}
+		ds.DocType.ID = dtype
+		hash[da] = ds
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return hash, nil
+}
+
+// _Transitions answers the possible document states into which a
+// document currently in the given state can transition.  Only
+// identifiers are answered in the map.
+func (dss *_DocStates) _Transitions(dtype DocTypeID, state DocStateID) (map[DocActionID]DocStateID, error) {
+	q := `
+	SELECT docaction_id, to_state_id
+	FROM wf_docstate_transitions
+	WHERE doctype_id = ?
+	AND from_state_id = ?
+	`
+	rows, err := db.Query(q, dtype, state)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	hash := make(map[DocActionID]DocStateID)
+	for rows.Next() {
+		var da DocActionID
+		var ds DocStateID
+		err := rows.Scan(&da, &ds)
+		if err != nil {
+			return nil, err
+		}
+		hash[da] = ds
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return hash, nil
+}
+
+// AddTransition associates a target document state with a document
+// action performed on documents in the given current state.
+func (dss *_DocStates) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+	action DocActionID, toState DocStateID) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_docstate_transitions(doctype_id, from_state_id, docaction_id, to_state_id)
+	VALUES(?, ?, ?, ?)
+	`
+	_, err := tx.Exec(q, dtype, state, action, toState)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveTransition disassociates a target document state with a
+// document action performed on documents in the given current state.
+func (dss *_DocStates) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+	action DocActionID, toState DocStateID) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	DELETE FROM wf_docstate_transitions
+	WHERE doctype_id = ?
+	AND from_state_id =?
+	AND docaction_id = ?
+	AND to_state_id = ?
+	`
+	_, err := tx.Exec(q, dtype, state, action, toState)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

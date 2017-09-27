@@ -320,13 +320,10 @@ func (ws *_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 // map is consulted by the workflow when performing a state transition
 // of the system.
 func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wid WorkflowID,
-	name string, ntype NodeType, hash map[DocActionID]DocStateID) (NodeID, error) {
+	name string, ntype NodeType) (NodeID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name should not be empty")
-	}
-	if len(hash) == 0 {
-		return 0, errors.New("transitions map should have length > 0")
 	}
 
 	var tx *sql.Tx
@@ -353,17 +350,6 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wi
 		return 0, err
 	}
 
-	q = `
-	INSERT INTO wf_docstate_transitions(doctype_id, from_state_id, docaction_id, to_state_id)
-	VALUES(?, ?, ?, ?)
-	`
-	for da, ds := range hash {
-		_, err := tx.Exec(q, dtype, state, da, ds)
-		if err != nil {
-			return 0, err
-		}
-	}
-
 	if otx == nil {
 		err = tx.Commit()
 		if err != nil {
@@ -372,4 +358,39 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wi
 	}
 
 	return NodeID(id), nil
+}
+
+// RemoveNode unmaps the given document state to the specified node.
+// This map is consulted by the workflow when performing a state
+// transition of the system.
+func (ws *_Workflows) RemoveNode(otx *sql.Tx, wid WorkflowID, nid NodeID) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	DELETE FROM wf_workflow_nodes
+	WHERE workflow_id = ?
+	AND id = ?
+	`
+	_, err := tx.Exec(q, wid, nid)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

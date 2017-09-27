@@ -68,33 +68,7 @@ type Node struct {
 // Transitions answers the possible document states into which a
 // document currently in the given state can transition.
 func (n *Node) Transitions() (map[DocActionID]DocStateID, error) {
-	q := `
-	SELECT docaction_id, to_state_id
-	FROM wf_docstate_transitions
-	WHERE doctype_id = ?
-	AND from_state_id = ?
-	`
-	rows, err := db.Query(q, n.DocType, n.State)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	hash := make(map[DocActionID]DocStateID)
-	for rows.Next() {
-		var da DocActionID
-		var ds DocStateID
-		err := rows.Scan(&da, &ds)
-		if err != nil {
-			return nil, err
-		}
-		hash[da] = ds
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return hash, nil
+	return _docstates._Transitions(n.DocType, n.State)
 }
 
 // SetFunc registers the given node function with this node.
@@ -279,8 +253,8 @@ func Nodes() *_Nodes {
 	return _nodes
 }
 
-// Nodes answers a list of the nodes comprising the given workflow.
-func (ns *_Nodes) Nodes(id WorkflowID) ([]*Node, error) {
+// List answers a list of the nodes comprising the given workflow.
+func (ns *_Nodes) List(id WorkflowID) ([]*Node, error) {
 	q := `
 	SELECT id, doctype_id, docstate_id, workflow_id, name, type
 	FROM wf_workflow_nodes
