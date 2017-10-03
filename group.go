@@ -361,7 +361,7 @@ func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
 // group is a singleton group.
 func (gs *_Groups) SingletonUser(gid GroupID) (*User, error) {
 	q := `
-	SELECT um.id, um.first_name, um.last_name, um.active
+	SELECT um.id, um.first_name, um.last_name, um.email, um.active
 	FROM wf_users_master um
 	JOIN wf_group_users gus ON gus.user_id = um.id
 	JOIN wf_groups_master gm ON gus.group_id = gm.id
@@ -373,7 +373,7 @@ func (gs *_Groups) SingletonUser(gid GroupID) (*User, error) {
 
 	var elem User
 	row := db.QueryRow(q, gid)
-	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Active)
+	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 	switch {
 	case err != nil:
 		return nil, err
