@@ -42,8 +42,8 @@ type DocActionID int64
 //
 // N.B. All document actions must be defined as constant strings.
 type DocAction struct {
-	ID   DocActionID `json:"id"`   // Unique identifier of this action
-	Name string      `json:"name"` // Globally-unique name of this action
+	ID   DocActionID `json:"ID"`   // Unique identifier of this action
+	Name string      `json:"Name"` // Globally-unique name of this action
 }
 
 // Unexported type, only for convenience methods.

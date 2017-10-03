@@ -30,11 +30,11 @@ type UserID int64
 // provider application or directory.  `flow` neither defines nor
 // manages users.
 type User struct {
-	ID        UserID `json:"id"`               // Must be globally-unique
-	FirstName string `json:"firstName"`        // For display purposes only
-	LastName  string `json:"lastName"`         // For display purposes only
-	Email     string `json:"email"`            // E-mail address of this user
-	Active    bool   `json:"active,omitempty"` // Is this user account active?
+	ID        UserID `json:"ID"`               // Must be globally-unique
+	FirstName string `json:"FirstName"`        // For display purposes only
+	LastName  string `json:"LastName"`         // For display purposes only
+	Email     string `json:"Email"`            // E-mail address of this user
+	Active    bool   `json:"Active,omitempty"` // Is this user account active?
 }
 
 // Unexported type, only for convenience methods.
@@ -141,44 +141,52 @@ func (us *_Users) IsActive(uid UserID) (bool, error) {
 
 // GroupsOf answers a list of groups that the given user is a member
 // of.
-func (us *_Users) GroupsOf(uid UserID) ([]GroupID, error) {
-	rows, err := db.Query("SELECT group_id FROM wf_group_users WHERE user_id = ?", uid)
+func (us *_Users) GroupsOf(uid UserID) ([]*Group, error) {
+	q := `
+	SELECT gm.id, gm.name, gm.group_type
+	FROM wf_groups_master gm
+	JOIN wf_group_users gus ON gus.group_id = gm.id
+	JOIN wf_users_master um ON um.id = gus.user_id
+	WHERE um.id = ?
+	`
+	rows, err := db.Query(q, uid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	gids := make([]GroupID, 0, 1)
-	var gid GroupID
+	ary := make([]*Group, 0, 2)
 	for rows.Next() {
-		err = rows.Scan(&gid)
+		var elem Group
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.GroupType)
 		if err != nil {
 			return nil, err
 		}
-		gids = append(gids, gid)
+		ary = append(ary, &elem)
 	}
 	err = rows.Err()
 	if err != nil {
 		return nil, err
 	}
 
-	return gids, nil
+	return ary, nil
 }
 
 // SingletonGroupOf answers the ID of the given user's singleton
 // group.
-func (us *_Users) SingletonGroupOf(uid UserID) (GroupID, error) {
+func (us *_Users) SingletonGroupOf(uid UserID) (*Group, error) {
 	q := `
-	SELECT gm.id FROM wf_groups_master gm
+	SELECT gm.id, gm.name, gm.group_type
+	FROM wf_groups_master gm
 	JOIN wf_users_master um ON gm.name = um.email
 	WHERE um.id = ?
 	`
-	var gid GroupID
+	var elem Group
 	row := db.QueryRow(q, uid)
-	err := row.Scan(&gid)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.GroupType)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return gid, nil
+	return &elem, nil
 }

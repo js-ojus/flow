@@ -29,8 +29,8 @@ type RoleID int64
 //
 // Each group in the system can have one or more roles assigned.
 type Role struct {
-	ID   RoleID `json:"id"`   // globally-unique ID of this role
-	Name string `json:"name"` // name of this role
+	ID   RoleID `json:"ID"`   // globally-unique ID of this role
+	Name string `json:"Name"` // name of this role
 }
 
 // Unexported type, only for convenience methods.

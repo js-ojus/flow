@@ -24,10 +24,10 @@ type MessageID int64
 // contains a reference to the document that began the current
 // workflow, as well as the event that triggered this message.
 type Message struct {
-	ID      MessageID  `json:"id"`       // Globally-unique identifier of this message
-	DocType DocTypeID  `json:"docType"`  // Document type of the associated document
-	DocID   DocumentID `json:"docID"`    // Document in the workflow
-	Event   DocEventID `json:"docEvent"` // Event that triggered this message
-	Title   string     `json:"title"`    // Subject of this message
-	Data    string     `json:"data"`     // Body of this message
+	ID      MessageID  `json:"ID"`       // Globally-unique identifier of this message
+	DocType DocTypeID  `json:"DocType"`  // Document type of the associated document
+	DocID   DocumentID `json:"DocID"`    // Document in the workflow
+	Event   DocEventID `json:"DocEvent"` // Event that triggered this message
+	Title   string     `json:"Title"`    // Subject of this message
+	Data    string     `json:"Data"`     // Body of this message
 }

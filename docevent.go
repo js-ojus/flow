@@ -46,15 +46,15 @@ type DocEventID int64
 // from one state to another, usually in response to user actions.  It
 // is possible for system events to cause state transitions, as well.
 type DocEvent struct {
-	ID      DocEventID  `json:"id"`        // Unique ID of this event
-	DocType DocTypeID   `json:"docType"`   // Document type of the document to which this event is to be applied
-	DocID   DocumentID  `json:"docID"`     // Document to which this event is to be applied
-	State   DocStateID  `json:"docState"`  // Current state of the document must equal this
-	Action  DocActionID `json:"docAction"` // Action performed by the user
-	User    UserID      `json:"user"`      // User who caused this action
-	Text    string      `json:"text"`      // Comment or other content
-	Ctime   time.Time   `json:"ctime"`     // Time at which the event occurred
-	Status  EventStatus `json:"status"`    // Status of this event
+	ID      DocEventID  `json:"ID"`        // Unique ID of this event
+	DocType DocTypeID   `json:"DocType"`   // Document type of the document to which this event is to be applied
+	DocID   DocumentID  `json:"DocID"`     // Document to which this event is to be applied
+	State   DocStateID  `json:"DocState"`  // Current state of the document must equal this
+	Action  DocActionID `json:"DocAction"` // Action performed by the user
+	User    UserID      `json:"User"`      // User who caused this action
+	Text    string      `json:"Text"`      // Comment or other content
+	Ctime   time.Time   `json:"Ctime"`     // Time at which the event occurred
+	Status  EventStatus `json:"Status"`    // Status of this event
 }
 
 // StatusInDB answers the status of this event.

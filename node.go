@@ -56,12 +56,12 @@ func defNodeFunc(d *Document, event *DocEvent) *Message {
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	ID       NodeID     `json:"id"`       // Unique identifier of this node
-	DocType  DocTypeID  `json:"docType"`  // Document type which this node's workflow manages
-	State    DocStateID `json:"docState"` // A document arriving at this node must be in this state
-	Wflow    WorkflowID `json:"wflow"`    // Containing flow of this node
-	Name     string     `json:"name"`     // Unique within its workflow
-	NodeType NodeType   `json:"nodeType"` // Topology type of this node
+	ID       NodeID     `json:"ID"`       // Unique identifier of this node
+	DocType  DocTypeID  `json:"DocType"`  // Document type which this node's workflow manages
+	State    DocStateID `json:"DocState"` // A document arriving at this node must be in this state
+	Wflow    WorkflowID `json:"Workflow"` // Containing flow of this node
+	Name     string     `json:"Name"`     // Unique within its workflow
+	NodeType NodeType   `json:"NodeType"` // Topology type of this node
 	nfunc    NodeFunc   // Processing function of this node
 }
 

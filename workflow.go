@@ -40,10 +40,10 @@ type WorkflowID int64
 // N.B. It is highly recommended, but not necessary, that workflow
 // names be defined in a system of hierarchical namespaces.
 type Workflow struct {
-	ID         WorkflowID `json:"id"`         // Globally-unique identifier of this workflow
-	Name       string     `json:"name"`       // Globally-unique name of this workflow
-	DocType    DocTypeID  `json:"docType"`    // Document type of which this workflow defines the life cycle
-	BeginState DocStateID `json:"beginState"` // Where this flow begins
+	ID         WorkflowID `json:"ID"`         // Globally-unique identifier of this workflow
+	Name       string     `json:"Name"`       // Globally-unique name of this workflow
+	DocType    DocTypeID  `json:"DocType"`    // Document type of which this workflow defines the life cycle
+	BeginState DocStateID `json:"BeginState"` // Where this flow begins
 }
 
 // ApplyEvent takes an input user action or a system event, and
