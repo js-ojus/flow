@@ -311,7 +311,10 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, act
 // Permissions answers the current set of permissions this role has.
 // It answers `nil` in case the given document type does not have any
 // permissions set in this role.
-func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
+func (rs *_Roles) Permissions(rid RoleID) (map[string]struct {
+	DocTypeID DocTypeID
+	Actions   []*DocAction
+}, error) {
 	q := `
 	SELECT dtm.id, dtm.name, dam.id, dam.name
 	FROM wf_doctypes_master dtm
@@ -325,7 +328,10 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 	}
 	defer rows.Close()
 
-	das := make(map[DocType][]*DocAction)
+	das := make(map[string]struct {
+		DocTypeID DocTypeID
+		Actions   []*DocAction
+	})
 	for rows.Next() {
 		var dt DocType
 		var da DocAction
@@ -333,12 +339,13 @@ func (rs *_Roles) Permissions(rid RoleID) (map[DocType][]*DocAction, error) {
 		if err != nil {
 			return nil, err
 		}
-		ary, ok := das[dt]
+		st, ok := das[dt.Name]
 		if !ok {
-			ary = make([]*DocAction, 0, 1)
+			st.DocTypeID = dt.ID
+			st.Actions = make([]*DocAction, 0, 1)
 		}
-		ary = append(ary, &da)
-		das[dt] = ary
+		st.Actions = append(st.Actions, &da)
+		das[dt.Name] = st
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
