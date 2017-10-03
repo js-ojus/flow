@@ -46,8 +46,8 @@ type DocTypeID int64
 //
 // N.B. All document types must be defined as constant strings.
 type DocType struct {
-	ID   DocTypeID `json:"id"`   // Unique identifier of this document type
-	Name string    `json:"name"` // Unique name of this document type
+	ID   DocTypeID `json:"ID"`   // Unique identifier of this document type
+	Name string    `json:"Name"` // Unique name of this document type
 }
 
 // Unexported type, only for convenience methods.

@@ -28,7 +28,7 @@ import (
 // and out of mailboxes to facilitate reassignments under specific or
 // extraordinary conditions.
 type Mailbox struct {
-	GroupID GroupID `json:"groupID"` // Group (or singleton user) owner of this mailbox
+	GroupID GroupID `json:"GroupID"` // Group (or singleton user) owner of this mailbox
 }
 
 // Count answers the number of messages in this mailbox.  Specifying

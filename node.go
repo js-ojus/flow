@@ -56,45 +56,19 @@ func defNodeFunc(d *Document, event *DocEvent) *Message {
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	ID       NodeID     `json:"id"`       // Unique identifier of this node
-	DocType  DocTypeID  `json:"docType"`  // Document type which this node's workflow manages
-	State    DocStateID `json:"docState"` // A document arriving at this node must be in this state
-	Wflow    WorkflowID `json:"wflow"`    // Containing flow of this node
-	Name     string     `json:"name"`     // Unique within its workflow
-	NodeType NodeType   `json:"nodeType"` // Topology type of this node
+	ID       NodeID     `json:"ID"`       // Unique identifier of this node
+	DocType  DocTypeID  `json:"DocType"`  // Document type which this node's workflow manages
+	State    DocStateID `json:"DocState"` // A document arriving at this node must be in this state
+	Wflow    WorkflowID `json:"Workflow"` // Containing flow of this node
+	Name     string     `json:"Name"`     // Unique within its workflow
+	NodeType NodeType   `json:"NodeType"` // Topology type of this node
 	nfunc    NodeFunc   // Processing function of this node
 }
 
 // Transitions answers the possible document states into which a
 // document currently in the given state can transition.
 func (n *Node) Transitions() (map[DocActionID]DocStateID, error) {
-	q := `
-	SELECT docaction_id, to_state_id
-	FROM wf_docstate_transitions
-	WHERE doctype_id = ?
-	AND from_state_id = ?
-	`
-	rows, err := db.Query(q, n.DocType, n.State)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	hash := make(map[DocActionID]DocStateID)
-	for rows.Next() {
-		var da DocActionID
-		var ds DocStateID
-		err := rows.Scan(&da, &ds)
-		if err != nil {
-			return nil, err
-		}
-		hash[da] = ds
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return hash, nil
+	return _docstates._Transitions(n.DocType, n.State)
 }
 
 // SetFunc registers the given node function with this node.
@@ -279,8 +253,8 @@ func Nodes() *_Nodes {
 	return _nodes
 }
 
-// Nodes answers a list of the nodes comprising the given workflow.
-func (ns *_Nodes) Nodes(id WorkflowID) ([]*Node, error) {
+// List answers a list of the nodes comprising the given workflow.
+func (ns *_Nodes) List(id WorkflowID) ([]*Node, error) {
 	q := `
 	SELECT id, doctype_id, docstate_id, workflow_id, name, type
 	FROM wf_workflow_nodes

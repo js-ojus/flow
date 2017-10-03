@@ -28,9 +28,9 @@ type GroupID int64
 // Group represents a specified collection of users.  A user belongs
 // to zero or more groups.
 type Group struct {
-	ID        GroupID `json:"id"`        // Globally-unique ID
-	Name      string  `json:"name"`      // Globally-unique name
-	GroupType string  `json:"groupType"` // Is this a user-specific group? Etc.
+	ID        GroupID `json:"ID"`        // Globally-unique ID
+	Name      string  `json:"Name"`      // Globally-unique name
+	GroupType string  `json:"GroupType"` // Is this a user-specific group? Etc.
 }
 
 // Unexported type, only for convenience methods.
@@ -197,21 +197,6 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 	if err != nil {
 		return nil, err
 	}
-	if elem.GroupType == "S" {
-		q := `
-		SELECT active FROM wf_users_master
-		WHERE id = (SELECT user_id FROM wf_group_users WHERE group_id = ?)
-		`
-		var active bool
-		row = db.QueryRow(q, id)
-		err = row.Scan(&active)
-		if err != nil {
-			return nil, err
-		}
-		if !active {
-			return nil, errors.New("user corresponding to this singleton group is currently inactive")
-		}
-	}
 
 	return &elem, nil
 }
@@ -374,27 +359,27 @@ func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
 
 // SingletonUser answer the user ID of the corresponding user, if this
 // group is a singleton group.
-func (gs *_Groups) SingletonUser(gid GroupID) (UserID, error) {
+func (gs *_Groups) SingletonUser(gid GroupID) (*User, error) {
 	q := `
-	SELECT gus.user_id FROM wf_group_users gus
+	SELECT um.id, um.first_name, um.last_name, um.active
+	FROM wf_users_master um
+	JOIN wf_group_users gus ON gus.user_id = um.id
 	JOIN wf_groups_master gm ON gus.group_id = gm.id
 	WHERE gm.id = ?
 	AND gm.group_type = 'S'
-	ORDER BY gus.id
+	ORDER BY um.id
 	LIMIT 1
 	`
-	var uid UserID
-	row := db.QueryRow(q, gid)
-	err := row.Scan(&uid)
-	switch {
-	case err == sql.ErrNoRows:
-		return 0, errors.New("given group is not a singleton group")
 
+	var elem User
+	row := db.QueryRow(q, gid)
+	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Active)
+	switch {
 	case err != nil:
-		return 0, err
+		return nil, err
 
 	default:
-		return uid, nil
+		return &elem, nil
 	}
 }
 

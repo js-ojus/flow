@@ -31,9 +31,9 @@ import (
 // user-supplied name of the binary object, the path of the stored
 // binary object, and its SHA1 checksum.
 type Blob struct {
-	Name    string `json:"name"`    // User-given name to the binary object
-	Path    string `json:"path"`    // Path to the stored binary object
-	Sha1Sum string `json:"sha1sum"` // SHA1 checksum of the binary object
+	Name    string `json:"Name"`    // User-given name to the binary object
+	Path    string `json:"Path"`    // Path to the stored binary object
+	Sha1Sum string `json:"Sha1sum"` // SHA1 checksum of the binary object
 }
 
 // DocumentID is the type of unique document identifiers.
@@ -51,15 +51,15 @@ type DocumentID int64
 // documents.  Most applications should embed `Document` in their
 // document structures rather than use this directly.
 type Document struct {
-	ID      DocumentID `json:"id"`      // Globally-unique identifier of this document
-	DocType DocType    `json:"docType"` // For namespacing
+	ID      DocumentID `json:"ID"`      // Globally-unique identifier of this document
+	DocType DocType    `json:"DocType"` // For namespacing
 
-	User  UserID    `json:"user"`     // Creator of this document
-	State DocState  `json:"docState"` // Current state
-	Ctime time.Time `json:"ctime"`    // Creation time of this revision
+	User  UserID    `json:"User"`     // Creator of this document
+	State DocState  `json:"DocState"` // Current state
+	Ctime time.Time `json:"Ctime"`    // Creation time of this revision
 
-	Title string `json:"title"` // Human-readable title; applicable only for top-level documents
-	Data  []byte `json:"data"`  // Primary content of the document
+	Title string `json:"Title"` // Human-readable title; applicable only for top-level documents
+	Data  []byte `json:"Data"`  // Primary content of the document
 }
 
 // Unexported type, only for convenience methods.
