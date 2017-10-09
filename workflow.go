@@ -217,7 +217,7 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	FROM wf_workflows wf
 	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
 	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
-	WHERE id = ?
+	WHERE wf.id = ?
 	`
 	row := db.QueryRow(q, id)
 	var elem Workflow
@@ -238,13 +238,16 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 // to be fetched separately.
 func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
 	q := `
-	SELECT id, name, doctype_id, docstate_id, active
-	FROM wf_workflows
-	WHERE name = ?
+	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
+	FROM wf_workflows wf
+	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
+	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
+	WHERE wf.name = ?
 	`
 	row := db.QueryRow(q, name)
 	var elem Workflow
-	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState, &elem.Active)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType.ID, &elem.DocType.Name,
+		&elem.BeginState.ID, &elem.BeginState.Name, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
