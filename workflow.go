@@ -40,10 +40,11 @@ type WorkflowID int64
 // N.B. It is highly recommended, but not necessary, that workflow
 // names be defined in a system of hierarchical namespaces.
 type Workflow struct {
-	ID         WorkflowID `json:"ID"`         // Globally-unique identifier of this workflow
-	Name       string     `json:"Name"`       // Globally-unique name of this workflow
-	DocType    DocTypeID  `json:"DocType"`    // Document type of which this workflow defines the life cycle
-	BeginState DocStateID `json:"BeginState"` // Where this flow begins
+	ID         WorkflowID `json:"ID,omitempty"`     // Globally-unique identifier of this workflow
+	Name       string     `json:"Name,omitempty"`   // Globally-unique name of this workflow
+	DocType    DocType    `json:"DocType"`          // Document type of which this workflow defines the life cycle
+	BeginState DocState   `json:"BeginState"`       // Where this flow begins
+	Active     bool       `json:"Active,omitempty"` // Is this workflow enabled?
 }
 
 // ApplyEvent takes an input user action or a system event, and
@@ -51,6 +52,9 @@ type Workflow struct {
 // a possibly new document state.  This method also prepares a message
 // that is posted to applicable mailboxes.
 func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
+	if !w.Active {
+		return 0, errors.New("this workflow is currently disabled")
+	}
 	if event == nil {
 		return 0, errors.New("event should be non-nil")
 	}
@@ -60,11 +64,11 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 	if event.Status == EventStatusApplied {
 		return 0, errors.New("event already applied; nothing to do")
 	}
-	if w.DocType != event.DocType {
-		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.DocType, event.DocType)
+	if w.DocType.ID != event.DocType {
+		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.DocType.ID, event.DocType)
 	}
 
-	n, err := _nodes.GetByState(w.DocType, event.State)
+	n, err := _nodes.GetByState(w.DocType.ID, event.State)
 	if err != nil {
 		return 0, err
 	}
@@ -171,9 +175,11 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 	}
 
 	q := `
-	SELECT id, name, doctype_id, docstate_id
-	FROM wf_workflows
-	ORDER BY id
+	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
+	FROM wf_workflows wf
+	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
+	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
+	ORDER BY wf.id
 	LIMIT ? OFFSET ?
 	`
 	rows, err := db.Query(q, limit, offset)
@@ -185,7 +191,8 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 	ary := make([]*Workflow, 0, 10)
 	for rows.Next() {
 		var elem Workflow
-		err = rows.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.DocType.ID, &elem.DocType.Name,
+			&elem.BeginState.ID, &elem.BeginState.Name, &elem.Active)
 		if err != nil {
 			return nil, err
 		}
@@ -206,13 +213,16 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 // to be fetched separately.
 func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	q := `
-	SELECT id, name, doctype_id, docstate_id
-	FROM wf_workflows
+	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
+	FROM wf_workflows wf
+	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
+	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
 	WHERE id = ?
 	`
 	row := db.QueryRow(q, id)
 	var elem Workflow
-	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType.ID, &elem.DocType.Name,
+		&elem.BeginState.ID, &elem.BeginState.Name, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
@@ -228,13 +238,13 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 // to be fetched separately.
 func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
 	q := `
-	SELECT id, name, doctype_id, docstate_id
+	SELECT id, name, doctype_id, docstate_id, active
 	FROM wf_workflows
 	WHERE name = ?
 	`
 	row := db.QueryRow(q, name)
 	var elem Workflow
-	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType, &elem.BeginState, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
