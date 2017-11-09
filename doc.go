@@ -33,7 +33,7 @@ var blobsDir string
 
 func init() {
 	f := log.Flags()
-	log.SetFlags(f | log.Llongfile)
+	log.SetFlags(f | log.Lmicroseconds | log.Lshortfile)
 }
 
 // RegisterDB provides an already initialised database handle to `flow`.

@@ -34,3 +34,16 @@ const (
 	// NodeTypeJoinAll : two or more incoming, one outgoing
 	NodeTypeJoinAll = "joinall"
 )
+
+// IsValidNodeType answers `true` if the given node type is a
+// recognised node type in the system.
+func IsValidNodeType(ntype string) bool {
+	nt := NodeType(ntype)
+	switch nt {
+	case NodeTypeBegin, NodeTypeEnd, NodeTypeLinear, NodeTypeBranch, NodeTypeJoinAny, NodeTypeJoinAll:
+		return true
+
+	default:
+		return false
+	}
+}
