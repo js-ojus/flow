@@ -201,7 +201,7 @@ func (rs *_Roles) Delete(otx *sql.Tx, id RoleID) error {
 		return errors.New("role ID must be a positive integer")
 	}
 
-	row := db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE role_id = ?", id)
+	row := db.QueryRow("SELECT COUNT(*) FROM wf_ac_group_roles WHERE role_id = ?", id)
 	var n int64
 	err := row.Scan(&n)
 	if n > 0 {
