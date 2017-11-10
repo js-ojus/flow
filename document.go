@@ -31,9 +31,9 @@ import (
 // user-supplied name of the binary object, the path of the stored
 // binary object, and its SHA1 checksum.
 type Blob struct {
-	Name    string `json:"Name"`    // User-given name to the binary object
-	Path    string `json:"Path"`    // Path to the stored binary object
-	Sha1Sum string `json:"Sha1sum"` // SHA1 checksum of the binary object
+	Name    string `json:"Name"`           // User-given name to the binary object
+	Path    string `json:"Path,omitempty"` // Path to the stored binary object
+	Sha1Sum string `json:"Sha1sum"`        // SHA1 checksum of the binary object
 }
 
 // DocumentID is the type of unique document identifiers.
@@ -365,12 +365,12 @@ func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 	return nil
 }
 
-// Blobs answers a list of this document's enclosures (as paths, not
+// Blobs answers a list of this document's enclosures (as names, not
 // the actual blobs).
 func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	bs := make([]*Blob, 0, 1)
 	q := `
-	SELECT name, path, sha1sum
+	SELECT name, sha1sum
 	FROM wf_document_blobs
 	WHERE doctype_id = ?
 	AND doc_id = ?
@@ -382,7 +382,7 @@ func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var b Blob
-		err = rows.Scan(&b.Name, &b.Path, &b.Sha1Sum)
+		err = rows.Scan(&b.Name, &b.Sha1Sum)
 		if err != nil {
 			return nil, err
 		}
