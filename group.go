@@ -261,7 +261,7 @@ func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
 		return errors.New("singleton groups cannot be deleted")
 	}
 
-	row = db.QueryRow("SELECT COUNT(*) FROM wf_access_contexts WHERE group_id = ?", id)
+	row = db.QueryRow("SELECT COUNT(*) FROM wf_ac_group_roles WHERE group_id = ?", id)
 	var n int64
 	err = row.Scan(&n)
 	if n > 0 {
