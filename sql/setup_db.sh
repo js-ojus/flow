@@ -26,9 +26,11 @@ fi
 mysql -u travis $db < ./sql/wf_users_master.sql >> err.log 2>&1
 mysql -u travis $db < ./sql/wf_groups_master.sql >> err.log 2>&1
 mysql -u travis $db < ./sql/wf_roles_master.sql >> err.log 2>&1
-mysql -u travis $db < ./sql/wf_access_contexts.sql >> err.log 2>&1
 mysql -u travis $db < ./sql/wf_group_users.sql >> err.log 2>&1
 mysql -u travis $db < ./sql/wf_role_docactions.sql >> err.log 2>&1
+mysql -u travis $db < ./sql/wf_access_contexts.sql >> err.log 2>&1
+mysql -u travis $db < ./sql/wf_ac_group_roles.sql >> err.log 2>&1
+mysql -u travis $db < ./sql/wf_ac_user_levels.sql >> err.log 2>&1
 mysql -u travis $db < ./sql/wf_ac_perms_v.sql >> err.log 2>&1
 
 # Workflow related.
