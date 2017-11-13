@@ -31,9 +31,9 @@ import (
 // user-supplied name of the binary object, the path of the stored
 // binary object, and its SHA1 checksum.
 type Blob struct {
-	Name    string `json:"Name"`    // User-given name to the binary object
-	Path    string `json:"Path"`    // Path to the stored binary object
-	Sha1Sum string `json:"Sha1sum"` // SHA1 checksum of the binary object
+	Name    string `json:"Name"`           // User-given name to the binary object
+	Path    string `json:"Path,omitempty"` // Path to the stored binary object
+	Sha1Sum string `json:"Sha1sum"`        // SHA1 checksum of the binary object
 }
 
 // DocumentID is the type of unique document identifiers.
@@ -54,9 +54,12 @@ type Document struct {
 	ID      DocumentID `json:"ID"`      // Globally-unique identifier of this document
 	DocType DocType    `json:"DocType"` // For namespacing
 
-	User  UserID    `json:"User"`     // Creator of this document
-	State DocState  `json:"DocState"` // Current state
-	Ctime time.Time `json:"Ctime"`    // Creation time of this revision
+	OrigAccCtx AccessContextID `json:"OrigAccessContext"` // The originating access context of this document; applicable only to a top-level document
+	AccCtx     AccessContext   `json:"AccessContext"`     // Current access context of this document; applicable only to a top-level document
+	State      DocState        `json:"DocState"`          // Current state of this document; applicable only to a top-level document
+
+	User  UserID    `json:"User"`  // Creator of this document
+	Ctime time.Time `json:"Ctime"` // Creation time of this (possibly child) document
 
 	Title string `json:"Title"` // Human-readable title; applicable only for top-level documents
 	Data  []byte `json:"Data"`  // Primary content of the document
@@ -80,14 +83,21 @@ func Documents() *_Documents {
 // New creates and initialises a document.
 //
 // The document created through this method has a life cycle that is
-// associated with it through a particular workflow.
+// associated with it through a particular workflow.  In addition, the
+// operations that different users can perform on this document, are
+// determined in the scope of the access context applicable to the
+// current state of the document.
 //
 // N.B. Blobs, tags and children documents have to be associated with
 // this document, if needed, through appropriate separate calls.
-func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTypeID, oid DocumentID,
-	state DocStateID, title string, data []byte) (DocumentID, error) {
-	if user <= 0 {
-		return 0, errors.New("user ID must be a positive integer")
+func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
+	user UserID, dtype DocTypeID, otype DocTypeID, oid DocumentID,
+	title string, data []byte) (DocumentID, error) {
+	if user <= 0 || acID <= 0 || dtype <= 0 || otype < 0 || oid < 0 {
+		return 0, errors.New("all identifiers should be positive integers; parent document references should be zero or positive integers")
+	}
+	if len(data) == 0 {
+		return 0, errors.New("document's body should be non-empty")
 	}
 
 	if oid > 0 {
@@ -97,13 +107,25 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 			return 0, err
 		}
 		title = outer.Title
+	}
 
-		// A child document does not have its own state.
-		doc, err := _documents.Get(otype, oid)
-		if err != nil {
+	q := `
+	SELECT docstate_id
+	FROM wf_workflows
+	WHERE doctype_id = ?
+	AND active = 1
+	`
+	var dsid int64
+	row := db.QueryRow(q, dtype)
+	err := row.Scan(&dsid)
+	if err != nil {
+		switch {
+		case err == sql.ErrNoRows:
+			return 0, errors.New("no active workflow is defined for the given document type")
+
+		default:
 			return 0, err
 		}
-		state = doc.State.ID
 	}
 
 	var tx *sql.Tx
@@ -118,10 +140,10 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 	}
 
 	tbl := _doctypes.docStorName(dtype)
-	q := `INSERT INTO ` + tbl + `(user_id, docstate_id, ctime, title, data)
-	VALUES (?, ?, NOW(), ?, ?)
+	q2 := `INSERT INTO ` + tbl + `(orig_ac_id, ac_id, docstate_id, user_id, ctime, title, data)
+	VALUES (?, ?, ?, ?, NOW(), ?, ?)
 	`
-	res, err := tx.Exec(q, user, state, title, data)
+	res, err := tx.Exec(q2, acID, acID, dsid, user, title, data)
 	if err != nil {
 		return 0, err
 	}
@@ -130,11 +152,11 @@ func (ds *_Documents) New(otx *sql.Tx, user UserID, dtype DocTypeID, otype DocTy
 		return 0, err
 	}
 
+	q2 = `
+	INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
+	VALUES (?, ?, ?, ?)
+	`
 	if oid > 0 {
-		q2 := `
-		INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
-		VALUES (?, ?, ?, ?)
-		`
 		res, err = tx.Exec(q2, otype, oid, dtype, id)
 		if err != nil {
 			return 0, err
@@ -224,6 +246,29 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	d.ID = id
 	d.DocType.ID = dtype
 	return &d, nil
+}
+
+// GetOuter answers the identifiers of the parent document of the
+// specified document.
+func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
+	q := `
+	SELECT parent_doctype_id, parent_id
+	FROM wf_document_children
+	WHERE child_doctype_id = ?
+	AND child_id = ?
+	LIMIT 1
+	`
+	row := db.QueryRow(q, dtype, id)
+	var dtid, did int64
+	err := row.Scan(&dtid, &did)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, 0, errors.New("this is a top-level document")
+		}
+		return 0, 0, err
+	}
+
+	return DocTypeID(dtid), DocumentID(did), nil
 }
 
 // setState sets the new state of the document.
@@ -365,12 +410,12 @@ func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 	return nil
 }
 
-// Blobs answers a list of this document's enclosures (as paths, not
+// Blobs answers a list of this document's enclosures (as names, not
 // the actual blobs).
 func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	bs := make([]*Blob, 0, 1)
 	q := `
-	SELECT name, path, sha1sum
+	SELECT name, sha1sum
 	FROM wf_document_blobs
 	WHERE doctype_id = ?
 	AND doc_id = ?
@@ -382,7 +427,7 @@ func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var b Blob
-		err = rows.Scan(&b.Name, &b.Path, &b.Sha1Sum)
+		err = rows.Scan(&b.Name, &b.Sha1Sum)
 		if err != nil {
 			return nil, err
 		}

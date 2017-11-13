@@ -108,12 +108,16 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	q = `
 	CREATE TABLE ` + tbl + ` (
 		id INT NOT NULL AUTO_INCREMENT,
-		user_id INT NOT NULL,
+		orig_ac_id INT NOT NULL,
+		ac_id INT NOT NULL,
 		docstate_id INT NOT NULL,
+		user_id INT NOT NULL,
 		ctime TIMESTAMP NOT NULL,
 		title VARCHAR(250) NOT NULL,
 		data BLOB NOT NULL,
 		PRIMARY KEY (id),
+		FOREIGN KEY (orig_ac_id) REFERENCES wf_access_contexts(id),
+		FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
 		FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id)
 	)
 	`
