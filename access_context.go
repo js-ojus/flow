@@ -393,6 +393,7 @@ func (ac *AccessContext) UserHasPermission(uid UserID, dtype DocTypeID, action D
 	AND user_id = ?
 	AND doctype_id = ?
 	AND docaction_id = ?
+	LIMIT 1
 	`
 	row := db.QueryRow(q, ac.ID, uid, dtype, action)
 	var roleID int64
@@ -420,6 +421,7 @@ func (ac *AccessContext) GroupHasPermission(gid GroupID, dtype DocTypeID, action
 	AND group_id = ?
 	AND doctype_id = ?
 	AND docaction_id = ?
+	LIMIT 1
 	`
 	row := db.QueryRow(q, ac.ID, gid, dtype, action)
 	var roleID int64
