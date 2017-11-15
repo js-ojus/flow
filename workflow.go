@@ -17,7 +17,6 @@ package flow
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"math"
 	"strings"
 )
@@ -53,22 +52,19 @@ type Workflow struct {
 // that is posted to applicable mailboxes.
 func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
 	if !w.Active {
-		return 0, errors.New("this workflow is currently disabled")
-	}
-	if event == nil {
-		return 0, errors.New("event should be non-nil")
+		return 0, ErrWorkflowInactive
 	}
 	if len(recipients) == 0 {
-		return 0, errors.New("list of recipients should have length > 0")
+		return 0, ErrDocEventNoRecipients
 	}
 	if event.Status == EventStatusApplied {
-		return 0, errors.New("event already applied; nothing to do")
+		return 0, ErrDocEventAlreadyApplied
 	}
 	if w.DocType.ID != event.DocType {
-		return 0, fmt.Errorf("document type mismatch -- workflow's document type : %d, event's document type : %d", w.DocType.ID, event.DocType)
+		return 0, ErrDocEventDocTypeMismatch
 	}
 
-	n, err := _nodes.GetByState(w.DocType.ID, event.State)
+	n, err := Nodes.GetByState(w.DocType.ID, event.State)
 	if err != nil {
 		return 0, err
 	}

@@ -17,7 +17,7 @@ package flow
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"log"
 )
 
 // NodeID is the type of unique identifiers of nodes.
@@ -97,33 +97,40 @@ func (n *Node) Func() NodeFunc {
 // registered node function, and posts it to applicable mailboxes.
 func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {
 	ts, err := n.Transitions()
-	nstate, ok := ts[event.Action]
-	if !ok {
-		return 0, fmt.Errorf("given event's action '%d' cannot be performed on a document in the state '%d'", event.Action, n.State)
-	}
-
-	doc, err := _documents.Get(event.DocType, event.DocID)
 	if err != nil {
 		return 0, err
 	}
-	if doc.State.ID != event.State && doc.State.ID != nstate {
-		return 0, fmt.Errorf("document state is : %d, but event is targeting state : %d", doc.State.ID, event.State)
+	tstate, ok := ts[event.Action]
+	if !ok {
+		return 0, ErrWorkflowInvalidAction
 	}
 
-	var tx *sql.Tx
-	if otx == nil {
-		tx, err := db.Begin()
+	// Check document's current state.
+	doc, err := _documents.Get(otx, event.DocType, event.DocID)
+	if err != nil {
+		return 0, err
+	}
+	if doc.State.ID != event.State {
+		return 0, ErrDocEventStateMismatch
+	}
+
+	// Document has already transitioned.  So, we note that the event
+	// is applied, and return.
+	//
+	// N.B. This has implications for `NodeTypeJoinAny` below.  Should
+	// you alter this logic or its position, verify that the
+	// corresponding logic in the switch below is in coherence.
+	if doc.State.ID == tstate {
+		err = n.recordEvent(otx, event, tstate, true)
 		if err != nil {
 			return 0, err
 		}
-		defer tx.Rollback()
-	} else {
-		tx = otx
+		return tstate, ErrDocEventRedundant
 	}
 
-	// Process state transition according to the target node type.
+	// Transition document state according to the target node type.
 
-	tnode, err := _nodes.GetByState(n.DocType, nstate)
+	tnode, err := Nodes.GetByState(n.DocType, tstate)
 	if err != nil {
 		return 0, err
 	}
@@ -132,34 +139,29 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 	case NodeTypeJoinAny:
 		// Multiple 'in's, but any one suffices.
 
-		// Document has already transitioned; nothing to do.
-		if doc.State.ID == nstate {
-			return nstate, nil
-		}
-
-		// This is the first event; process it.
+		// We have already checked to see if the document has
+		// transitioned into the target state.  If we have come this
+		// far, the event can be applied.
 		fallthrough
 
 	case NodeTypeBegin, NodeTypeEnd, NodeTypeLinear, NodeTypeBranch:
 		// Any node type having a single 'in'.
 
 		// Update the document to transition the state.
-		tbl := _doctypes.docStorName(event.DocType)
-		q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-		_, err = tx.Exec(q, nstate, event.DocID)
+		err = _documents.setState(otx, event.DocType, event.DocID, tstate)
 		if err != nil {
 			return 0, err
 		}
 
 		// Record event application.
-		err = n.recordEvent(tx, event, nstate)
+		err = n.recordEvent(otx, event, tstate, false)
 		if err != nil {
 			return 0, err
 		}
 
 		// Post messages.
 		msg := n.nfunc(doc, event)
-		err = n.postMessage(tx, msg, recipients)
+		err = n.postMessage(otx, msg, recipients)
 		if err != nil {
 			return 0, err
 		}
@@ -170,33 +172,28 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// TODO(js)
 
 	default:
-		return 0, fmt.Errorf("unknown node type encountered : %s", tnode.NodeType)
+		log.Panicf("unknown node type encountered : %s\n", tnode.NodeType)
 	}
 
-	if otx == nil {
-		err = tx.Commit()
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return nstate, nil
+	return tstate, nil
 }
 
 // recordEvent writes a record stating that the given event has
 // successfully been applied to effect a document state transition.
-func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, nstate DocStateID) error {
-	q := `
-	INSERT INTO wf_docevent_application(doctype_id, doc_id, from_state_id, docevent_id, to_state_id)
-	VALUES(?, ?, ?, ?, ?)
-	`
-	_, err := otx.Exec(q, event.DocType, event.DocID, event.State, event.ID, nstate)
-	if err != nil {
-		return err
+func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, statusOnly bool) error {
+	if !statusOnly {
+		q := `
+		INSERT INTO wf_docevent_application(doctype_id, doc_id, from_state_id, docevent_id, to_state_id)
+		VALUES(?, ?, ?, ?, ?)
+		`
+		_, err := otx.Exec(q, event.DocType, event.DocID, event.State, event.ID, tstate)
+		if err != nil {
+			return err
+		}
 	}
 
-	q = `UPDATE wf_docevents SET status = 'A' WHERE id = ?`
-	_, err = otx.Exec(q, event.ID)
+	q := `UPDATE wf_docevents SET status = 'A' WHERE id = ?`
+	_, err := otx.Exec(q, event.ID)
 	if err != nil {
 		return err
 	}
@@ -241,20 +238,12 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 // Unexported type, only for convenience methods.
 type _Nodes struct{}
 
-var _nodes *_Nodes
-
-func init() {
-	_nodes = &_Nodes{}
-}
-
 // Nodes provides a resource-like interface to the nodes defined in
 // this system.
-func Nodes() *_Nodes {
-	return _nodes
-}
+var Nodes _Nodes
 
 // List answers a list of the nodes comprising the given workflow.
-func (ns *_Nodes) List(id WorkflowID) ([]*Node, error) {
+func (_Nodes) List(id WorkflowID) ([]*Node, error) {
 	q := `
 	SELECT id, doctype_id, docstate_id, workflow_id, name, type
 	FROM wf_workflow_nodes
@@ -284,7 +273,7 @@ func (ns *_Nodes) List(id WorkflowID) ([]*Node, error) {
 }
 
 // Get retrieves the requested node from the database.
-func (ns *_Nodes) Get(id NodeID) (*Node, error) {
+func (_Nodes) Get(id NodeID) (*Node, error) {
 	if id <= 0 {
 		return nil, errors.New("node ID must be a positive integer")
 	}
@@ -307,7 +296,7 @@ func (ns *_Nodes) Get(id NodeID) (*Node, error) {
 
 // GetByState retrieves the requested node from the database, as per
 // the document state specification.
-func (ns *_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
+func (_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
 	var elem Node
 	q := `
 	SELECT id, doctype_id, docstate_id, workflow_id, name, type

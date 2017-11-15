@@ -102,7 +102,7 @@ func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
 
 	if oid > 0 {
 		// A child document does not have its own title.
-		outer, err := _documents.Get(otype, oid)
+		outer, err := _documents.Get(otx, otype, oid)
 		if err != nil {
 			return 0, err
 		}
@@ -222,7 +222,7 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 // N.B. This retrieves the primary data of the document.  Other
 // information viz. blobs, tags and children documents have to be
 // fetched separately.
-func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
+func (ds *_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	tbl := _doctypes.docStorName(dtype)
 	var d Document
 	q := `
@@ -231,7 +231,13 @@ func (ds *_Documents) Get(dtype DocTypeID, id DocumentID) (*Document, error) {
 	JOIN wf_docstates_master states ON docs.docstate_id = states.id
 	WHERE docs.id = ?
 	`
-	row := db.QueryRow(q, id, dtype)
+
+	var row *sql.Row
+	if otx == nil {
+		row = db.QueryRow(q, id, dtype)
+	} else {
+		row = otx.QueryRow(q, id, dtype)
+	}
 	err := row.Scan(&d.User, &d.State.ID, &d.Ctime, &d.Title, &d.Data, &d.State.Name)
 	if err != nil {
 		return nil, err
@@ -278,30 +284,9 @@ func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, Docum
 func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID) error {
 	tbl := _doctypes.docStorName(dtype)
 
-	var tx *sql.Tx
-	if otx == nil {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	} else {
-		tx = otx
-	}
-
 	q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-	_, err := tx.Exec(q, state, id)
-	if err != nil {
-		return err
-	}
-
-	if otx == nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := otx.Exec(q, state, id)
+	return err
 }
 
 // SetTitle sets the title of the document.
