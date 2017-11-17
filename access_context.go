@@ -52,11 +52,11 @@ type AccessContextID int64
 //     - IN:south:HYD:BR-101
 //     - sbu-08/client-0249/prj-006348
 type AccessContext struct {
-	ID         AccessContextID           `json:"ID"`                   // Unique identifier of this access context
-	Name       string                    `json:"Name"`                 // Globally-unique namespace; can be a department, project, location, branch, etc.
-	Active     bool                      `json:"Active"`               // Can a workflow be initiated in this context?
-	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"` // Mapping of groups to their roles.
-	UserLevels map[UserID]AcUserLevel    `json:"UserLevels,omitempty"` // Mapping of users to their hierarchy.
+	ID         AccessContextID           `json:"ID"`                      // Unique identifier of this access context
+	Name       string                    `json:"Name"`                    // Globally-unique namespace; can be a department, project, location, branch, etc.
+	Active     bool                      `json:"Active"`                  // Can a workflow be initiated in this context?
+	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`    // Mapping of groups to their roles.
+	UserHier   map[UserID]UserID         `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
 }
 
 // AcGroupRoles holds the information of the various roles that each
@@ -64,13 +64,6 @@ type AccessContext struct {
 type AcGroupRoles struct {
 	Group string `json:"Group"` // Group whose roles this represents
 	Roles []Role `json:"Roles"` // Map holds the role assignments to groups
-}
-
-// AcUserLevel holds the information of the level assigned to a user
-// in the hierarchy of this access context.
-type AcUserLevel struct {
-	User  User  `json:"User"`  // User whose level this represents
-	Level int64 `json:"Level"` // Level assigned to this user in this access context
 }
 
 // Unexported type, only for convenience methods.
@@ -133,7 +126,7 @@ func (acs *_AccessContexts) List(offset, limit int64) ([]*AccessContext, error) 
 	}
 
 	q := `
-	SELECT id, name
+	SELECT id, name, active
 	FROM wf_access_contexts
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -147,7 +140,7 @@ func (acs *_AccessContexts) List(offset, limit int64) ([]*AccessContext, error) 
 	ary := make([]*AccessContext, 0, 10)
 	for rows.Next() {
 		var elem AccessContext
-		err = rows.Scan(&elem.ID, &elem.Name)
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.Active)
 		if err != nil {
 			return nil, err
 		}
@@ -162,26 +155,58 @@ func (acs *_AccessContexts) List(offset, limit int64) ([]*AccessContext, error) 
 
 // Get fetches the requested access context that determines how the
 // workflows that operate in its context run.
-func (acs *_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
-	q := `SELECT id, name FROM wf_access_contexts WHERE id = ?`
+func (acs *_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64) (*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT id, name, active
+	FROM wf_access_contexts
+	WHERE id = ?
+	`
 	res := db.QueryRow(q, id)
 	var elem AccessContext
-	err := res.Scan(&elem.ID, &elem.Name)
+	err := res.Scan(&elem.ID, &elem.Name, &elem.Active)
 	if err != nil {
 		return nil, err
 	}
 
-	q = `
+	if grs {
+		elem, err = acs.getGroupRoles(id, elem, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if uh {
+		elem, err = acs.getUserHierarchy(id, elem, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &elem, nil
+}
+
+// getGroupRoles retrieves the groups --> roles mapping for this
+// access context.
+func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext, offset, limit int64) (AccessContext, error) {
+	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
 	JOIN wf_groups_master gm ON gm.id = agrs.group_id
 	JOIN wf_roles_master rm ON rm.id = agrs.role_id
 	WHERE agrs.ac_id = ?
 	ORDER BY agrs.group_id
+	LIMIT ? OFFSET ?
 	`
-	rows, err := db.Query(q, id)
+	rows, err := db.Query(q, id, limit, offset)
 	if err != nil {
-		return nil, err
+		return elem, err
 	}
 
 	elem.GroupRoles = make(map[GroupID]*AcGroupRoles)
@@ -192,7 +217,7 @@ func (acs *_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
 		var role Role
 		err = rows.Scan(&gid, &gname, &role.ID, &role.Name)
 		if err != nil {
-			return nil, err
+			return elem, err
 		}
 
 		var gr *AcGroupRoles
@@ -206,37 +231,44 @@ func (acs *_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
 		elem.GroupRoles[GroupID(gid)] = gr
 	}
 	if rows.Err() != nil {
-		return nil, err
+		return elem, err
 	}
 
-	q = `
-	SELECT auls.user_id, um.first_name, um.last_name, um.email, auls.ulevel
-	FROM wf_ac_user_levels auls
-	JOIN wf_users_master um ON um.id = auls.user_id
+	return elem, nil
+}
+
+// getUserHierarchy retrieves the hierarchy of users included in this
+// access context.
+func (acs *_AccessContexts) getUserHierarchy(id AccessContextID, elem AccessContext, offset, limit int64) (AccessContext, error) {
+	q := `
+	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.parent_id
+	FROM wf_ac_user_hierarchy auh
+	JOIN wf_users_master um ON um.id = auh.user_id
 	WHERE agrs.ac_id = ?
-	ORDER BY auls.user_id
+	ORDER BY auh.user_id
+	LIMIT ? OFFSET ?
 	`
-	rows, err = db.Query(q, id)
+	rows, err := db.Query(q, id, limit, offset)
 	if err != nil {
-		return nil, err
+		return elem, err
 	}
 
-	elem.UserLevels = make(map[UserID]AcUserLevel)
+	elem.UserHier = make(map[UserID]UserID)
 	for rows.Next() {
-		var level int64
 		var u User
-		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &level)
+		var p UserID
+		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &p)
 		if err != nil {
-			return nil, err
+			return elem, err
 		}
 
-		elem.UserLevels[UserID(u.ID)] = AcUserLevel{User: u, Level: level}
+		elem.UserHier[UserID(u.ID)] = UserID(p)
 	}
 	if rows.Err() != nil {
-		return nil, err
+		return elem, err
 	}
 
-	return &elem, nil
+	return elem, nil
 }
 
 // AddGroupRole assigns the specified role to the given group, if it
@@ -305,10 +337,10 @@ func (ac *AccessContext) RemoveGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) e
 }
 
 // AddUser adds the given user to this access context, with the
-// specified level in the hierarchy.
-func (ac *AccessContext) AddUser(otx *sql.Tx, uid UserID, level int64) error {
-	if uid <= 0 || level <= 0 {
-		return errors.New("user ID and user level should be positive integers")
+// specified parent in the hierarchy.
+func (ac *AccessContext) AddUser(otx *sql.Tx, uid, parent UserID) error {
+	if uid <= 0 || parent < 0 {
+		return errors.New("user ID should be a positive integer; parent ID should be a non-negative integer")
 	}
 
 	var tx *sql.Tx
@@ -322,8 +354,8 @@ func (ac *AccessContext) AddUser(otx *sql.Tx, uid UserID, level int64) error {
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_ac_user_levels(ac_id, user_id, ulevel) VALUES (?, ?, ?)`
-	_, err := tx.Exec(q, ac.ID, uid, level)
+	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, user_id, parent_id) VALUES (?, ?, ?)`
+	_, err := tx.Exec(q, ac.ID, uid, parent)
 	if err != nil {
 		return err
 	}
@@ -355,7 +387,7 @@ func (ac *AccessContext) DeleteUser(otx *sql.Tx, uid UserID) error {
 		tx = otx
 	}
 
-	q := `DELETE FROM wf_ac_user_levels WHERE ac_id = ? AND user_id = ?`
+	q := `DELETE FROM wf_ac_user_hierarchy WHERE ac_id = ? AND user_id = ?`
 	_, err := tx.Exec(q, ac.ID, uid)
 	if err != nil {
 		return err

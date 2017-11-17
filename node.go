@@ -217,27 +217,14 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, stat
 func (n *Node) determineRecipients(otx *sql.Tx, user UserID) ([]GroupID, error) {
 	q := `
 	SELECT c.id
-	FROM wf_ac_user_levels a
-	JOIN wf_group_users b ON b.user_id = a.user_id
+	FROM wf_ac_user_hierarchy a
+	JOIN wf_group_users b ON b.user_id = a.parent_id
 	JOIN wf_groups_master c ON c.id = b.group_id
-	WHERE a.user_id IN (
-		SELECT user_id FROM wf_ac_user_levels
-		WHERE ac_id = ?
-		AND ulevel = (
-			SELECT MAX(ulevel)
-			FROM wf_ac_user_levels
-			WHERE ac_id = ?
-			AND ulevel < (
-				SELECT ulevel
-				FROM wf_ac_user_levels
-				WHERE ac_id = ?
-				AND user_id = ?
-			)
-		)
-	)
+	WHERE a.ac_id = ?
+	AND a.user_id = ?
 	AND c.group_type = 'S'
 	`
-	rows, err := otx.Query(q, n.AccCtx, n.AccCtx, n.AccCtx, user)
+	rows, err := otx.Query(q, n.AccCtx, user)
 	if err != nil {
 		return nil, err
 	}
