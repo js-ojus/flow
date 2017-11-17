@@ -87,11 +87,11 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		adminID, err = Roles().New(tx, roles[0])
+		adminID, err = Roles.New(tx, roles[0])
 		if err != nil {
 			t.Fatalf("error creating role '%s' : %v\n", roles[0], err)
 		}
-		userID, err = Roles().New(tx, roles[1])
+		userID, err = Roles.New(tx, roles[1])
 		if err != nil {
 			t.Fatalf("error creating role '%s' : %v\n", roles[1], err)
 		}
@@ -104,17 +104,17 @@ func TestRoles01(t *testing.T) {
 
 	// Test reading.
 	t.Run("Read", func(t *testing.T) {
-		_, err := Roles().List(0, 0)
+		_, err := Roles.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
 
-		_, err = Roles().Get(adminID)
+		_, err = Roles.Get(adminID)
 		if err != nil {
 			t.Fatalf("error getting role '%d' : %v\n", adminID, err)
 		}
 
-		_, err = Roles().GetByName(roles[1])
+		_, err = Roles.GetByName(roles[1])
 		if err != nil {
 			t.Fatalf("error getting role '%s' : %v\n", roles[1], err)
 		}
@@ -128,11 +128,11 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Roles().Rename(tx, adminID, "Administrator")
+		err = Roles.Rename(tx, adminID, "Administrator")
 		if err != nil {
 			t.Fatalf("error renaming role '%d' : %v\n", adminID, err)
 		}
-		err = Roles().Rename(tx, adminID, roles[0])
+		err = Roles.Rename(tx, adminID, roles[0])
 		if err != nil {
 			t.Fatalf("error renaming role '%d' : %v\n", adminID, err)
 		}
@@ -152,19 +152,19 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		dtypeStorReqID, err := DocTypes().New(tx, dtypeStorReq)
+		dtypeStorReqID, err := DocTypes.New(tx, dtypeStorReq)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
 		var da DocActionID
 		for _, name := range actions {
-			da, err = DocActions().New(tx, name)
+			da, err = DocActions.New(tx, name)
 			if err != nil {
 				t.Fatalf("error creating document action '%s' : %v\n", name, err)
 			}
 		}
 
-		err = Roles().AddPermission(tx, adminID, dtypeStorReqID, da)
+		err = Roles.AddPermission(tx, adminID, dtypeStorReqID, da)
 		if err != nil {
 			t.Fatalf("error adding permission : %v\n", err)
 		}
@@ -175,7 +175,7 @@ func TestRoles01(t *testing.T) {
 		}
 
 		// List permissions.
-		perms, err := Roles().Permissions(adminID)
+		perms, err := Roles.Permissions(adminID)
 		if err != nil {
 			t.Fatalf("unable to query permissions : %v\n", err)
 		}
@@ -183,7 +183,7 @@ func TestRoles01(t *testing.T) {
 			t.Fatalf("permission doctype count -- expected : 1, got : %d\n", len(perms))
 		}
 
-		ok, err := Roles().HasPermission(adminID, dtypeStorReqID, da)
+		ok, err := Roles.HasPermission(adminID, dtypeStorReqID, da)
 		if err != nil {
 			t.Fatalf("unable to query permission : %v\n", err)
 		}
@@ -198,7 +198,7 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Roles().RemovePermission(tx, adminID, dtypeStorReqID, da)
+		err = Roles.RemovePermission(tx, adminID, dtypeStorReqID, da)
 		if err != nil {
 			t.Fatalf("error removing permission : %v\n", err)
 		}
@@ -209,7 +209,7 @@ func TestRoles01(t *testing.T) {
 		}
 
 		// Verify removal.
-		ok, err = Roles().HasPermission(adminID, dtypeStorReqID, da)
+		ok, err = Roles.HasPermission(adminID, dtypeStorReqID, da)
 		if err != nil {
 			t.Fatalf("unable to query permission : %v\n", err)
 		}
@@ -226,7 +226,7 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Roles().Delete(tx, userID)
+		err = Roles.Delete(tx, userID)
 		if err != nil {
 			t.Fatalf("error deleting role '%d' : %v\n", adminID, err)
 		}

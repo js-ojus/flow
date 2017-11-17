@@ -36,16 +36,8 @@ type Role struct {
 // Unexported type, only for convenience methods.
 type _Roles struct{}
 
-var _roles *_Roles
-
-func init() {
-	_roles = &_Roles{}
-}
-
 // Roles provides a resource-like interface to roles in the system.
-func Roles() *_Roles {
-	return _roles
-}
+var Roles *_Roles
 
 // New creates a role with the given name.
 func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {

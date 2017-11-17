@@ -53,17 +53,9 @@ type DocType struct {
 // Unexported type, only for convenience methods.
 type _DocTypes struct{}
 
-var _doctypes *_DocTypes
-
-func init() {
-	_doctypes = &_DocTypes{}
-}
-
 // DocTypes provides a resource-like interface to document types in
 // the system.
-func DocTypes() *_DocTypes {
-	return _doctypes
-}
+var DocTypes *_DocTypes
 
 // docStorName answers the appropriate table name for the given
 // document type.
@@ -99,7 +91,7 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		return 0, err
 	}
 
-	tbl := _doctypes.docStorName(DocTypeID(id))
+	tbl := DocTypes.docStorName(DocTypeID(id))
 	q := `DROP TABLE IF EXISTS ` + tbl
 	res, err = tx.Exec(q)
 	if err != nil {

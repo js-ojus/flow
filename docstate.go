@@ -45,17 +45,9 @@ type DocState struct {
 // Unexported type, only for convenience methods.
 type _DocStates struct{}
 
-var _docstates *_DocStates
-
-func init() {
-	_docstates = &_DocStates{}
-}
-
 // DocStates provides a resource-like interface to document actions
 // in the system.
-func DocStates() *_DocStates {
-	return _docstates
-}
+var DocStates *_DocStates
 
 // New creates an enumerated state as defined by the consuming
 // application.

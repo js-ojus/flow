@@ -69,11 +69,11 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		dtypeStorReqID, err := DocTypes().New(tx, dtypeStorReq)
+		dtypeStorReqID, err := DocTypes.New(tx, dtypeStorReq)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
-		_, err = DocTypes().New(tx, dtypeStorRel)
+		_, err = DocTypes.New(tx, dtypeStorRel)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorRel, err)
 		}
@@ -84,22 +84,22 @@ func TestDocTypes01(t *testing.T) {
 		}
 
 		// Test reading.
-		_, err = DocTypes().Get(dtypeStorReqID)
+		_, err = DocTypes.Get(dtypeStorReqID)
 		if err != nil {
 			t.Fatalf("error getting document type : %v\n", err)
 		}
 
-		_, err = DocTypes().GetByName(dtypeStorRel)
+		_, err = DocTypes.GetByName(dtypeStorRel)
 		if err != nil {
 			t.Fatalf("error getting document type '%s' : %v\n", dtypeStorRel, err)
 		}
 
-		_, err = DocTypes().List(0, 0)
+		_, err = DocTypes.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
 
-		_, err = DocStates().List(0, 0)
+		_, err = DocStates.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
@@ -111,7 +111,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_DEL")
+		err = DocTypes.Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_DEL")
 		if err != nil {
 			t.Fatalf("error renaming document type : %v\n", err)
 		}
@@ -127,7 +127,7 @@ func TestDocTypes01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocTypes().Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_REQ")
+		err = DocTypes.Rename(tx, dtypeStorReqID, "DATA_PLAT:STOR_REQ")
 		if err != nil {
 			t.Fatalf("error renaming document type : %v\n", err)
 		}

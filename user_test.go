@@ -99,22 +99,22 @@ func TestUsers01(t *testing.T) {
 		}
 
 		// Test reading.
-		_, err = Users().Get(UserID(u1))
+		_, err = Users.Get(UserID(u1))
 		if err != nil {
 			t.Fatalf("error getting user : %v\n", err)
 		}
 
-		_, err = Users().GetByEmail(users[1].email)
+		_, err = Users.GetByEmail(users[1].email)
 		if err != nil {
 			t.Fatalf("error getting user : %v\n", err)
 		}
 
-		_, err = Users().List(0, 0)
+		_, err = Users.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
 
-		active, err := Users().IsActive(UserID(u2))
+		active, err := Users.IsActive(UserID(u2))
 		if err != nil {
 			t.Fatalf("error geting status of user : %v\n", err)
 		}

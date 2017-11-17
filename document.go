@@ -68,17 +68,9 @@ type Document struct {
 // Unexported type, only for convenience methods.
 type _Documents struct{}
 
-var _documents *_Documents
-
-func init() {
-	_documents = &_Documents{}
-}
-
 // Documents provides a resource-like interface to the documents in
 // this system.
-func Documents() *_Documents {
-	return _documents
-}
+var Documents *_Documents
 
 // New creates and initialises a document.
 //
@@ -102,7 +94,7 @@ func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
 
 	if oid > 0 {
 		// A child document does not have its own title.
-		outer, err := _documents.Get(otx, otype, oid)
+		outer, err := Documents.Get(otx, otype, oid)
 		if err != nil {
 			return 0, err
 		}
@@ -139,7 +131,7 @@ func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
 		tx = otx
 	}
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	q2 := `INSERT INTO ` + tbl + `(orig_ac_id, ac_id, docstate_id, user_id, ctime, title, data)
 	VALUES (?, ?, ?, ?, NOW(), ?, ?)
 	`
@@ -187,7 +179,7 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 		limit = math.MaxInt64
 	}
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	q := `
 	SELECT id, user_id, docstate_id, ctime, title, data
 	FROM ` + tbl + `
@@ -223,7 +215,7 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 // information viz. blobs, tags and children documents have to be
 // fetched separately.
 func (ds *_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var d Document
 	q := `
 	SELECT docs.user_id, docs.docstate_id, docs.ctime, docs.title, docs.data, states.name
@@ -282,7 +274,7 @@ func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, Docum
 // This method is not exported.  It is used internally by `Workflow`
 // to move the document along the workflow, into a new document state.
 func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID, ac AccessContextID) error {
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 
 	var q string
 	var err error
@@ -320,7 +312,7 @@ func (ds *_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id Doc
 		return errors.New("a child document cannot have its own title")
 	}
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var duser UserID
 	q = `SELECT user FROM ` + tbl + ` WHERE id = ?`
 	row = db.QueryRow(q, id)
@@ -364,7 +356,7 @@ func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 		return errors.New("document data should not be empty")
 	}
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var duser UserID
 	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
@@ -481,7 +473,7 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 		return errors.New("blob should be non-nil")
 	}
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var duser UserID
 	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
@@ -603,7 +595,7 @@ func (ds *_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Docum
 	}
 	tag = strings.ToLower(tag)
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var duser UserID
 	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
@@ -672,7 +664,7 @@ func (ds *_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Do
 	}
 	tag = strings.ToLower(tag)
 
-	tbl := _doctypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(dtype)
 	var duser UserID
 	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)

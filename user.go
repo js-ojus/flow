@@ -40,16 +40,8 @@ type User struct {
 // Unexported type, only for convenience methods.
 type _Users struct{}
 
-var _users *_Users
-
-func init() {
-	_users = &_Users{}
-}
-
 // Users provides a resource-like interface to users in the system.
-func Users() *_Users {
-	return _users
-}
+var Users *_Users
 
 // List answers a subset of the users, based on the input
 // specification.

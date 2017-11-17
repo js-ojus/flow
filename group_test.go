@@ -112,15 +112,15 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		_, err = Groups().NewSingleton(tx, UserID(u1))
+		_, err = Groups.NewSingleton(tx, UserID(u1))
 		if err != nil {
 			t.Fatalf("error adding singleton group for user '%d' : %v\n", u1, err)
 		}
-		_, err = Groups().NewSingleton(tx, UserID(u2))
+		_, err = Groups.NewSingleton(tx, UserID(u2))
 		if err != nil {
 			t.Fatalf("error adding singleton group for user '%d' : %v\n", u2, err)
 		}
-		_, err = Groups().New(tx, genGrp, "G")
+		_, err = Groups.New(tx, genGrp, "G")
 		if err != nil {
 			t.Fatalf("error adding group '%s' : %v\n", genGrp, err)
 		}
@@ -131,7 +131,7 @@ func TestGroups01(t *testing.T) {
 		}
 
 		// List groups.
-		gs, err = Groups().List(0, 0)
+		gs, err = Groups.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
@@ -139,23 +139,23 @@ func TestGroups01(t *testing.T) {
 			t.Fatalf("listing groups -- expected : 3, got : %d\n", len(gs))
 		}
 
-		_, err = Groups().Get(gs[0].ID)
+		_, err = Groups.Get(gs[0].ID)
 		if err != nil {
 			t.Fatalf("error getting group : %v\n", err)
 		}
 
-		_, err = Users().SingletonGroupOf(UserID(u1))
+		_, err = Users.SingletonGroupOf(UserID(u1))
 		if err != nil {
 			t.Fatalf("error querying groups of user '%d' : %v\n", u1, err)
 		}
 
-		_, err = Groups().SingletonUser(gs[1].ID)
+		_, err = Groups.SingletonUser(gs[1].ID)
 		if err != nil {
 			t.Fatalf("error querying singleton group '%d' : %v\n", gs[1].ID, err)
 		}
 
 		// Test membership.
-		ok, err := Groups().HasUser(gs[0].ID, UserID(u1))
+		ok, err := Groups.HasUser(gs[0].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error querying group users : %v\n", err)
 		}
@@ -174,7 +174,7 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().Rename(tx, gs[len(gs)-1].ID, "TestName")
+		err = Groups.Rename(tx, gs[len(gs)-1].ID, "TestName")
 		if err != nil {
 			t.Fatalf("error renaming group : %v\n", err)
 		}
@@ -190,7 +190,7 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().Rename(tx, gs[len(gs)-1].ID, genGrp)
+		err = Groups.Rename(tx, gs[len(gs)-1].ID, genGrp)
 		if err != nil {
 			t.Fatalf("error renaming group : %v\n", err)
 		}
@@ -207,11 +207,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().AddUser(tx, gs[0].ID, UserID(u2))
+		err = Groups.AddUser(tx, gs[0].ID, UserID(u2))
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().AddUser(tx, gs[2].ID, UserID(u1))
+		err = Groups.AddUser(tx, gs[2].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error adding user to general group : %v\n", err)
 		}
@@ -222,14 +222,14 @@ func TestGroups01(t *testing.T) {
 		}
 
 		// Fetch groups a user is a member of.
-		gids, err := Users().GroupsOf(UserID(u1))
+		gids, err := Users.GroupsOf(UserID(u1))
 		if err != nil {
 			t.Fatalf("error querying groups of user '%d' : %v\n", 1, err)
 		}
 		if len(gids) != 2 {
 			t.Fatalf("listing groups -- expected : 2, got : %d\n", len(gids))
 		}
-		gids, err = Users().GroupsOf(UserID(u2))
+		gids, err = Users.GroupsOf(UserID(u2))
 		if err != nil {
 			t.Fatalf("error querying groups of user '%d' : %v\n", 1, err)
 		}
@@ -244,11 +244,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().RemoveUser(tx, gs[0].ID, UserID(u1))
+		err = Groups.RemoveUser(tx, gs[0].ID, UserID(u1))
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().RemoveUser(tx, gs[2].ID, UserID(u1))
+		err = Groups.RemoveUser(tx, gs[2].ID, UserID(u1))
 		if err != nil {
 			t.Fatalf("error removing user from general group : %v\n", err)
 		}
@@ -268,11 +268,11 @@ func TestGroups01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Groups().Delete(tx, gs[1].ID)
+		err = Groups.Delete(tx, gs[1].ID)
 		if err == nil {
 			t.Fatalf("should have failed because group is singleton")
 		}
-		err = Groups().Delete(tx, gs[2].ID)
+		err = Groups.Delete(tx, gs[2].ID)
 		if err != nil {
 			t.Fatalf("error deleting general group : %v\n", err)
 		}

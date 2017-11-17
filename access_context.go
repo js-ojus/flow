@@ -76,17 +76,9 @@ type AcUserLevel struct {
 // Unexported type, only for convenience methods.
 type _AccessContexts struct{}
 
-var _accCtxs *_AccessContexts
-
-func init() {
-	_accCtxs = &_AccessContexts{}
-}
-
 // AccessContexts provides a resource-like interface to access
 // contexts in the system.
-func AccessContexts() *_AccessContexts {
-	return _accCtxs
-}
+var AccessContexts *_AccessContexts
 
 // New creates a new access context with the globally-unique name
 // given.
