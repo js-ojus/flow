@@ -82,12 +82,12 @@ func TestWorkflows01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		dtypeStorReqID, err = DocTypes().New(tx, dtypeStorReq)
+		dtypeStorReqID, err = DocTypes.New(tx, dtypeStorReq)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
 		for _, name := range storReqStates {
-			dstateID, err = DocStates().New(tx, dtypeStorReqID, name)
+			dstateID, err = DocStates.New(tx, dtypeStorReqID, name)
 			if err != nil {
 				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
 			}

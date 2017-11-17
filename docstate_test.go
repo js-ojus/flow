@@ -77,11 +77,11 @@ func TestDocStates01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		dtypeStorReqID, err = DocTypes().New(tx, dtypeStorReq)
+		dtypeStorReqID, err = DocTypes.New(tx, dtypeStorReq)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorReq, err)
 		}
-		dtypeStorRelID, err = DocTypes().New(tx, dtypeStorRel)
+		dtypeStorRelID, err = DocTypes.New(tx, dtypeStorRel)
 		if err != nil {
 			t.Fatalf("error creating document type '%s' : %v\n", dtypeStorRel, err)
 		}
@@ -89,13 +89,13 @@ func TestDocStates01(t *testing.T) {
 		// Add document states.
 		var ds DocStateID
 		for _, name := range storReqStates {
-			_, err = DocStates().New(tx, dtypeStorReqID, name)
+			_, err = DocStates.New(tx, dtypeStorReqID, name)
 			if err != nil {
 				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
 			}
 		}
 		for _, name := range storRelStates {
-			ds, err = DocStates().New(tx, dtypeStorRelID, name)
+			ds, err = DocStates.New(tx, dtypeStorRelID, name)
 			if err != nil {
 				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorRelID, name, err)
 			}
@@ -107,17 +107,17 @@ func TestDocStates01(t *testing.T) {
 		}
 
 		// Test reading.
-		_, err = DocStates().Get(ds)
+		_, err = DocStates.Get(ds)
 		if err != nil {
 			t.Fatalf("error getting document state '1' : %v\n", err)
 		}
 
-		_, err = DocStates().GetByName(dtypeStorReqID, storReqStates[1])
+		_, err = DocStates.GetByName(dtypeStorReqID, storReqStates[1])
 		if err != nil {
 			t.Fatalf("error getting document type:state '%d:%s' : %v\n", dtypeStorReqID, storReqStates[1], err)
 		}
 
-		_, err = DocStates().List(0, 0)
+		_, err = DocStates.List(0, 0)
 		if err != nil {
 			t.Fatalf("error listing document types : %v\n", err)
 		}
@@ -129,7 +129,7 @@ func TestDocStates01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocStates().Rename(tx, ds, "INITIAL")
+		err = DocStates.Rename(tx, ds, "INITIAL")
 		if err != nil {
 			t.Fatalf("error renaming document state '1' : %v\n", err)
 		}
@@ -145,7 +145,7 @@ func TestDocStates01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocStates().Rename(tx, ds, storRelStates[len(storRelStates)-1])
+		err = DocStates.Rename(tx, ds, storRelStates[len(storRelStates)-1])
 		if err != nil {
 			t.Fatalf("error renaming document state '1' : %v\n", err)
 		}

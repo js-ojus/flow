@@ -36,16 +36,8 @@ type Group struct {
 // Unexported type, only for convenience methods.
 type _Groups struct{}
 
-var _groups *_Groups
-
-func init() {
-	_groups = &_Groups{}
-}
-
 // Groups provides a resource-like interface to groups in the system.
-func Groups() *_Groups {
-	return _groups
-}
+var Groups *_Groups
 
 // NewSingleton creates a singleton group associated with the given
 // user.  The e-mail address of the user is used as the name of the

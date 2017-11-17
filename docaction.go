@@ -49,17 +49,9 @@ type DocAction struct {
 // Unexported type, only for convenience methods.
 type _DocActions struct{}
 
-var _docactions *_DocActions
-
-func init() {
-	_docactions = &_DocActions{}
-}
-
 // DocActions provides a resource-like interface to document actions
 // in the system.
-func DocActions() *_DocActions {
-	return _docactions
-}
+var DocActions *_DocActions
 
 // New creates and registers a new document action in the system.
 func (das *_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {

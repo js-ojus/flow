@@ -69,7 +69,7 @@ func TestDocActions01(t *testing.T) {
 
 		var da DocActionID
 		for _, name := range actions {
-			da, err = DocActions().New(tx, name)
+			da, err = DocActions.New(tx, name)
 			if err != nil {
 				t.Fatalf("error creating document action '%s' : %v\n", name, err)
 			}
@@ -81,17 +81,17 @@ func TestDocActions01(t *testing.T) {
 		}
 
 		// Test read operations.
-		_, err = DocActions().Get(da)
+		_, err = DocActions.Get(da)
 		if err != nil {
 			t.Fatalf("error getting document action : %v\n", err)
 		}
 
-		_, err = DocActions().GetByName(actions[1])
+		_, err = DocActions.GetByName(actions[1])
 		if err != nil {
 			t.Fatalf("error getting document action '%s' : %v\n", actions[1], err)
 		}
 
-		_, err = DocActions().List(0, 0)
+		_, err = DocActions.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
@@ -103,7 +103,7 @@ func TestDocActions01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocActions().Rename(tx, da, "INITIALISE")
+		err = DocActions.Rename(tx, da, "INITIALISE")
 		if err != nil {
 			t.Fatalf("error renaming document action : %v\n", err)
 		}
@@ -119,7 +119,7 @@ func TestDocActions01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocActions().Rename(tx, da, actions[len(actions)-1])
+		err = DocActions.Rename(tx, da, actions[len(actions)-1])
 		if err != nil {
 			t.Fatalf("error renaming document action : %v\n", err)
 		}
