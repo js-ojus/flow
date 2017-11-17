@@ -21,8 +21,6 @@ const (
 	ErrDocEventDocTypeMismatch = Error("ErrDocEventDocTypeMismatch : document's type does not match event's type")
 	// ErrDocEventStateMismatch : document's state does not match event's state
 	ErrDocEventStateMismatch = Error("ErrDocEventStateMismatch : document's state does not match event's state")
-	// ErrDocEventNoRecipients : list of recipients is empty
-	ErrDocEventNoRecipients = Error("ErrDocEventNoRecipients : list of recipients is empty")
 	// ErrDocEventAlreadyApplied : event already applied; nothing to do
 	ErrDocEventAlreadyApplied = Error("ErrDocEventAlreadyApplied : event already applied; nothing to do")
 
@@ -30,4 +28,7 @@ const (
 	ErrWorkflowInactive = Error("ErrWorkflowInactive : this workflow is currently inactive")
 	// ErrWorkflowInvalidAction : given action cannot be performed on this document's current state
 	ErrWorkflowInvalidAction = Error("ErrWorkflowInvalidAction : given action cannot be performed on this document's current state")
+
+	// ErrMessageNoRecipients : list of recipients is empty
+	ErrMessageNoRecipients = Error("ErrMessageNoRecipients : list of recipients is empty")
 )

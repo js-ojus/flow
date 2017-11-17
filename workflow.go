@@ -54,9 +54,6 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 	if !w.Active {
 		return 0, ErrWorkflowInactive
 	}
-	if len(recipients) == 0 {
-		return 0, ErrDocEventNoRecipients
-	}
 	if event.Status == EventStatusApplied {
 		return 0, ErrDocEventAlreadyApplied
 	}
@@ -98,17 +95,9 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 // Unexported type, only for convenience methods.
 type _Workflows struct{}
 
-var _workflows *_Workflows
-
-func init() {
-	_workflows = &_Workflows{}
-}
-
 // Workflows provides a resource-like interface to the workflows
-// defined in this system.
-func Workflows() *_Workflows {
-	return _workflows
-}
+// defined in the system.
+var Workflows *_Workflows
 
 // New creates and initialises a workflow definition using the given
 // name, the document type whose life cycle this workflow should
@@ -328,8 +317,8 @@ func (ws *_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 // AddNode maps the given document state to the specified node.  This
 // map is consulted by the workflow when performing a state transition
 // of the system.
-func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wid WorkflowID,
-	name string, ntype NodeType) (NodeID, error) {
+func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+	ac AccessContextID, wid WorkflowID, name string, ntype NodeType) (NodeID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name should not be empty")
@@ -347,10 +336,10 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID, wi
 	}
 
 	q := `
-	INSERT INTO wf_workflow_nodes(doctype_id, docstate_id, workflow_id, name, type)
+	INSERT INTO wf_workflow_nodes(doctype_id, docstate_id, ac_id, workflow_id, name, type)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	res, err := tx.Exec(q, dtype, state, wid, name, string(ntype))
+	res, err := tx.Exec(q, dtype, state, ac, wid, name, string(ntype))
 	if err != nil {
 		return 0, err
 	}

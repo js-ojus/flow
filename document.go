@@ -281,11 +281,18 @@ func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, Docum
 //
 // This method is not exported.  It is used internally by `Workflow`
 // to move the document along the workflow, into a new document state.
-func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID) error {
+func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID, ac AccessContextID) error {
 	tbl := _doctypes.docStorName(dtype)
 
-	q := `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
-	_, err := otx.Exec(q, state, id)
+	var q string
+	var err error
+	if ac > 0 {
+		q = `UPDATE ` + tbl + ` SET state = ?, ac_id = ? WHERE doc_id = ?`
+		_, err = otx.Exec(q, state, ac, id)
+	} else {
+		q = `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
+		_, err = otx.Exec(q, state, id)
+	}
 	return err
 }
 

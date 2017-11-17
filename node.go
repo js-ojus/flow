@@ -56,13 +56,14 @@ func defNodeFunc(d *Document, event *DocEvent) *Message {
 // Node represents a specific logical unit of processing and routing
 // in a workflow.
 type Node struct {
-	ID       NodeID     `json:"ID"`       // Unique identifier of this node
-	DocType  DocTypeID  `json:"DocType"`  // Document type which this node's workflow manages
-	State    DocStateID `json:"DocState"` // A document arriving at this node must be in this state
-	Wflow    WorkflowID `json:"Workflow"` // Containing flow of this node
-	Name     string     `json:"Name"`     // Unique within its workflow
-	NodeType NodeType   `json:"NodeType"` // Topology type of this node
-	nfunc    NodeFunc   // Processing function of this node
+	ID       NodeID          `json:"ID"`                      // Unique identifier of this node
+	DocType  DocTypeID       `json:"DocType"`                 // Document type which this node's workflow manages
+	State    DocStateID      `json:"DocState"`                // A document arriving at this node must be in this state
+	AccCtx   AccessContextID `json:"AccessContext,omitempty"` // Specific access context associated with this state, if any
+	Wflow    WorkflowID      `json:"Workflow"`                // Containing flow of this node
+	Name     string          `json:"Name"`                    // Unique within its workflow
+	NodeType NodeType        `json:"NodeType"`                // Topology type of this node
+	nfunc    NodeFunc        // Processing function of this node
 }
 
 // Transitions answers the possible document states into which a
@@ -148,7 +149,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Any node type having a single 'in'.
 
 		// Update the document to transition the state.
-		err = _documents.setState(otx, event.DocType, event.DocID, tstate)
+		err = _documents.setState(otx, event.DocType, event.DocID, tstate, tnode.AccCtx)
 		if err != nil {
 			return 0, err
 		}
@@ -161,9 +162,18 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 
 		// Post messages.
 		msg := n.nfunc(doc, event)
-		err = n.postMessage(otx, msg, recipients)
-		if err != nil {
-			return 0, err
+		if recipients == nil {
+			recipients, err = tnode.determineRecipients(otx, event.User)
+			if err != nil {
+				return 0, err
+			}
+		}
+		// It is legal to not have any recipients, too.
+		if len(recipients) > 0 {
+			err = n.postMessage(otx, msg, recipients)
+			if err != nil {
+				return 0, err
+			}
 		}
 
 	case NodeTypeJoinAll:
@@ -199,6 +209,51 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, stat
 	}
 
 	return nil
+}
+
+// determineRecipients takes the document type and access context into
+// account, and determines the list of groups to which the
+// notification should be posted.
+func (n *Node) determineRecipients(otx *sql.Tx, user UserID) ([]GroupID, error) {
+	q := `
+	SELECT c.id
+	FROM wf_ac_user_levels a
+	JOIN wf_group_users b ON b.user_id = a.user_id
+	JOIN wf_groups_master c ON c.id = b.group_id
+	WHERE a.user_id IN (
+		SELECT user_id FROM wf_ac_user_levels
+		WHERE ac_id = ?
+		AND ulevel = (
+			SELECT MAX(ulevel)
+			FROM wf_ac_user_levels
+			WHERE ac_id = ?
+			AND ulevel < (
+				SELECT ulevel
+				FROM wf_ac_user_levels
+				WHERE ac_id = ?
+				AND user_id = ?
+			)
+		)
+	)
+	AND c.group_type = 'S'
+	`
+	rows, err := otx.Query(q, n.AccCtx, n.AccCtx, n.AccCtx, user)
+	if err != nil {
+		return nil, err
+	}
+	ary := make([]GroupID, 0, 4)
+	for rows.Next() {
+		var gid int64
+		err = rows.Scan(&gid)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, GroupID(gid))
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+	return ary, nil
 }
 
 // postMessage posts the given message into the mailboxes of the
@@ -279,15 +334,19 @@ func (_Nodes) Get(id NodeID) (*Node, error) {
 	}
 
 	var elem Node
+	var acID sql.NullInt64
 	q := `
-	SELECT id, doctype_id, docstate_id, workflow_id, name, type
+	SELECT id, doctype_id, docstate_id, ac_id, workflow_id, name, type
 	FROM wf_workflow_nodes
 	WHERE id = ?
 	`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &acID, &elem.Wflow, &elem.Name, &elem.NodeType)
 	if err != nil {
 		return nil, err
+	}
+	if acID.Valid {
+		acID.Scan(&elem.AccCtx)
 	}
 
 	elem.nfunc = defNodeFunc
@@ -298,8 +357,9 @@ func (_Nodes) Get(id NodeID) (*Node, error) {
 // the document state specification.
 func (_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
 	var elem Node
+	var acID sql.NullInt64
 	q := `
-	SELECT id, doctype_id, docstate_id, workflow_id, name, type
+	SELECT id, doctype_id, docstate_id, ac_id, workflow_id, name, type
 	FROM wf_workflow_nodes
 	WHERE doctype_id = ?
 	AND docstate_id = ?
@@ -308,6 +368,9 @@ func (_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
 	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
 	if err != nil {
 		return nil, err
+	}
+	if acID.Valid {
+		acID.Scan(&elem.AccCtx)
 	}
 
 	elem.nfunc = defNodeFunc
