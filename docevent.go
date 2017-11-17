@@ -82,15 +82,12 @@ func (e *DocEvent) StatusInDB() (EventStatus, error) {
 // Unexported type, only for convenience methods.
 type _DocEvents struct{}
 
-var _docevents *_DocEvents
-
-func init() {
-	_docevents = &_DocEvents{}
-}
+// DocEvents exposes a resource-like interface to document events.
+var DocEvents _DocEvents
 
 // New creates and initialises an event that transforms the document
 // that it refers to.
-func (des *_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did DocumentID,
+func (_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did DocumentID,
 	state DocStateID, action DocActionID, text string) (DocEventID, error) {
 	if user <= 0 {
 		return 0, errors.New("user ID should be a positive integer")
@@ -139,7 +136,7 @@ func (des *_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did Docume
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (des *_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, error) {
+func (_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -211,7 +208,7 @@ func (des *_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEven
 
 // Get retrieves a document event from the database, using the given
 // event ID.
-func (des *_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
+func (_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
 	if eid <= 0 {
 		return nil, errors.New("event ID should be a positive integer")
 	}
