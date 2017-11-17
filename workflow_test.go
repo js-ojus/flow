@@ -93,7 +93,7 @@ func TestWorkflows01(t *testing.T) {
 			}
 		}
 
-		wid, err = Workflows().New(tx, wflowName, dtypeStorReqID, dstateID)
+		wid, err = Workflows.New(tx, wflowName, dtypeStorReqID, dstateID)
 		if err != nil {
 			t.Fatalf("error creating workflow : %v\n", err)
 		}
@@ -106,17 +106,17 @@ func TestWorkflows01(t *testing.T) {
 
 	// Test reading.
 	t.Run("Read", func(t *testing.T) {
-		_, err = Workflows().Get(wid)
+		_, err = Workflows.Get(wid)
 		if err != nil {
 			t.Fatalf("error getting workflow : %v\n", err)
 		}
 
-		_, err = Workflows().GetByName(wflowName)
+		_, err = Workflows.GetByName(wflowName)
 		if err != nil {
 			t.Fatalf("error getting workflow : %v\n", err)
 		}
 
-		_, err = Workflows().List(0, 0)
+		_, err = Workflows.List(0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}
@@ -130,11 +130,11 @@ func TestWorkflows01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Workflows().Rename(tx, wid, "TEST_WFLOW")
+		err = Workflows.Rename(tx, wid, "TEST_WFLOW")
 		if err != nil {
 			t.Fatalf("error renaming workflow : %v\n", err)
 		}
-		err = Workflows().Rename(tx, wid, wflowName)
+		err = Workflows.Rename(tx, wid, wflowName)
 		if err != nil {
 			t.Fatalf("error renaming workflow : %v\n", err)
 		}
@@ -153,11 +153,11 @@ func TestWorkflows01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Workflows().SetActive(tx, wid, false)
+		err = Workflows.SetActive(tx, wid, false)
 		if err != nil {
 			t.Fatalf("error inactivating workflow : %v\n", err)
 		}
-		err = Workflows().SetActive(tx, wid, true)
+		err = Workflows.SetActive(tx, wid, true)
 		if err != nil {
 			t.Fatalf("error activating workflow : %v\n", err)
 		}
