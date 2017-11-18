@@ -65,15 +65,17 @@ func TestUsers01(t *testing.T) {
 		}
 	}()
 
-	// Test CRL operations.
-	t.Run("CRL", func(t *testing.T) {
+	// Test user IDs.
+	var u1, u2 int64
+
+	// Create operations that are not handled by `flow`.
+	t.Run("Create", func(t *testing.T) {
 		tx, err := db.Begin()
 		if err != nil {
 			t.Fatalf("error starting transaction : %v\n", err)
 		}
 		defer tx.Rollback()
 
-		var u1, u2 int64
 		q := `
 		INSERT INTO users_master(first_name, last_name, email, active)
 		VALUES(?, ?, ?, ?)
@@ -97,9 +99,20 @@ func TestUsers01(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error committing transaction : %v\n", err)
 		}
+	})
 
+	// Test list operations.
+	t.Run("List", func(t *testing.T) {
+		_, err = Users.List("", 0, 0)
+		if err != nil {
+			t.Fatalf("error : %v", err)
+		}
+	})
+
+	// Test read operations.
+	t.Run("Read", func(t *testing.T) {
 		// Test reading.
-		_, err = Users.Get(UserID(u1))
+		_, err := Users.Get(UserID(u1))
 		if err != nil {
 			t.Fatalf("error getting user : %v\n", err)
 		}
@@ -107,11 +120,6 @@ func TestUsers01(t *testing.T) {
 		_, err = Users.GetByEmail(users[1].email)
 		if err != nil {
 			t.Fatalf("error getting user : %v\n", err)
-		}
-
-		_, err = Users.List("", 0, 0)
-		if err != nil {
-			t.Fatalf("error : %v", err)
 		}
 
 		active, err := Users.IsActive(UserID(u2))
