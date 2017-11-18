@@ -117,7 +117,7 @@ func (acs *_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, erro
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (acs *_AccessContexts) List(offset, limit int64) ([]*AccessContext, error) {
+func (acs *_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContext, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -125,13 +125,30 @@ func (acs *_AccessContexts) List(offset, limit int64) ([]*AccessContext, error) 
 		limit = math.MaxInt64
 	}
 
-	q := `
-	SELECT id, name, active
-	FROM wf_access_contexts
-	ORDER BY id
-	LIMIT ? OFFSET ?
-	`
-	rows, err := db.Query(q, limit, offset)
+	var q string
+	var rows *sql.Rows
+	var err error
+
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		q = `
+		SELECT id, name, active
+		FROM wf_access_contexts
+		ORDER BY id
+		LIMIT ? OFFSET ?
+		`
+		rows, err = db.Query(q, limit, offset)
+	} else {
+		q = `
+		SELECT id, name, active
+		FROM wf_access_contexts
+		WHERE name LIKE ?
+		ORDER BY id
+		LIMIT ? OFFSET ?
+		`
+		rows, err = db.Query(q, prefix+"%", limit, offset)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +225,7 @@ func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext
 	if err != nil {
 		return elem, err
 	}
+	defer rows.Close()
 
 	elem.GroupRoles = make(map[GroupID]*AcGroupRoles)
 	var curGid int64
@@ -252,6 +270,7 @@ func (acs *_AccessContexts) getUserHierarchy(id AccessContextID, elem AccessCont
 	if err != nil {
 		return elem, err
 	}
+	defer rows.Close()
 
 	elem.UserHier = make(map[UserID]UserID)
 	for rows.Next() {
