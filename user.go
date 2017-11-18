@@ -15,6 +15,7 @@
 package flow
 
 import (
+	"database/sql"
 	"errors"
 	"math"
 	"strings"
@@ -49,7 +50,7 @@ var Users *_Users
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (us *_Users) List(offset, limit int64) ([]*User, error) {
+func (us *_Users) List(prefix string, offset, limit int64) ([]*User, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -57,13 +58,33 @@ func (us *_Users) List(offset, limit int64) ([]*User, error) {
 		limit = math.MaxInt64
 	}
 
-	q := `
-	SELECT id, first_name, last_name, email, active
-	FROM wf_users_master
-	ORDER BY id
-	LIMIT ? OFFSET ?
-	`
-	rows, err := db.Query(q, limit, offset)
+	var q string
+	var rows *sql.Rows
+	var err error
+
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		q = `
+		SELECT id, first_name, last_name, email, active
+		FROM wf_users_master
+		ORDER BY id
+		LIMIT ? OFFSET ?
+		`
+		rows, err = db.Query(q, limit, offset)
+	} else {
+		q = `
+		SELECT id, first_name, last_name, email, active
+		FROM wf_users_master
+		WHERE first_name LIKE ?
+		UNION
+		SELECT id, first_name, last_name, email, active
+		FROM wf_users_master
+		WHERE last_name LIKE ?
+		ORDER BY id
+		LIMIT ? OFFSET ?
+		`
+		rows, err = db.Query(q, prefix+"%", prefix+"%", limit, offset)
+	}
 	if err != nil {
 		return nil, err
 	}

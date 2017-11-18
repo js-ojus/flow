@@ -162,7 +162,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 
 		// Post messages.
 		msg := n.nfunc(doc, event)
-		if recipients == nil {
+		if len(recipients) == 0 {
 			recipients, err = tnode.determineRecipients(otx, event.User)
 			if err != nil {
 				return 0, err
@@ -223,11 +223,15 @@ func (n *Node) determineRecipients(otx *sql.Tx, user UserID) ([]GroupID, error) 
 	WHERE a.ac_id = ?
 	AND a.user_id = ?
 	AND c.group_type = 'S'
+	ORDER BY c.id
+	LIMIT 1
 	`
 	rows, err := otx.Query(q, n.AccCtx, user)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	ary := make([]GroupID, 0, 4)
 	for rows.Next() {
 		var gid int64

@@ -109,7 +109,7 @@ func TestUsers01(t *testing.T) {
 			t.Fatalf("error getting user : %v\n", err)
 		}
 
-		_, err = Users.List(0, 0)
+		_, err = Users.List("", 0, 0)
 		if err != nil {
 			t.Fatalf("error : %v", err)
 		}

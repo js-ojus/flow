@@ -409,6 +409,7 @@ func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		var b Blob
 		err = rows.Scan(&b.Name, &b.Sha1Sum)
@@ -567,6 +568,7 @@ func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		var t string
 		err = rows.Scan(&t)
@@ -730,6 +732,8 @@ func (ds *_Documents) ChildrenIDs(dtype DocTypeID, id DocumentID) ([]struct {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	for rows.Next() {
 		var s struct {
 			DocTypeID
