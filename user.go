@@ -42,7 +42,7 @@ type User struct {
 type _Users struct{}
 
 // Users provides a resource-like interface to users in the system.
-var Users *_Users
+var Users _Users
 
 // List answers a subset of the users, based on the input
 // specification.
@@ -50,7 +50,7 @@ var Users *_Users
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (us *_Users) List(prefix string, offset, limit int64) ([]*User, error) {
+func (_Users) List(prefix string, offset, limit int64) ([]*User, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -107,7 +107,7 @@ func (us *_Users) List(prefix string, offset, limit int64) ([]*User, error) {
 }
 
 // Get instantiates a user instance by reading the database.
-func (us *_Users) Get(uid UserID) (*User, error) {
+func (_Users) Get(uid UserID) (*User, error) {
 	if uid <= 0 {
 		return nil, errors.New("user ID should be a positive integer")
 	}
@@ -124,7 +124,7 @@ func (us *_Users) Get(uid UserID) (*User, error) {
 
 // GetByEmail retrieves user information from the database, by looking
 // up the given e-mail address.
-func (us *_Users) GetByEmail(email string) (*User, error) {
+func (_Users) GetByEmail(email string) (*User, error) {
 	email = strings.TrimSpace(email)
 	if email == "" {
 		return nil, errors.New("e-mail address should be non-empty")
@@ -141,7 +141,7 @@ func (us *_Users) GetByEmail(email string) (*User, error) {
 }
 
 // IsActive answers `true` if the given user's account is enabled.
-func (us *_Users) IsActive(uid UserID) (bool, error) {
+func (_Users) IsActive(uid UserID) (bool, error) {
 	row := db.QueryRow("SELECT active FROM wf_users_master WHERE id = ?", uid)
 	var active bool
 	err := row.Scan(&active)
@@ -154,7 +154,7 @@ func (us *_Users) IsActive(uid UserID) (bool, error) {
 
 // GroupsOf answers a list of groups that the given user is a member
 // of.
-func (us *_Users) GroupsOf(uid UserID) ([]*Group, error) {
+func (_Users) GroupsOf(uid UserID) ([]*Group, error) {
 	q := `
 	SELECT gm.id, gm.name, gm.group_type
 	FROM wf_groups_master gm
@@ -187,7 +187,7 @@ func (us *_Users) GroupsOf(uid UserID) ([]*Group, error) {
 
 // SingletonGroupOf answers the ID of the given user's singleton
 // group.
-func (us *_Users) SingletonGroupOf(uid UserID) (*Group, error) {
+func (_Users) SingletonGroupOf(uid UserID) (*Group, error) {
 	q := `
 	SELECT gm.id, gm.name, gm.group_type
 	FROM wf_groups_master gm

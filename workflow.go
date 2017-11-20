@@ -97,7 +97,7 @@ type _Workflows struct{}
 
 // Workflows provides a resource-like interface to the workflows
 // defined in the system.
-var Workflows *_Workflows
+var Workflows _Workflows
 
 // New creates and initialises a workflow definition using the given
 // name, the document type whose life cycle this workflow should
@@ -105,7 +105,7 @@ var Workflows *_Workflows
 // begins.
 //
 // N.B.  Workflow names must be globally-unique.
-func (ws *_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocStateID) (WorkflowID, error) {
+func (_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocStateID) (WorkflowID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name should not be empty")
@@ -151,7 +151,7 @@ func (ws *_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocSt
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
+func (_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -196,7 +196,7 @@ func (ws *_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 // N.B.  This method retrieves the primary information of the
 // workflow.  Information of the nodes comprising this workflow have
 // to be fetched separately.
-func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
+func (_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
@@ -221,7 +221,7 @@ func (ws *_Workflows) Get(id WorkflowID) (*Workflow, error) {
 // N.B.  This method retrieves the primary information of the
 // workflow.  Information of the nodes comprising this workflow have
 // to be fetched separately.
-func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
+func (_Workflows) GetByName(name string) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
@@ -241,7 +241,7 @@ func (ws *_Workflows) GetByName(name string) (*Workflow, error) {
 }
 
 // Rename assigns a new name to the given workflow.
-func (ws *_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
+func (_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name should be non-empty")
@@ -279,7 +279,7 @@ func (ws *_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
 
 // SetActive sets the status of the workflow as either active or
 // inactive, helping in workflow management and deprecation.
-func (ws *_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
+func (_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -317,7 +317,7 @@ func (ws *_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 // AddNode maps the given document state to the specified node.  This
 // map is consulted by the workflow when performing a state transition
 // of the system.
-func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+func (_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	ac AccessContextID, wid WorkflowID, name string, ntype NodeType) (NodeID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -361,7 +361,7 @@ func (ws *_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 // RemoveNode unmaps the given document state to the specified node.
 // This map is consulted by the workflow when performing a state
 // transition of the system.
-func (ws *_Workflows) RemoveNode(otx *sql.Tx, wid WorkflowID, nid NodeID) error {
+func (_Workflows) RemoveNode(otx *sql.Tx, wid WorkflowID, nid NodeID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()

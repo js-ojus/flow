@@ -70,7 +70,7 @@ type _Documents struct{}
 
 // Documents provides a resource-like interface to the documents in
 // this system.
-var Documents *_Documents
+var Documents _Documents
 
 // New creates and initialises a document.
 //
@@ -82,7 +82,7 @@ var Documents *_Documents
 //
 // N.B. Blobs, tags and children documents have to be associated with
 // this document, if needed, through appropriate separate calls.
-func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
+func (_Documents) New(otx *sql.Tx, acID AccessContextID,
 	user UserID, dtype DocTypeID, ptype DocTypeID, pid DocumentID,
 	title string, data []byte) (DocumentID, error) {
 	if user <= 0 || acID <= 0 || dtype <= 0 || ptype < 0 || pid < 0 {
@@ -169,7 +169,7 @@ func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error) {
+func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -212,7 +212,7 @@ func (ds *_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, e
 // N.B. This retrieves the primary data of the document.  Other
 // information viz. blobs, tags and children documents have to be
 // fetched separately.
-func (ds *_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
+func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	tbl := DocTypes.docStorName(dtype)
 	var d Document
 	q := `
@@ -246,7 +246,7 @@ func (ds *_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Documen
 
 // GetParent answers the identifiers of the parent document of the
 // specified document.
-func (ds *_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
+func (_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
 	q := `
 	SELECT parent_doctype_id, parent_id
 	FROM wf_document_children
@@ -268,7 +268,7 @@ func (ds *_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, Docu
 //
 // This method is not exported.  It is used internally by `Workflow`
 // to move the document along the workflow, into a new document state.
-func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID, ac AccessContextID) error {
+func (_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state DocStateID, ac AccessContextID) error {
 	tbl := DocTypes.docStorName(dtype)
 
 	var q string
@@ -284,7 +284,7 @@ func (ds *_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, stat
 }
 
 // SetTitle sets the title of the document.
-func (ds *_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, title string) error {
+func (_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, title string) error {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return errors.New("document title should not be empty")
@@ -346,7 +346,7 @@ func (ds *_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id Doc
 }
 
 // SetData sets the data of the document.
-func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, data []byte) error {
+func (_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, data []byte) error {
 	if data == nil {
 		return errors.New("document data should not be empty")
 	}
@@ -391,7 +391,7 @@ func (ds *_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 
 // Blobs answers a list of this document's enclosures (as names, not
 // the actual blobs).
-func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
+func (_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 	bs := make([]*Blob, 0, 1)
 	q := `
 	SELECT name, sha1sum
@@ -424,7 +424,7 @@ func (ds *_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 // GetBlob retrieves the requested blob from the specified document,
 // if one such exists.  Lookup happens based on the given blob name.
 // The retrieved blob is copied into the specified path.
-func (ds *_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
+func (_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
 	if blob == nil {
 		return errors.New("blob should be non-nil")
 	}
@@ -464,7 +464,7 @@ func (ds *_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
 }
 
 // AddBlob adds the path to an enclosure to this document.
-func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, blob *Blob) error {
+func (_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, blob *Blob) error {
 	if blob == nil {
 		return errors.New("blob should be non-nil")
 	}
@@ -550,7 +550,7 @@ func (ds *_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id Docu
 }
 
 // Tags answers a list of the tags associated with this document.
-func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
+func (_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
 	ts := make([]string, 0, 1)
 	q := `
 	SELECT tag
@@ -585,7 +585,7 @@ func (ds *_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
 // Tags are converted to lower case (as per normal Unicode casing)
 // before getting associated with documents.  Also, embedded spaces,
 // if any, are retained.
-func (ds *_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+func (_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return errors.New("tag should not be empty")
@@ -654,7 +654,7 @@ func (ds *_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Docum
 }
 
 // RemoveTag disassociates the given tag from this document.
-func (ds *_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+func (_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return errors.New("tag should not be empty")
@@ -708,7 +708,7 @@ func (ds *_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Do
 }
 
 // ChildrenIDs answers a list of this document's children IDs.
-func (ds *_Documents) ChildrenIDs(dtype DocTypeID, id DocumentID) ([]struct {
+func (_Documents) ChildrenIDs(dtype DocTypeID, id DocumentID) ([]struct {
 	DocTypeID
 	DocumentID
 }, error) {

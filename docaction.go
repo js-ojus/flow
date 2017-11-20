@@ -51,10 +51,10 @@ type _DocActions struct{}
 
 // DocActions provides a resource-like interface to document actions
 // in the system.
-var DocActions *_DocActions
+var DocActions _DocActions
 
 // New creates and registers a new document action in the system.
-func (das *_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
+func (_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("document action cannot be empty")
@@ -97,7 +97,7 @@ func (das *_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (das *_DocActions) List(offset, limit int64) ([]*DocAction, error) {
+func (_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -134,7 +134,7 @@ func (das *_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 }
 
 // Get retrieves the document action for the given ID.
-func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
+func (_DocActions) Get(id DocActionID) (*DocAction, error) {
 	if id <= 0 {
 		return nil, errors.New("ID should be a positive integer")
 	}
@@ -151,7 +151,7 @@ func (das *_DocActions) Get(id DocActionID) (*DocAction, error) {
 
 // GetByName answers the document action, if one such with the given
 // name is registered; `nil` and the error, otherwise.
-func (das *_DocActions) GetByName(name string) (*DocAction, error) {
+func (_DocActions) GetByName(name string) (*DocAction, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("document action cannot be empty")
@@ -168,7 +168,7 @@ func (das *_DocActions) GetByName(name string) (*DocAction, error) {
 }
 
 // Rename renames the given document action.
-func (das *_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
+func (_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")

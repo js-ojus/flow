@@ -47,11 +47,11 @@ type _DocStates struct{}
 
 // DocStates provides a resource-like interface to document actions
 // in the system.
-var DocStates *_DocStates
+var DocStates _DocStates
 
 // New creates an enumerated state as defined by the consuming
 // application.
-func (dss *_DocStates) New(otx *sql.Tx, dtype DocTypeID, name string) (DocStateID, error) {
+func (_DocStates) New(otx *sql.Tx, dtype DocTypeID, name string) (DocStateID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name cannot be empty")
@@ -94,7 +94,7 @@ func (dss *_DocStates) New(otx *sql.Tx, dtype DocTypeID, name string) (DocStateI
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
+func (_DocStates) List(offset, limit int64) ([]*DocState, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -132,7 +132,7 @@ func (dss *_DocStates) List(offset, limit int64) ([]*DocState, error) {
 }
 
 // Get retrieves the document state for the given ID.
-func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
+func (_DocStates) Get(id DocStateID) (*DocState, error) {
 	if id <= 0 {
 		return nil, errors.New("ID should be a positive integer")
 	}
@@ -155,7 +155,7 @@ func (dss *_DocStates) Get(id DocStateID) (*DocState, error) {
 
 // GetByName answers the document state, if one with the given name is
 // registered; `nil` and the error, otherwise.
-func (dss *_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error) {
+func (_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("document state cannot be empty")
@@ -172,7 +172,7 @@ func (dss *_DocStates) GetByName(dtype DocTypeID, name string) (*DocState, error
 }
 
 // Rename renames the given document state.
-func (dss *_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
+func (_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -206,7 +206,7 @@ func (dss *_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 
 // Transitions answers the possible document states into which a
 // document currently in the given state can transition.
-func (dss *_DocStates) Transitions(dtype DocTypeID, state DocStateID) (map[DocAction]DocState, error) {
+func (_DocStates) Transitions(dtype DocTypeID, state DocStateID) (map[DocAction]DocState, error) {
 	q := `
 	SELECT dst.docaction_id, dam.name, dst.to_state_id, dsm.name, dtm.name
 	FROM wf_docstate_transitions dst
@@ -243,7 +243,7 @@ func (dss *_DocStates) Transitions(dtype DocTypeID, state DocStateID) (map[DocAc
 // _Transitions answers the possible document states into which a
 // document currently in the given state can transition.  Only
 // identifiers are answered in the map.
-func (dss *_DocStates) _Transitions(dtype DocTypeID, state DocStateID) (map[DocActionID]DocStateID, error) {
+func (_DocStates) _Transitions(dtype DocTypeID, state DocStateID) (map[DocActionID]DocStateID, error) {
 	q := `
 	SELECT docaction_id, to_state_id
 	FROM wf_docstate_transitions
@@ -275,7 +275,7 @@ func (dss *_DocStates) _Transitions(dtype DocTypeID, state DocStateID) (map[DocA
 
 // AddTransition associates a target document state with a document
 // action performed on documents in the given current state.
-func (dss *_DocStates) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+func (_DocStates) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	action DocActionID, toState DocStateID) error {
 	var tx *sql.Tx
 	if otx == nil {
@@ -309,7 +309,7 @@ func (dss *_DocStates) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStat
 
 // RemoveTransition disassociates a target document state with a
 // document action performed on documents in the given current state.
-func (dss *_DocStates) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+func (_DocStates) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	action DocActionID, toState DocStateID) error {
 	var tx *sql.Tx
 	if otx == nil {
