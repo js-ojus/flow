@@ -218,7 +218,7 @@ func (n *Node) determineRecipients(otx *sql.Tx, user UserID) ([]GroupID, error) 
 	q := `
 	SELECT c.id
 	FROM wf_ac_user_hierarchy a
-	JOIN wf_group_users b ON b.user_id = a.parent_id
+	JOIN wf_group_users b ON b.user_id = a.reports_to
 	JOIN wf_groups_master c ON c.id = b.group_id
 	WHERE a.ac_id = ?
 	AND a.user_id = ?

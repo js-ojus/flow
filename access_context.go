@@ -192,26 +192,12 @@ func (acs *_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit 
 		return nil, err
 	}
 
-	if grs {
-		elem, err = acs.getGroupRoles(id, elem, offset, limit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if uh {
-		elem, err = acs.getUserHierarchy(id, elem, offset, limit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return &elem, nil
 }
 
-// getGroupRoles retrieves the groups --> roles mapping for this
-// access context.
-func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext, offset, limit int64) (AccessContext, error) {
+// GroupRoles retrieves the groups --> roles mapping for this access
+// context.
+func (acs *_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
@@ -221,12 +207,14 @@ func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext
 	ORDER BY agrs.group_id
 	LIMIT ? OFFSET ?
 	`
+	var elem AccessContext
 	rows, err := db.Query(q, id, limit, offset)
 	if err != nil {
-		return elem, err
+		return nil, err
 	}
 	defer rows.Close()
 
+	elem.ID = id
 	elem.GroupRoles = make(map[GroupID]*AcGroupRoles)
 	var curGid int64
 	for rows.Next() {
@@ -235,7 +223,7 @@ func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext
 		var role Role
 		err = rows.Scan(&gid, &gname, &role.ID, &role.Name)
 		if err != nil {
-			return elem, err
+			return nil, err
 		}
 
 		var gr *AcGroupRoles
@@ -249,50 +237,15 @@ func (acs *_AccessContexts) getGroupRoles(id AccessContextID, elem AccessContext
 		elem.GroupRoles[GroupID(gid)] = gr
 	}
 	if rows.Err() != nil {
-		return elem, err
+		return nil, err
 	}
 
-	return elem, nil
-}
-
-// getUserHierarchy retrieves the hierarchy of users included in this
-// access context.
-func (acs *_AccessContexts) getUserHierarchy(id AccessContextID, elem AccessContext, offset, limit int64) (AccessContext, error) {
-	q := `
-	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.parent_id
-	FROM wf_ac_user_hierarchy auh
-	JOIN wf_users_master um ON um.id = auh.user_id
-	WHERE agrs.ac_id = ?
-	ORDER BY auh.user_id
-	LIMIT ? OFFSET ?
-	`
-	rows, err := db.Query(q, id, limit, offset)
-	if err != nil {
-		return elem, err
-	}
-	defer rows.Close()
-
-	elem.UserHier = make(map[UserID]UserID)
-	for rows.Next() {
-		var u User
-		var p UserID
-		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &p)
-		if err != nil {
-			return elem, err
-		}
-
-		elem.UserHier[UserID(u.ID)] = UserID(p)
-	}
-	if rows.Err() != nil {
-		return elem, err
-	}
-
-	return elem, nil
+	return &elem, nil
 }
 
 // AddGroupRole assigns the specified role to the given group, if it
 // is not already assigned.
-func (ac *AccessContext) AddGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) error {
+func (acs *_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
 	if gid <= 0 || rid <= 0 {
 		return errors.New("group ID and role ID should be positive integers")
 	}
@@ -308,7 +261,7 @@ func (ac *AccessContext) AddGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) erro
 		tx = otx
 	}
 
-	_, err := tx.Exec(`INSERT INTO wf_ac_group_roles(ac_id, group_id, role_id) VALUES(?, ?, ?)`, ac.ID, gid, rid)
+	_, err := tx.Exec(`INSERT INTO wf_ac_group_roles(ac_id, group_id, role_id) VALUES(?, ?, ?)`, id, gid, rid)
 	if err != nil {
 		return err
 	}
@@ -324,7 +277,7 @@ func (ac *AccessContext) AddGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) erro
 }
 
 // RemoveGroupRole unassigns the specified role from the given group.
-func (ac *AccessContext) RemoveGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) error {
+func (acs *_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
 	if gid <= 0 || rid <= 0 {
 		return errors.New("group ID and role ID should be positive integers")
 	}
@@ -340,7 +293,7 @@ func (ac *AccessContext) RemoveGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) e
 		tx = otx
 	}
 
-	_, err := tx.Exec(`DELETE FROM wf_access_contexts WHERE ns_id = ? AND group_id = ? AND role_id = ?`, ac.ID, gid, rid)
+	_, err := tx.Exec(`DELETE FROM wf_access_contexts WHERE ns_id = ? AND group_id = ? AND role_id = ?`, id, gid, rid)
 	if err != nil {
 		return err
 	}
@@ -355,11 +308,48 @@ func (ac *AccessContext) RemoveGroupRole(otx *sql.Tx, gid GroupID, rid RoleID) e
 	return nil
 }
 
+// Users retrieves the users included in this access context.
+func (acs *_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+	q := `
+	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
+	FROM wf_ac_user_hierarchy auh
+	JOIN wf_users_master um ON um.id = auh.user_id
+	WHERE agrs.ac_id = ?
+	ORDER BY auh.user_id
+	LIMIT ? OFFSET ?
+	`
+	var elem AccessContext
+	rows, err := db.Query(q, id, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	elem.ID = id
+	elem.UserHier = make(map[UserID]UserID)
+	for rows.Next() {
+		var u User
+		var p UserID
+		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &p)
+		if err != nil {
+			return nil, err
+		}
+
+		elem.UserHier[UserID(u.ID)] = UserID(p)
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
 // AddUser adds the given user to this access context, with the
-// specified parent in the hierarchy.
-func (ac *AccessContext) AddUser(otx *sql.Tx, uid, parent UserID) error {
-	if uid <= 0 || parent < 0 {
-		return errors.New("user ID should be a positive integer; parent ID should be a non-negative integer")
+// specified reporting authority within the hierarchy of this access
+// context.
+func (acs *_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
+	if uid <= 0 || reportsTo < 0 {
+		return errors.New("user ID should be a positive integer; reporting authority ID should be a non-negative integer")
 	}
 
 	var tx *sql.Tx
@@ -373,8 +363,8 @@ func (ac *AccessContext) AddUser(otx *sql.Tx, uid, parent UserID) error {
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, user_id, parent_id) VALUES (?, ?, ?)`
-	_, err := tx.Exec(q, ac.ID, uid, parent)
+	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, user_id, reports_to) VALUES (?, ?, ?)`
+	_, err := tx.Exec(q, id, uid, reportsTo)
 	if err != nil {
 		return err
 	}
@@ -390,9 +380,9 @@ func (ac *AccessContext) AddUser(otx *sql.Tx, uid, parent UserID) error {
 }
 
 // DeleteUser removes the given user from this access context.
-func (ac *AccessContext) DeleteUser(otx *sql.Tx, uid UserID) error {
+func (acs *_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) error {
 	if uid <= 0 {
-		return errors.New("user ID should be positive integers")
+		return errors.New("user ID should be positive integer")
 	}
 
 	var tx *sql.Tx
@@ -407,7 +397,96 @@ func (ac *AccessContext) DeleteUser(otx *sql.Tx, uid UserID) error {
 	}
 
 	q := `DELETE FROM wf_ac_user_hierarchy WHERE ac_id = ? AND user_id = ?`
-	_, err := tx.Exec(q, ac.ID, uid)
+	_, err := tx.Exec(q, id, uid)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UserReportsTo answers the user to whom the given user reports to,
+// within this access context.
+func (acs *_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserID, error) {
+	q := `
+	SELECT reports_to
+	FROM wf_ac_user_hierarchy
+	WHERE ac_id = ?
+	AND user_id = ?
+	`
+	row := db.QueryRow(q, id, uid)
+	var repID int64
+	err := row.Scan(&repID)
+	if err != nil {
+		return 0, err
+	}
+
+	return UserID(repID), nil
+}
+
+// UserReportees answers a list of the users who report to the given
+// user, within this access context.
+func (acs *_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, error) {
+	q := `
+	SELECT user_id
+	FROM wf_ac_user_hierarchy
+	WHERE ac_id = ?
+	AND reports_to = ?
+	`
+	rows, err := db.Query(q, id, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]UserID, 0, 4)
+	for rows.Next() {
+		var repID int64
+		err = rows.Scan(&repID)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, UserID(repID))
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
+}
+
+// ChangeReporting reassigns the user to a different reporting
+// authority.
+func (acs *_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
+	if uid <= 0 || reportsTo < 0 {
+		return errors.New("user ID should be positive integer; reporting authority ID should be a non-negative integer")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_ac_user_hierarchy
+	SET reports_to = ?
+	WHERE ac_id = ?
+	AND user_id = ?
+	`
+	_, err := tx.Exec(q, reportsTo, id, uid)
 	if err != nil {
 		return err
 	}
@@ -425,7 +504,7 @@ func (ac *AccessContext) DeleteUser(otx *sql.Tx, uid UserID) error {
 // UserHasPermission answers `true` if the given user has the
 // requested action enabled on the specified document type; `false`
 // otherwise.
-func (ac *AccessContext) UserHasPermission(uid UserID, dtype DocTypeID, action DocActionID) (bool, error) {
+func (acs *_AccessContexts) UserHasPermission(id AccessContextID, uid UserID, dtype DocTypeID, action DocActionID) (bool, error) {
 	if uid <= 0 || dtype <= 0 || action <= 0 {
 		return false, errors.New("invalid user ID or document type or document action")
 	}
@@ -438,7 +517,7 @@ func (ac *AccessContext) UserHasPermission(uid UserID, dtype DocTypeID, action D
 	AND docaction_id = ?
 	LIMIT 1
 	`
-	row := db.QueryRow(q, ac.ID, uid, dtype, action)
+	row := db.QueryRow(q, id, uid, dtype, action)
 	var roleID int64
 	err := row.Scan(&roleID)
 	if err != nil {
@@ -453,7 +532,7 @@ func (ac *AccessContext) UserHasPermission(uid UserID, dtype DocTypeID, action D
 // GroupHasPermission answers `true` if the given group has the
 // requested action enabled on the specified document type; `false`
 // otherwise.
-func (ac *AccessContext) GroupHasPermission(gid GroupID, dtype DocTypeID, action DocActionID) (bool, error) {
+func (ac *AccessContext) GroupHasPermission(id AccessContextID, gid GroupID, dtype DocTypeID, action DocActionID) (bool, error) {
 	if gid <= 0 || dtype <= 0 || action <= 0 {
 		return false, errors.New("invalid group ID or document type or document action")
 	}
@@ -466,7 +545,7 @@ func (ac *AccessContext) GroupHasPermission(gid GroupID, dtype DocTypeID, action
 	AND docaction_id = ?
 	LIMIT 1
 	`
-	row := db.QueryRow(q, ac.ID, gid, dtype, action)
+	row := db.QueryRow(q, id, gid, dtype, action)
 	var roleID int64
 	err := row.Scan(&roleID)
 	if err != nil {

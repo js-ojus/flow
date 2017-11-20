@@ -83,18 +83,18 @@ var Documents *_Documents
 // N.B. Blobs, tags and children documents have to be associated with
 // this document, if needed, through appropriate separate calls.
 func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
-	user UserID, dtype DocTypeID, otype DocTypeID, oid DocumentID,
+	user UserID, dtype DocTypeID, ptype DocTypeID, pid DocumentID,
 	title string, data []byte) (DocumentID, error) {
-	if user <= 0 || acID <= 0 || dtype <= 0 || otype < 0 || oid < 0 {
+	if user <= 0 || acID <= 0 || dtype <= 0 || ptype < 0 || pid < 0 {
 		return 0, errors.New("all identifiers should be positive integers; parent document references should be zero or positive integers")
 	}
 	if len(data) == 0 {
 		return 0, errors.New("document's body should be non-empty")
 	}
 
-	if oid > 0 {
+	if pid > 0 {
 		// A child document does not have its own title.
-		outer, err := Documents.Get(otx, otype, oid)
+		outer, err := Documents.Get(otx, ptype, pid)
 		if err != nil {
 			return 0, err
 		}
@@ -148,11 +148,9 @@ func (ds *_Documents) New(otx *sql.Tx, acID AccessContextID,
 	INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
 	VALUES (?, ?, ?, ?)
 	`
-	if oid > 0 {
-		res, err = tx.Exec(q2, otype, oid, dtype, id)
-		if err != nil {
-			return 0, err
-		}
+	res, err = tx.Exec(q2, ptype, pid, dtype, id)
+	if err != nil {
+		return 0, err
 	}
 
 	if otx == nil {
@@ -246,9 +244,9 @@ func (ds *_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Documen
 	return &d, nil
 }
 
-// GetOuter answers the identifiers of the parent document of the
+// GetParent answers the identifiers of the parent document of the
 // specified document.
-func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
+func (ds *_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
 	q := `
 	SELECT parent_doctype_id, parent_id
 	FROM wf_document_children
@@ -260,9 +258,6 @@ func (ds *_Documents) GetOuter(dtype DocTypeID, id DocumentID) (DocTypeID, Docum
 	var dtid, did int64
 	err := row.Scan(&dtid, &did)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return 0, 0, errors.New("this is a top-level document")
-		}
 		return 0, 0, err
 	}
 
