@@ -71,11 +71,11 @@ type _AccessContexts struct{}
 
 // AccessContexts provides a resource-like interface to access
 // contexts in the system.
-var AccessContexts *_AccessContexts
+var AccessContexts _AccessContexts
 
 // New creates a new access context with the globally-unique name
 // given.
-func (acs *_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, error) {
+func (_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("access context name should be non-empty")
@@ -117,7 +117,7 @@ func (acs *_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, erro
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (acs *_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContext, error) {
+func (_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContext, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -172,7 +172,7 @@ func (acs *_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessC
 
 // Get fetches the requested access context that determines how the
 // workflows that operate in its context run.
-func (acs *_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64) (*AccessContext, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -197,7 +197,7 @@ func (acs *_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit 
 
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
-func (acs *_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
@@ -245,7 +245,7 @@ func (acs *_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) 
 
 // AddGroupRole assigns the specified role to the given group, if it
 // is not already assigned.
-func (acs *_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
+func (_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
 	if gid <= 0 || rid <= 0 {
 		return errors.New("group ID and role ID should be positive integers")
 	}
@@ -277,7 +277,7 @@ func (acs *_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid Gr
 }
 
 // RemoveGroupRole unassigns the specified role from the given group.
-func (acs *_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
+func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID, rid RoleID) error {
 	if gid <= 0 || rid <= 0 {
 		return errors.New("group ID and role ID should be positive integers")
 	}
@@ -309,7 +309,7 @@ func (acs *_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid
 }
 
 // Users retrieves the users included in this access context.
-func (acs *_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
 	q := `
 	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
 	FROM wf_ac_user_hierarchy auh
@@ -347,7 +347,7 @@ func (acs *_AccessContexts) Users(id AccessContextID, offset, limit int64) (*Acc
 // AddUser adds the given user to this access context, with the
 // specified reporting authority within the hierarchy of this access
 // context.
-func (acs *_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
+func (_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
 	if uid <= 0 || reportsTo < 0 {
 		return errors.New("user ID should be a positive integer; reporting authority ID should be a non-negative integer")
 	}
@@ -380,7 +380,7 @@ func (acs *_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, report
 }
 
 // DeleteUser removes the given user from this access context.
-func (acs *_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) error {
+func (_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) error {
 	if uid <= 0 {
 		return errors.New("user ID should be positive integer")
 	}
@@ -414,7 +414,7 @@ func (acs *_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid User
 
 // UserReportsTo answers the user to whom the given user reports to,
 // within this access context.
-func (acs *_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserID, error) {
+func (_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserID, error) {
 	q := `
 	SELECT reports_to
 	FROM wf_ac_user_hierarchy
@@ -433,7 +433,7 @@ func (acs *_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserI
 
 // UserReportees answers a list of the users who report to the given
 // user, within this access context.
-func (acs *_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, error) {
+func (_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, error) {
 	q := `
 	SELECT user_id
 	FROM wf_ac_user_hierarchy
@@ -464,7 +464,7 @@ func (acs *_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]Use
 
 // ChangeReporting reassigns the user to a different reporting
 // authority.
-func (acs *_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
+func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
 	if uid <= 0 || reportsTo < 0 {
 		return errors.New("user ID should be positive integer; reporting authority ID should be a non-negative integer")
 	}
@@ -504,7 +504,7 @@ func (acs *_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid
 // UserHasPermission answers `true` if the given user has the
 // requested action enabled on the specified document type; `false`
 // otherwise.
-func (acs *_AccessContexts) UserHasPermission(id AccessContextID, uid UserID, dtype DocTypeID, action DocActionID) (bool, error) {
+func (_AccessContexts) UserHasPermission(id AccessContextID, uid UserID, dtype DocTypeID, action DocActionID) (bool, error) {
 	if uid <= 0 || dtype <= 0 || action <= 0 {
 		return false, errors.New("invalid user ID or document type or document action")
 	}

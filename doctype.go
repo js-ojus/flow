@@ -55,16 +55,16 @@ type _DocTypes struct{}
 
 // DocTypes provides a resource-like interface to document types in
 // the system.
-var DocTypes *_DocTypes
+var DocTypes _DocTypes
 
 // docStorName answers the appropriate table name for the given
 // document type.
-func (dts *_DocTypes) docStorName(dtid DocTypeID) string {
+func (_DocTypes) docStorName(dtid DocTypeID) string {
 	return fmt.Sprintf("wf_documents_%03d", dtid)
 }
 
 // New creates and registers a new document type in the system.
-func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
+func (_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name cannot be empty")
@@ -133,7 +133,7 @@ func (dts *_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (dts *_DocTypes) List(offset, limit int64) ([]*DocType, error) {
+func (_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -170,7 +170,7 @@ func (dts *_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 }
 
 // Get retrieves the document type for the given ID.
-func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
+func (_DocTypes) Get(id DocTypeID) (*DocType, error) {
 	if id <= 0 {
 		return nil, errors.New("ID should be a positive integer")
 	}
@@ -187,7 +187,7 @@ func (dts *_DocTypes) Get(id DocTypeID) (*DocType, error) {
 
 // GetByName answers the document type, if one with the given name is
 // registered; `nil` and the error, otherwise.
-func (dts *_DocTypes) GetByName(name string) (*DocType, error) {
+func (_DocTypes) GetByName(name string) (*DocType, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("document type cannot be empty")
@@ -204,7 +204,7 @@ func (dts *_DocTypes) GetByName(name string) (*DocType, error) {
 }
 
 // Rename renames the given document type.
-func (dts *_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
+func (_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")

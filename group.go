@@ -37,12 +37,12 @@ type Group struct {
 type _Groups struct{}
 
 // Groups provides a resource-like interface to groups in the system.
-var Groups *_Groups
+var Groups _Groups
 
 // NewSingleton creates a singleton group associated with the given
 // user.  The e-mail address of the user is used as the name of the
 // group.  This serves as the linking identifier.
-func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID) (GroupID, error) {
+func (_Groups) NewSingleton(otx *sql.Tx, uid UserID) (GroupID, error) {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -90,7 +90,7 @@ func (gs *_Groups) NewSingleton(otx *sql.Tx, uid UserID) (GroupID, error) {
 }
 
 // New creates a new group that can be populated with users later.
-func (gs *_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) {
+func (_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 	name = strings.TrimSpace(name)
 	gtype = strings.TrimSpace(gtype)
 	if name == "" || gtype == "" {
@@ -141,7 +141,7 @@ func (gs *_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) 
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (gs *_Groups) List(offset, limit int64) ([]*Group, error) {
+func (_Groups) List(offset, limit int64) ([]*Group, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -178,7 +178,7 @@ func (gs *_Groups) List(offset, limit int64) ([]*Group, error) {
 }
 
 // Get initialises the group by reading from database.
-func (gs *_Groups) Get(id GroupID) (*Group, error) {
+func (_Groups) Get(id GroupID) (*Group, error) {
 	if id <= 0 {
 		return nil, errors.New("group ID should be a positive integer")
 	}
@@ -194,7 +194,7 @@ func (gs *_Groups) Get(id GroupID) (*Group, error) {
 }
 
 // Rename renames the given group.
-func (gs *_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
+func (_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -238,7 +238,7 @@ func (gs *_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
 
 // Delete deletes the given group from the system, if no access
 // context is actively using it.
-func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
+func (_Groups) Delete(otx *sql.Tx, id GroupID) error {
 	if id <= 0 {
 		return errors.New("group ID must be a positive integer")
 	}
@@ -295,7 +295,7 @@ func (gs *_Groups) Delete(otx *sql.Tx, id GroupID) error {
 }
 
 // Users answers a list of the given group's users.
-func (gs *_Groups) Users(gid GroupID) ([]*User, error) {
+func (_Groups) Users(gid GroupID) ([]*User, error) {
 	q := `
 	SELECT um.id, um.first_name, um.last_name, um.email, um.active
 	FROM wf_users_master um
@@ -326,7 +326,7 @@ func (gs *_Groups) Users(gid GroupID) ([]*User, error) {
 
 // HasUser answers `true` if this group includes the given user;
 // `false` otherwise.
-func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
+func (_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
 	q := `
 	SELECT id FROM wf_group_users
 	WHERE group_id = ?
@@ -351,7 +351,7 @@ func (gs *_Groups) HasUser(gid GroupID, uid UserID) (bool, error) {
 
 // SingletonUser answer the user ID of the corresponding user, if this
 // group is a singleton group.
-func (gs *_Groups) SingletonUser(gid GroupID) (*User, error) {
+func (_Groups) SingletonUser(gid GroupID) (*User, error) {
 	q := `
 	SELECT um.id, um.first_name, um.last_name, um.email, um.active
 	FROM wf_users_master um
@@ -376,7 +376,7 @@ func (gs *_Groups) SingletonUser(gid GroupID) (*User, error) {
 }
 
 // AddUser adds the given user as a member of this group.
-func (gs *_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
+func (_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 	if gid <= 0 || uid <= 0 {
 		return errors.New("group ID and user ID must be positive integers")
 	}
@@ -418,7 +418,7 @@ func (gs *_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 
 // RemoveUser removes the given user from this group, if the user is a
 // member of the group.  This operation is idempotent.
-func (gs *_Groups) RemoveUser(otx *sql.Tx, gid GroupID, uid UserID) error {
+func (_Groups) RemoveUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 	if gid <= 0 || uid <= 0 {
 		return errors.New("group ID and user ID must be positive integers")
 	}

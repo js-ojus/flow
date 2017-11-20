@@ -37,10 +37,10 @@ type Role struct {
 type _Roles struct{}
 
 // Roles provides a resource-like interface to roles in the system.
-var Roles *_Roles
+var Roles _Roles
 
 // New creates a role with the given name.
-func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
+func (_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("name cannot not be empty")
@@ -82,7 +82,7 @@ func (rs *_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (rs *_Roles) List(offset, limit int64) ([]*Role, error) {
+func (_Roles) List(offset, limit int64) ([]*Role, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -120,7 +120,7 @@ func (rs *_Roles) List(offset, limit int64) ([]*Role, error) {
 
 // Get loads the role object corresponding to the given role ID from
 // the database, and answers that.
-func (rs *_Roles) Get(id RoleID) (*Role, error) {
+func (_Roles) Get(id RoleID) (*Role, error) {
 	if id <= 0 {
 		return nil, errors.New("ID must be a positive integer")
 	}
@@ -137,7 +137,7 @@ func (rs *_Roles) Get(id RoleID) (*Role, error) {
 
 // GetByName answers the role, if one with the given name is
 // registered; `nil` and the error, otherwise.
-func (rs *_Roles) GetByName(name string) (*Role, error) {
+func (_Roles) GetByName(name string) (*Role, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("role cannot be empty")
@@ -154,7 +154,7 @@ func (rs *_Roles) GetByName(name string) (*Role, error) {
 }
 
 // Rename renames the given role.
-func (rs *_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
+func (_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name cannot be empty")
@@ -188,7 +188,7 @@ func (rs *_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 
 // Delete deletes the given role from the system, if no access context
 // is actively using it.
-func (rs *_Roles) Delete(otx *sql.Tx, id RoleID) error {
+func (_Roles) Delete(otx *sql.Tx, id RoleID) error {
 	if id <= 0 {
 		return errors.New("role ID must be a positive integer")
 	}
@@ -236,7 +236,7 @@ func (rs *_Roles) Delete(otx *sql.Tx, id RoleID) error {
 
 // AddPermission adds the given action to this role, for the given
 // document type.
-func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
+func (_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -268,7 +268,7 @@ func (rs *_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action
 
 // RemovePermission removes all permissions from this role, for the
 // given document type.
-func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
+func (_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -303,7 +303,7 @@ func (rs *_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, act
 // Permissions answers the current set of permissions this role has.
 // It answers `nil` in case the given document type does not have any
 // permissions set in this role.
-func (rs *_Roles) Permissions(rid RoleID) (map[string]struct {
+func (_Roles) Permissions(rid RoleID) (map[string]struct {
 	DocTypeID DocTypeID
 	Actions   []*DocAction
 }, error) {
@@ -348,7 +348,7 @@ func (rs *_Roles) Permissions(rid RoleID) (map[string]struct {
 
 // HasPermission answers `true` if this role has the queried
 // permission for the given document type.
-func (rs *_Roles) HasPermission(rid RoleID, dtype DocTypeID, action DocActionID) (bool, error) {
+func (_Roles) HasPermission(rid RoleID, dtype DocTypeID, action DocActionID) (bool, error) {
 	q := `
 	SELECT rdas.id FROM wf_role_docactions rdas
 	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
