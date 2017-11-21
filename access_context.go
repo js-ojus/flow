@@ -92,7 +92,7 @@ func (_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, error) {
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_access_contexts(name) VALUES(?)`
+	q := `INSERT INTO wf_access_contexts(name, active) VALUES(?, 1)`
 	res, err := tx.Exec(q, name)
 	if err != nil {
 		return 0, err
@@ -193,6 +193,84 @@ func (_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64
 	}
 
 	return &elem, nil
+}
+
+// Rename changes the name of the given access context to the
+// specified new name.
+func (_AccessContexts) Rename(otx *sql.Tx, id AccessContextID, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("access context name should be non-empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_access_contexts
+	SET name = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, name, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// SetActive updates the given access context with the new active
+// status.
+func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) error {
+	act := 0
+	if active {
+		act = 1
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_access_contexts
+	SET active = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, act, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GroupRoles retrieves the groups --> roles mapping for this access
