@@ -592,6 +592,49 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, rep
 	return nil
 }
 
+// UserPermissions answers a list of the permissions available to the
+// given user in this access context.
+func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocTypeID][]DocAction, error) {
+	if uid <= 0 {
+		return nil, errors.New("user ID should be a positive integer")
+	}
+
+	q := `
+	SELECT acpv.doctype_id, acpv.docaction_id, dam.name
+	FROM wf_ac_perms_v acpv
+	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	WHERE acpv.ac_id = ?
+	AND acpv.user_id = ?
+	`
+	rows, err := db.Query(q, id, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := map[DocTypeID][]DocAction{}
+	for rows.Next() {
+		var dtid int64
+		var da DocAction
+		err = rows.Scan(&dtid, &da.ID, &da.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		ary, ok := res[DocTypeID(dtid)]
+		if !ok {
+			ary = []DocAction{}
+		}
+		ary = append(ary, da)
+		res[DocTypeID(dtid)] = ary
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // UserHasPermission answers `true` if the given user has the
 // requested action enabled on the specified document type; `false`
 // otherwise.
