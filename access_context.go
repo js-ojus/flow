@@ -56,7 +56,7 @@ type AccessContext struct {
 	Name       string                    `json:"Name"`                    // Globally-unique namespace; can be a department, project, location, branch, etc.
 	Active     bool                      `json:"Active"`                  // Can a workflow be initiated in this context?
 	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`    // Mapping of groups to their roles.
-	UserHier   map[UserID]UserID         `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
+	UserHier   map[UserID]*AcUser        `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
 }
 
 // AcGroupRoles holds the information of the various roles that each
@@ -64,6 +64,13 @@ type AccessContext struct {
 type AcGroupRoles struct {
 	Group string `json:"Group"` // Group whose roles this represents
 	Roles []Role `json:"Roles"` // Map holds the role assignments to groups
+}
+
+// AcUser holds the information of a user together with the user's
+// reporting authority.
+type AcUser struct {
+	User      `json:"User"` // An assigned user
+	ReportsTo UserID        `json:"ReportsTo"` // Reporting authority of this user
 }
 
 // Unexported type, only for convenience methods.
@@ -411,16 +418,15 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	defer rows.Close()
 
 	elem.ID = id
-	elem.UserHier = make(map[UserID]UserID)
+	elem.UserHier = make(map[UserID]*AcUser)
 	for rows.Next() {
-		var u User
-		var p UserID
-		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &p)
+		var u AcUser
+		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.ReportsTo)
 		if err != nil {
 			return nil, err
 		}
 
-		elem.UserHier[UserID(u.ID)] = UserID(p)
+		elem.UserHier[UserID(u.ID)] = &u
 	}
 	if rows.Err() != nil {
 		return nil, err
