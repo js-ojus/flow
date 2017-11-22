@@ -56,7 +56,7 @@ type AccessContext struct {
 	Name       string                    `json:"Name"`                    // Globally-unique namespace; can be a department, project, location, branch, etc.
 	Active     bool                      `json:"Active"`                  // Can a workflow be initiated in this context?
 	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`    // Mapping of groups to their roles.
-	UserHier   map[UserID]UserID         `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
+	UserHier   map[UserID]*AcUser        `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
 }
 
 // AcGroupRoles holds the information of the various roles that each
@@ -64,6 +64,13 @@ type AccessContext struct {
 type AcGroupRoles struct {
 	Group string `json:"Group"` // Group whose roles this represents
 	Roles []Role `json:"Roles"` // Map holds the role assignments to groups
+}
+
+// AcUser holds the information of a user together with the user's
+// reporting authority.
+type AcUser struct {
+	User      `json:"User"` // An assigned user
+	ReportsTo UserID        `json:"ReportsTo"` // Reporting authority of this user
 }
 
 // Unexported type, only for convenience methods.
@@ -92,7 +99,7 @@ func (_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, error) {
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_access_contexts(name) VALUES(?)`
+	q := `INSERT INTO wf_access_contexts(name, active) VALUES(?, 1)`
 	res, err := tx.Exec(q, name)
 	if err != nil {
 		return 0, err
@@ -172,14 +179,7 @@ func (_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContex
 
 // Get fetches the requested access context that determines how the
 // workflows that operate in its context run.
-func (_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64) (*AccessContext, error) {
-	if offset < 0 || limit < 0 {
-		return nil, errors.New("offset and limit should be non-negative integers")
-	}
-	if limit == 0 {
-		limit = math.MaxInt64
-	}
-
+func (_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
 	q := `
 	SELECT id, name, active
 	FROM wf_access_contexts
@@ -195,9 +195,94 @@ func (_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64
 	return &elem, nil
 }
 
+// Rename changes the name of the given access context to the
+// specified new name.
+func (_AccessContexts) Rename(otx *sql.Tx, id AccessContextID, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("access context name should be non-empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_access_contexts
+	SET name = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, name, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// SetActive updates the given access context with the new active
+// status.
+func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) error {
+	act := 0
+	if active {
+		act = 1
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	UPDATE wf_access_contexts
+	SET active = ?
+	WHERE id = ?
+	`
+	_, err := tx.Exec(q, act, id)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
 func (_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
@@ -310,6 +395,13 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 
 // Users retrieves the users included in this access context.
 func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
 	q := `
 	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
 	FROM wf_ac_user_hierarchy auh
@@ -326,16 +418,15 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	defer rows.Close()
 
 	elem.ID = id
-	elem.UserHier = make(map[UserID]UserID)
+	elem.UserHier = make(map[UserID]*AcUser)
 	for rows.Next() {
-		var u User
-		var p UserID
-		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &p)
+		var u AcUser
+		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.ReportsTo)
 		if err != nil {
 			return nil, err
 		}
 
-		elem.UserHier[UserID(u.ID)] = UserID(p)
+		elem.UserHier[UserID(u.ID)] = &u
 	}
 	if rows.Err() != nil {
 		return nil, err
