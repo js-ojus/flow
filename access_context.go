@@ -172,14 +172,7 @@ func (_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContex
 
 // Get fetches the requested access context that determines how the
 // workflows that operate in its context run.
-func (_AccessContexts) Get(id AccessContextID, grs, uh bool, offset, limit int64) (*AccessContext, error) {
-	if offset < 0 || limit < 0 {
-		return nil, errors.New("offset and limit should be non-negative integers")
-	}
-	if limit == 0 {
-		limit = math.MaxInt64
-	}
-
+func (_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
 	q := `
 	SELECT id, name, active
 	FROM wf_access_contexts
@@ -276,6 +269,13 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
 func (_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
@@ -388,6 +388,13 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 
 // Users retrieves the users included in this access context.
 func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
 	q := `
 	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
 	FROM wf_ac_user_hierarchy auh
