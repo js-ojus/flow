@@ -11,5 +11,5 @@ CREATE TABLE wf_ac_group_hierarchy (
     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
     FOREIGN KEY (group_id) REFERENCES wf_groups_master(id),
     FOREIGN KEY (reports_to) REFERENCES wf_groups_master(id),
-    UNIQUE (ac_id, user_id)
+    UNIQUE (ac_id, group_id)
 );
