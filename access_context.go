@@ -319,7 +319,7 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
-func (_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit int64) (*AccessContext, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -333,11 +333,12 @@ func (_AccessContexts) GroupRoles(id AccessContextID, offset, limit int64) (*Acc
 	JOIN wf_groups_master gm ON gm.id = agrs.group_id
 	JOIN wf_roles_master rm ON rm.id = agrs.role_id
 	WHERE agrs.ac_id = ?
+	AND agrs.group_id = ?
 	ORDER BY agrs.group_id
 	LIMIT ? OFFSET ?
 	`
 	var elem AccessContext
-	rows, err := db.Query(q, id, limit, offset)
+	rows, err := db.Query(q, id, gid, limit, offset)
 	if err != nil {
 		return nil, err
 	}
