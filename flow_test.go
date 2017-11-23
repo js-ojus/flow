@@ -90,9 +90,9 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			tdt := error1(DocTypes.New(tx, "STOR_REQ"))
+			tdt := fatal1(DocTypes.New(tx, "STOR_REQ"))
 			dtID1 = tdt.(DocTypeID)
-			tdt = error1(DocTypes.New(tx, "COMPUTE_REQ"))
+			tdt = fatal1(DocTypes.New(tx, "COMPUTE_REQ"))
 			dtID2 = tdt.(DocTypeID)
 
 			fatal0(tx.Commit())
@@ -103,15 +103,15 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			tds := error1(DocStates.New(tx, dtID1, "INITIAL"))
+			tds := fatal1(DocStates.New(tx, dtID1, "INITIAL"))
 			dsID1 = tds.(DocStateID)
-			tds = error1(DocStates.New(tx, dtID1, "PENDING_APPROVAL"))
+			tds = fatal1(DocStates.New(tx, dtID1, "PENDING_APPROVAL"))
 			dsID2 = tds.(DocStateID)
-			tds = error1(DocStates.New(tx, dtID1, "APPROVED"))
+			tds = fatal1(DocStates.New(tx, dtID1, "APPROVED"))
 			dsID3 = tds.(DocStateID)
-			tds = error1(DocStates.New(tx, dtID1, "REJECTED"))
+			tds = fatal1(DocStates.New(tx, dtID1, "REJECTED"))
 			dsID4 = tds.(DocStateID)
-			tds = error1(DocStates.New(tx, dtID1, "DISCARDED"))
+			tds = fatal1(DocStates.New(tx, dtID1, "DISCARDED"))
 			dsID5 = tds.(DocStateID)
 
 			fatal0(tx.Commit())
@@ -122,23 +122,23 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			tda := error1(DocActions.New(tx, "INITIALISE"))
+			tda := fatal1(DocActions.New(tx, "INITIALISE"))
 			daID1 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "NEW"))
+			tda = fatal1(DocActions.New(tx, "NEW"))
 			daID2 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "GET"))
+			tda = fatal1(DocActions.New(tx, "GET"))
 			daID3 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "UPDATE"))
+			tda = fatal1(DocActions.New(tx, "UPDATE"))
 			daID4 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "DELETE"))
+			tda = fatal1(DocActions.New(tx, "DELETE"))
 			daID5 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "APPROVE"))
+			tda = fatal1(DocActions.New(tx, "APPROVE"))
 			daID6 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "REJECT"))
+			tda = fatal1(DocActions.New(tx, "REJECT"))
 			daID7 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "RETURN"))
+			tda = fatal1(DocActions.New(tx, "RETURN"))
 			daID8 = tda.(DocActionID)
-			tda = error1(DocActions.New(tx, "DISCARD"))
+			tda = fatal1(DocActions.New(tx, "DISCARD"))
 			daID9 = tda.(DocActionID)
 
 			fatal0(tx.Commit())
@@ -149,9 +149,9 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			tr := error1(Roles.New(tx, "ADMIN"))
+			tr := fatal1(Roles.New(tx, "ADMIN"))
 			roleID1 = tr.(RoleID)
-			tr = error1(Roles.New(tx, "RESEARCH_ANALYST"))
+			tr = fatal1(Roles.New(tx, "RESEARCH_ANALYST"))
 			roleID2 = tr.(RoleID)
 
 			fatal0(tx.Commit())
@@ -165,21 +165,21 @@ func TestFlow01(t *testing.T) {
 			res, err := tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 1', 'LN 1', 'email1@example.com', 1)`)
 			if err != nil {
-				t.Errorf("%v\n", err)
+				t.Fatalf("%v\n", err)
 			}
 			uid, _ := res.LastInsertId()
 			uID1 = UserID(uid)
-			tg := error1(Groups.NewSingleton(tx, uID1))
+			tg := fatal1(Groups.NewSingleton(tx, uID1))
 			gID1 = tg.(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 2', 'LN 2', 'email2@example.com', 1)`)
 			if err != nil {
-				t.Errorf("%v\n", err)
+				t.Fatalf("%v\n", err)
 			}
 			uid, _ = res.LastInsertId()
 			uID2 = UserID(uid)
-			tg = error1(Groups.NewSingleton(tx, uID2))
+			tg = fatal1(Groups.NewSingleton(tx, uID2))
 			gID2 = tg.(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
@@ -189,17 +189,17 @@ func TestFlow01(t *testing.T) {
 			}
 			uid, _ = res.LastInsertId()
 			uID3 = UserID(uid)
-			tg = error1(Groups.NewSingleton(tx, uID3))
+			tg = fatal1(Groups.NewSingleton(tx, uID3))
 			gID3 = tg.(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 4', 'LN 4', 'email4@example.com', 1)`)
 			if err != nil {
-				t.Errorf("%v\n", err)
+				t.Fatalf("%v\n", err)
 			}
 			uid, _ = res.LastInsertId()
 			uID4 = UserID(uid)
-			tg = error1(Groups.NewSingleton(tx, uID4))
+			tg = fatal1(Groups.NewSingleton(tx, uID4))
 			gID4 = tg.(GroupID)
 
 			fatal0(tx.Commit())
@@ -210,10 +210,10 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			td := error1(Groups.New(tx, "RAs", "G"))
+			td := fatal1(Groups.New(tx, "RAs", "G"))
 			gID5 = td.(GroupID)
 
-			td = error1(Groups.New(tx, "PIs", "G"))
+			td = fatal1(Groups.New(tx, "PIs", "G"))
 			gID6 = td.(GroupID)
 
 			fatal0(tx.Commit())
@@ -224,13 +224,13 @@ func TestFlow01(t *testing.T) {
 			tx := ttx.(*sql.Tx)
 			defer tx.Rollback()
 
-			error0(Groups.AddUser(tx, gID5, uID1))
-			error0(Groups.AddUser(tx, gID5, uID2))
-			error0(Groups.AddUser(tx, gID5, uID3))
+			fatal0(Groups.AddUser(tx, gID5, uID1))
+			fatal0(Groups.AddUser(tx, gID5, uID2))
+			fatal0(Groups.AddUser(tx, gID5, uID3))
 
-			error0(Groups.AddUser(tx, gID6, uID2))
-			error0(Groups.AddUser(tx, gID6, uID3))
-			error0(Groups.AddUser(tx, gID6, uID4))
+			fatal0(Groups.AddUser(tx, gID6, uID2))
+			fatal0(Groups.AddUser(tx, gID6, uID3))
+			fatal0(Groups.AddUser(tx, gID6, uID4))
 
 			fatal0(tx.Commit())
 		})

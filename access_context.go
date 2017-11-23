@@ -406,7 +406,7 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
 	FROM wf_ac_user_hierarchy auh
 	JOIN wf_users_master um ON um.id = auh.user_id
-	WHERE agrs.ac_id = ?
+	WHERE auh.ac_id = ?
 	ORDER BY auh.user_id
 	LIMIT ? OFFSET ?
 	`
