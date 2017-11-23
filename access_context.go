@@ -177,6 +177,50 @@ func (_AccessContexts) List(prefix string, offset, limit int64) ([]*AccessContex
 	return ary, nil
 }
 
+// ListByGroup answers a list of access contexts in which the given
+// group is included.
+//
+// Result set begins with ID >= `offset`, and has not more than
+// `limit` elements.  A value of `0` for `offset` fetches from the
+// beginning, while a value of `0` for `limit` fetches until the end.
+func (_AccessContexts) ListByGroup(gid GroupID, offset, limit int64) ([]*AccessContext, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errors.New("offset and limit should be non-negative integers")
+	}
+	if limit == 0 {
+		limit = math.MaxInt64
+	}
+
+	q := `
+	SELECT ac.id, ac.name, ac.active
+	FROM wf_access_contexts ac
+	JOIN wf_ac_group_hierarchy agh ON agh.ac_id = ac.id
+	WHERE agh.group_id = ?
+	ORDER BY agh.ac_id
+	LIMIT ? OFFSET ?
+	`
+	rows, err := db.Query(q, gid, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ary := make([]*AccessContext, 0, 10)
+	for rows.Next() {
+		var elem AccessContext
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.Active)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, &elem)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ary, nil
+}
+
 // Get fetches the requested access context that determines how the
 // workflows that operate in its context run.
 func (_AccessContexts) Get(id AccessContextID) (*AccessContext, error) {
