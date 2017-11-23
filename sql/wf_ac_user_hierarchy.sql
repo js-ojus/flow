@@ -1,8 +1,8 @@
-DROP TABLE IF EXISTS wf_ac_user_hierarchy;
+DROP TABLE IF EXISTS wf_ac_group_hierarchy;
 
 --
 
-CREATE TABLE wf_ac_user_hierarchy (
+CREATE TABLE wf_ac_group_hierarchy (
     id INT NOT NULL AUTO_INCREMENT,
     ac_id INT NOT NULL,
     group_id INT NOT NULL,
