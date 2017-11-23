@@ -27,7 +27,7 @@ type AccessContextID int64
 // AccessContext is a namespace that provides an environment for
 // workflow execution.
 //
-// It is an environment in which users are mapped into an hierarchy
+// It is an environment in which users are mapped into a hierarchy
 // that determines certain aspects of workflow control. This
 // hierarchy, usually, but not necessarily, reflects an organogram. In
 // each access context, applicable groups are mapped to their
@@ -52,11 +52,11 @@ type AccessContextID int64
 //     - IN:south:HYD:BR-101
 //     - sbu-08/client-0249/prj-006348
 type AccessContext struct {
-	ID         AccessContextID           `json:"ID"`                      // Unique identifier of this access context
-	Name       string                    `json:"Name"`                    // Globally-unique namespace; can be a department, project, location, branch, etc.
-	Active     bool                      `json:"Active"`                  // Can a workflow be initiated in this context?
-	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`    // Mapping of groups to their roles.
-	UserHier   map[UserID]*AcUser        `json:"UserHierarchy,omitempty"` // Mapping of users to their hierarchy.
+	ID         AccessContextID           `json:"ID"`                       // Unique identifier of this access context
+	Name       string                    `json:"Name"`                     // Globally-unique namespace; can be a department, project, location, branch, etc.
+	Active     bool                      `json:"Active"`                   // Can a workflow be initiated in this context?
+	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`     // Mapping of groups to their roles.
+	GroupHier  map[GroupID]*AcGroup      `json:"GroupHierarchy,omitempty"` // Mapping of users to their hierarchy.
 }
 
 // AcGroupRoles holds the information of the various roles that each
@@ -66,11 +66,11 @@ type AcGroupRoles struct {
 	Roles []Role `json:"Roles"` // Map holds the role assignments to groups
 }
 
-// AcUser holds the information of a user together with the user's
+// AcGroup holds the information of a user together with the user's
 // reporting authority.
-type AcUser struct {
-	User      `json:"User"` // An assigned user
-	ReportsTo UserID        `json:"ReportsTo"` // Reporting authority of this user
+type AcGroup struct {
+	Group     `json:"Group"` // An assigned user
+	ReportsTo GroupID        `json:"ReportsTo"` // Reporting authority of this user
 }
 
 // Unexported type, only for convenience methods.
@@ -393,8 +393,8 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 	return nil
 }
 
-// Users retrieves the users included in this access context.
-func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+// Groups retrieves the users included in this access context.
+func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (*AccessContext, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -403,11 +403,11 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	}
 
 	q := `
-	SELECT auh.user_id, um.first_name, um.last_name, um.email, auh.reports_to
-	FROM wf_ac_user_hierarchy auh
-	JOIN wf_users_master um ON um.id = auh.user_id
+	SELECT gm.id, gm.name, gm.group_type, auh.reports_to
+	FROM wf_groups_master gm
+	JOIN wf_ac_user_hierarchy auh ON auh.group_id = gm.id
 	WHERE auh.ac_id = ?
-	ORDER BY auh.user_id
+	ORDER BY auh.group_id
 	LIMIT ? OFFSET ?
 	`
 	var elem AccessContext
@@ -418,15 +418,15 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	defer rows.Close()
 
 	elem.ID = id
-	elem.UserHier = make(map[UserID]*AcUser)
+	elem.GroupHier = make(map[GroupID]*AcGroup)
 	for rows.Next() {
-		var u AcUser
-		err = rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.ReportsTo)
+		var g AcGroup
+		err = rows.Scan(&g.ID, &g.Name, &g.GroupType, &g.ReportsTo)
 		if err != nil {
 			return nil, err
 		}
 
-		elem.UserHier[UserID(u.ID)] = &u
+		elem.GroupHier[GroupID(g.ID)] = &g
 	}
 	if rows.Err() != nil {
 		return nil, err
@@ -435,12 +435,12 @@ func (_AccessContexts) Users(id AccessContextID, offset, limit int64) (*AccessCo
 	return &elem, nil
 }
 
-// AddUser adds the given user to this access context, with the
+// AddGroup adds the given group to this access context, with the
 // specified reporting authority within the hierarchy of this access
 // context.
-func (_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
-	if uid <= 0 || reportsTo < 0 {
-		return errors.New("user ID should be a positive integer; reporting authority ID should be a non-negative integer")
+func (_AccessContexts) AddGroup(otx *sql.Tx, id AccessContextID, gid, reportsTo GroupID) error {
+	if gid <= 0 || reportsTo < 0 {
+		return errors.New("group ID should be a positive integer; reporting authority ID should be a non-negative integer")
 	}
 
 	var tx *sql.Tx
@@ -454,8 +454,8 @@ func (_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo U
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, user_id, reports_to) VALUES (?, ?, ?)`
-	_, err := tx.Exec(q, id, uid, reportsTo)
+	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, group_id, reports_to) VALUES (?, ?, ?)`
+	_, err := tx.Exec(q, id, gid, reportsTo)
 	if err != nil {
 		return err
 	}
@@ -470,9 +470,9 @@ func (_AccessContexts) AddUser(otx *sql.Tx, id AccessContextID, uid, reportsTo U
 	return nil
 }
 
-// DeleteUser removes the given user from this access context.
-func (_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) error {
-	if uid <= 0 {
+// DeleteGroup removes the given group from this access context.
+func (_AccessContexts) DeleteGroup(otx *sql.Tx, id AccessContextID, gid GroupID) error {
+	if gid <= 0 {
 		return errors.New("user ID should be positive integer")
 	}
 
@@ -487,8 +487,8 @@ func (_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) e
 		tx = otx
 	}
 
-	q := `DELETE FROM wf_ac_user_hierarchy WHERE ac_id = ? AND user_id = ?`
-	_, err := tx.Exec(q, id, uid)
+	q := `DELETE FROM wf_ac_user_hierarchy WHERE ac_id = ? AND group_id = ?`
+	_, err := tx.Exec(q, id, gid)
 	if err != nil {
 		return err
 	}
@@ -503,14 +503,14 @@ func (_AccessContexts) DeleteUser(otx *sql.Tx, id AccessContextID, uid UserID) e
 	return nil
 }
 
-// UserReportsTo answers the user to whom the given user reports to,
+// GroupReportsTo answers the group to whom the given group reports to,
 // within this access context.
-func (_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserID, error) {
+func (_AccessContexts) GroupReportsTo(id AccessContextID, uid GroupID) (GroupID, error) {
 	q := `
 	SELECT reports_to
 	FROM wf_ac_user_hierarchy
 	WHERE ac_id = ?
-	AND user_id = ?
+	AND group_id = ?
 	`
 	row := db.QueryRow(q, id, uid)
 	var repID int64
@@ -519,14 +519,14 @@ func (_AccessContexts) UserReportsTo(id AccessContextID, uid UserID) (UserID, er
 		return 0, err
 	}
 
-	return UserID(repID), nil
+	return GroupID(repID), nil
 }
 
-// UserReportees answers a list of the users who report to the given
-// user, within this access context.
-func (_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, error) {
+// GroupReportees answers a list of the groups who report to the given
+// group, within this access context.
+func (_AccessContexts) GroupReportees(id AccessContextID, uid GroupID) ([]GroupID, error) {
 	q := `
-	SELECT user_id
+	SELECT group_id
 	FROM wf_ac_user_hierarchy
 	WHERE ac_id = ?
 	AND reports_to = ?
@@ -537,14 +537,14 @@ func (_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, 
 	}
 	defer rows.Close()
 
-	ary := make([]UserID, 0, 4)
+	ary := make([]GroupID, 0, 4)
 	for rows.Next() {
 		var repID int64
 		err = rows.Scan(&repID)
 		if err != nil {
 			return nil, err
 		}
-		ary = append(ary, UserID(repID))
+		ary = append(ary, GroupID(repID))
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -553,11 +553,11 @@ func (_AccessContexts) UserReportees(id AccessContextID, uid UserID) ([]UserID, 
 	return ary, nil
 }
 
-// ChangeReporting reassigns the user to a different reporting
+// ChangeReporting reassigns the group to a different reporting
 // authority.
-func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, reportsTo UserID) error {
-	if uid <= 0 || reportsTo < 0 {
-		return errors.New("user ID should be positive integer; reporting authority ID should be a non-negative integer")
+func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, gid, reportsTo GroupID) error {
+	if gid <= 0 || reportsTo < 0 {
+		return errors.New("group ID should be positive integer; reporting authority ID should be a non-negative integer")
 	}
 
 	var tx *sql.Tx
@@ -575,9 +575,9 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, rep
 	UPDATE wf_ac_user_hierarchy
 	SET reports_to = ?
 	WHERE ac_id = ?
-	AND user_id = ?
+	AND group_id = ?
 	`
-	_, err := tx.Exec(q, reportsTo, id, uid)
+	_, err := tx.Exec(q, reportsTo, id, gid)
 	if err != nil {
 		return err
 	}
@@ -592,11 +592,11 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, uid, rep
 	return nil
 }
 
-// UserPermissions answers a list of the permissions available to the
+// GroupPermissions answers a list of the permissions available to the
 // given user in this access context.
-func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocTypeID][]DocAction, error) {
-	if uid <= 0 {
-		return nil, errors.New("user ID should be a positive integer")
+func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[DocTypeID][]DocAction, error) {
+	if gid <= 0 {
+		return nil, errors.New("group ID should be a positive integer")
 	}
 
 	q := `
@@ -604,9 +604,9 @@ func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocT
 	FROM wf_ac_perms_v acpv
 	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
-	AND acpv.user_id = ?
+	AND acpv.group_id = ?
 	`
-	rows, err := db.Query(q, id, uid)
+	rows, err := db.Query(q, id, gid)
 	if err != nil {
 		return nil, err
 	}
