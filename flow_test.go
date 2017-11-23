@@ -315,7 +315,7 @@ func TestFlow01(t *testing.T) {
 		defer tx.Rollback()
 
 		error1(tx.Exec(`DELETE FROM wf_ac_group_roles`))
-		error1(tx.Exec(`DELETE FROM wf_ac_user_hierarchy`))
+		error1(tx.Exec(`DELETE FROM wf_ac_group_hierarchy`))
 		error1(tx.Exec(`DELETE FROM wf_access_contexts`))
 
 		error1(tx.Exec(`DELETE FROM wf_group_users`))
