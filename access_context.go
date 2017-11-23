@@ -405,7 +405,7 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (*AccessC
 	q := `
 	SELECT gm.id, gm.name, gm.group_type, auh.reports_to
 	FROM wf_groups_master gm
-	JOIN wf_ac_user_hierarchy auh ON auh.group_id = gm.id
+	JOIN wf_ac_group_hierarchy auh ON auh.group_id = gm.id
 	WHERE auh.ac_id = ?
 	ORDER BY auh.group_id
 	LIMIT ? OFFSET ?
@@ -454,7 +454,7 @@ func (_AccessContexts) AddGroup(otx *sql.Tx, id AccessContextID, gid, reportsTo 
 		tx = otx
 	}
 
-	q := `INSERT INTO wf_ac_user_hierarchy(ac_id, group_id, reports_to) VALUES (?, ?, ?)`
+	q := `INSERT INTO wf_ac_group_hierarchy(ac_id, group_id, reports_to) VALUES (?, ?, ?)`
 	_, err := tx.Exec(q, id, gid, reportsTo)
 	if err != nil {
 		return err
@@ -487,7 +487,7 @@ func (_AccessContexts) DeleteGroup(otx *sql.Tx, id AccessContextID, gid GroupID)
 		tx = otx
 	}
 
-	q := `DELETE FROM wf_ac_user_hierarchy WHERE ac_id = ? AND group_id = ?`
+	q := `DELETE FROM wf_ac_group_hierarchy WHERE ac_id = ? AND group_id = ?`
 	_, err := tx.Exec(q, id, gid)
 	if err != nil {
 		return err
@@ -508,7 +508,7 @@ func (_AccessContexts) DeleteGroup(otx *sql.Tx, id AccessContextID, gid GroupID)
 func (_AccessContexts) GroupReportsTo(id AccessContextID, uid GroupID) (GroupID, error) {
 	q := `
 	SELECT reports_to
-	FROM wf_ac_user_hierarchy
+	FROM wf_ac_group_hierarchy
 	WHERE ac_id = ?
 	AND group_id = ?
 	`
@@ -527,7 +527,7 @@ func (_AccessContexts) GroupReportsTo(id AccessContextID, uid GroupID) (GroupID,
 func (_AccessContexts) GroupReportees(id AccessContextID, uid GroupID) ([]GroupID, error) {
 	q := `
 	SELECT group_id
-	FROM wf_ac_user_hierarchy
+	FROM wf_ac_group_hierarchy
 	WHERE ac_id = ?
 	AND reports_to = ?
 	`
@@ -572,7 +572,7 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, gid, rep
 	}
 
 	q := `
-	UPDATE wf_ac_user_hierarchy
+	UPDATE wf_ac_group_hierarchy
 	SET reports_to = ?
 	WHERE ac_id = ?
 	AND group_id = ?
