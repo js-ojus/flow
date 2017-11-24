@@ -136,7 +136,7 @@ type DocumentID int64
 type Document struct {
 	ID      DocumentID `json:"ID"`      // Globally-unique identifier of this document
 	DocType DocType    `json:"DocType"` // For namespacing
-	Path    string     `json:"Path"`    // Path leading to, but not including, this document
+	Path    DocPath    `json:"Path"`    // Path leading to, but not including, this document
 
 	AccCtx AccessContext `json:"AccessContext"` // Originating access context of this document; applicable only to a root document
 	State  DocState      `json:"DocState"`      // Current state of this document; applicable only to a root document
@@ -194,14 +194,14 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 		}
 	}
 
-	var path string
-	var pdoc *Document
+	var path DocPath
 	if pid > 0 {
-		pdoc, err = Documents.Get(nil, ptype, pid)
+		pdoc, err := Documents.Get(nil, ptype, pid)
 		if err != nil {
 			return 0, err
 		}
-		path = pdoc.Path + fmt.Sprintf("%d:%d/", ptype, pid)
+		path = pdoc.Path
+		path.Append(ptype, pid)
 	}
 
 	var tx *sql.Tx
@@ -369,39 +369,24 @@ func (_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state Do
 }
 
 // SetTitle sets the title of the document.
-func (_Documents) SetTitle(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, title string) error {
+func (_Documents) SetTitle(otx *sql.Tx, dtype DocTypeID, id DocumentID, title string) error {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return errors.New("document title should not be empty")
 	}
 
 	// A child document does not have its own title.
-
-	q := `
-	SELECT child_id
-	FROM wf_document_children
-	WHERE child_doctype_id = ?
-	AND child_id = ?
-	ORDER BY child_id
-	LIMIT 1
-	`
-	var tid int64
-	row := db.QueryRow(q, dtype, id)
-	err := row.Scan(&tid)
-	if err == nil {
-		return errors.New("a child document cannot have its own title")
-	}
-
 	tbl := DocTypes.docStorName(dtype)
+	var path DocPath
 	var dgroup GroupID
-	q = `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
-	row = db.QueryRow(q, id)
-	err = row.Scan(&dgroup)
+	q := `SELECT path, group_id FROM ` + tbl + ` WHERE id = ?`
+	row := db.QueryRow(q, id)
+	err := row.Scan(&path, &dgroup)
 	if err != nil {
 		return err
 	}
-	if dgroup != group {
-		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
+	if path != "" {
+		return errors.New("a child document cannot have its own title")
 	}
 
 	var tx *sql.Tx
@@ -431,22 +416,12 @@ func (_Documents) SetTitle(otx *sql.Tx, group GroupID, dtype DocTypeID, id Docum
 }
 
 // SetData sets the data of the document.
-func (_Documents) SetData(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, data []byte) error {
+func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data []byte) error {
 	if data == nil {
 		return errors.New("document data should not be empty")
 	}
 
 	tbl := DocTypes.docStorName(dtype)
-	var dgroup GroupID
-	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
-	row := db.QueryRow(q, id)
-	err := row.Scan(&dgroup)
-	if err != nil {
-		return err
-	}
-	if dgroup != group {
-		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
-	}
 
 	var tx *sql.Tx
 	if otx == nil {
@@ -459,8 +434,8 @@ func (_Documents) SetData(otx *sql.Tx, group GroupID, dtype DocTypeID, id Docume
 		tx = otx
 	}
 
-	q = `UPDATE ` + tbl + ` SET data = ? WHERE doc_id = ?`
-	_, err = tx.Exec(q, data, id)
+	q := `UPDATE ` + tbl + ` SET data = ? WHERE doc_id = ?`
+	_, err := tx.Exec(q, data, id)
 	if err != nil {
 		return err
 	}
@@ -549,25 +524,12 @@ func (_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
 }
 
 // AddBlob adds the path to an enclosure to this document.
-func (_Documents) AddBlob(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, blob *Blob) error {
+func (_Documents) AddBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, blob *Blob) error {
 	if blob == nil {
 		return errors.New("blob should be non-nil")
 	}
 
-	tbl := DocTypes.docStorName(dtype)
-	var dgroup GroupID
-	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
-	row := db.QueryRow(q, id)
-	err := row.Scan(&dgroup)
-	if err != nil {
-		return err
-	}
-	if dgroup != group {
-		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
-	}
-
 	// Verify the given checksum.
-
 	f, err := os.Open(blob.Path)
 	if err != nil {
 		return err
@@ -595,6 +557,8 @@ func (_Documents) AddBlob(otx *sql.Tx, group GroupID, dtype DocTypeID, id Docume
 	// adequate if this method runs in the scope of an outer
 	// transaction.  The moved file will be orphaned, should the outer
 	// transaction abort later.
+	//
+	// TODO(js): Implement a better solution.
 	defer func() {
 		if !success {
 			os.Remove(bpath)
@@ -614,7 +578,7 @@ func (_Documents) AddBlob(otx *sql.Tx, group GroupID, dtype DocTypeID, id Docume
 
 	// Now write the database entry.
 
-	q = `
+	q := `
 	INSERT INTO wf_document_blobs(doctype_id, doc_id, name, path, sha1sum)
 	VALUES(?, ?, ?, ?, ?)
 	`
@@ -665,34 +629,15 @@ func (_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
 	return ts, nil
 }
 
-// AddTag associates the given tag with this document.
+// AddTags associates the given tag with this document.
 //
 // Tags are converted to lower case (as per normal Unicode casing)
 // before getting associated with documents.  Also, embedded spaces,
 // if any, are retained.
-func (_Documents) AddTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, tag string) error {
-	tag = strings.TrimSpace(tag)
-	if tag == "" {
-		return errors.New("tag should not be empty")
-	}
-	tag = strings.ToLower(tag)
-
-	tbl := DocTypes.docStorName(dtype)
-	var dgroup GroupID
-	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
-	row := db.QueryRow(q, id)
-	err := row.Scan(&dgroup)
-	if err != nil {
-		return err
-	}
-	if dgroup != group {
-		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
-	}
-
+func (_Documents) AddTags(otx *sql.Tx, dtype DocTypeID, id DocumentID, tags ...string) error {
 	// A child document does not have its own tags.
-
-	q = `
-	SELECT child_id
+	q := `
+	SELECT parent_id
 	FROM wf_document_children
 	WHERE child_doctype_id = ?
 	AND child_id = ?
@@ -700,8 +645,8 @@ func (_Documents) AddTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id Documen
 	LIMIT 1
 	`
 	var tid int64
-	row = db.QueryRow(q, dtype, id)
-	err = row.Scan(&tid)
+	row := db.QueryRow(q, dtype, id)
+	err := row.Scan(&tid)
 	if err == nil {
 		return errors.New("a child document cannot have its own tags")
 	}
@@ -723,9 +668,13 @@ func (_Documents) AddTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id Documen
 	INSERT INTO wf_document_tags(doctype_id, doc_id, tag)
 	VALUES(?, ?, ?)
 	`
-	_, err = tx.Exec(q, dtype, id, tag)
-	if err != nil {
-		return err
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		tag = strings.ToLower(tag)
+		_, err = tx.Exec(q, dtype, id, tag)
+		if err != nil {
+			return err
+		}
 	}
 
 	if otx == nil {
@@ -739,24 +688,12 @@ func (_Documents) AddTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id Documen
 }
 
 // RemoveTag disassociates the given tag from this document.
-func (_Documents) RemoveTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, tag string) error {
+func (_Documents) RemoveTag(otx *sql.Tx, dtype DocTypeID, id DocumentID, tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return errors.New("tag should not be empty")
 	}
 	tag = strings.ToLower(tag)
-
-	tbl := DocTypes.docStorName(dtype)
-	var dgroup GroupID
-	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
-	row := db.QueryRow(q, id)
-	err := row.Scan(&dgroup)
-	if err != nil {
-		return err
-	}
-	if dgroup != group {
-		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
-	}
 
 	var tx *sql.Tx
 	if otx == nil {
@@ -770,14 +707,13 @@ func (_Documents) RemoveTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id Docu
 	}
 
 	// Now write the database entry.
-
-	q = `
+	q := `
 	DELETE FROM wf_document_tags
 	WHERE doctype_id = ?
 	AND doc_id = ?
 	AND tag = ?
 	`
-	_, err = tx.Exec(q, dtype, id, tag)
+	_, err := tx.Exec(q, dtype, id, tag)
 	if err != nil {
 		return err
 	}
