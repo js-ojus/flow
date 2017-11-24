@@ -6,5 +6,11 @@
 
 DROP DATABASE IF EXISTS flow;
 
+--
+
 CREATE DATABASE flow
-CHARACTER SET = 'utf8mb4';
+CHARACTER SET = 'utf8mb4'
+COLLATE = 'utf8mb4_unicode_ci';
+
+SET collation_server = 'utf8mb4_unicode_ci';
+SET collation_connection = 'utf8mb4_unicode_ci';
