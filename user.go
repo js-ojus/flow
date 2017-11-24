@@ -191,8 +191,9 @@ func (_Users) SingletonGroupOf(uid UserID) (*Group, error) {
 	q := `
 	SELECT gm.id, gm.name, gm.group_type
 	FROM wf_groups_master gm
-	JOIN wf_users_master um ON gm.name = um.email
-	WHERE um.id = ?
+	JOIN wf_group_users gu ON gu.group_id = gm.id
+	WHERE gu.user_id = ?
+	AND gm.group_type = 'S'
 	`
 	var elem Group
 	row := db.QueryRow(q, uid)
