@@ -8,7 +8,6 @@
 --     title VARCHAR(250) NOT NULL,
 --     data BLOB NOT NULL,
 --     PRIMARY KEY (id),
---     FOREIGN KEY (orig_ac_id) REFERENCES wf_access_contexts(id),
 --     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
 --     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
 --     FOREIGN KEY (group_id) REFERENCES wf_groups_master(id)
