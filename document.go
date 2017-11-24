@@ -23,9 +23,86 @@ import (
 	"math"
 	"os"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var (
+	// reDocPath defines the regular expression for each component of
+	// a document's path.
+	reDocPath = regexp.MustCompile("[0-9]+?:[0-9]+?/")
+)
+
+// DocPath helps in managing document hierarchies.  It provides a set
+// of utility methods that ease path management.
+type DocPath string
+
+// Root answers the root document information.
+func (p *DocPath) Root() (DocTypeID, DocumentID, error) {
+	root := reDocPath.FindString(string(*p))
+	if root == "" {
+		return 0, 0, nil
+	}
+
+	parts := strings.Split(root, ":")
+	dtid, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+	did, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return DocTypeID(dtid), DocumentID(did), nil
+}
+
+// Components answers a sequence of this path's components, in order.
+func (p *DocPath) Components() ([]struct {
+	DocTypeID
+	DocumentID
+}, error) {
+	comps := reDocPath.FindAllString(string(*p), -1)
+	if len(comps) == 0 {
+		return nil, nil
+	}
+
+	ary := []struct {
+		DocTypeID
+		DocumentID
+	}{}
+	for _, comp := range comps {
+		parts := strings.Split(comp, ":")
+		dtid, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		did, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		ary = append(ary, struct {
+			DocTypeID
+			DocumentID
+		}{DocTypeID(dtid), DocumentID(did)})
+	}
+
+	return ary, nil
+}
+
+// Append adds the given document type-document ID pair to this path,
+// updating it as a result.
+func (p *DocPath) Append(dtid DocTypeID, did DocumentID) error {
+	if dtid <= 0 || did <= 0 {
+		return errors.New("document type ID and document ID should be positive integers")
+	}
+
+	*p = *p + DocPath(fmt.Sprintf("%d:%d/", dtid, did))
+	return nil
+}
 
 // Blob is a simple data holder for information concerning the
 // user-supplied name of the binary object, the path of the stored
@@ -48,20 +125,26 @@ type DocumentID int64
 // state transitions, whose details are also tracked.
 //
 // `Document` is a recursive structure: it can contain other
-// documents.  Most applications should embed `Document` in their
-// document structures rather than use this directly.
+// documents.  Therefore, when a document is created, it is
+// initialised with the path that leads from its root document to its
+// immediate parent.  For root documents, this path is empty.
+//
+// Most applications should embed `Document` in their document
+// structures rather than use this directly.  That enables them to
+// control their data persistence mechanisms, while delegating
+// workflow management to `flow`.
 type Document struct {
 	ID      DocumentID `json:"ID"`      // Globally-unique identifier of this document
 	DocType DocType    `json:"DocType"` // For namespacing
+	Path    string     `json:"Path"`    // Path leading to, but not including, this document
 
-	OrigAccCtx AccessContextID `json:"OrigAccessContext"` // The originating access context of this document; applicable only to a top-level document
-	AccCtx     AccessContext   `json:"AccessContext"`     // Current access context of this document; applicable only to a top-level document
-	State      DocState        `json:"DocState"`          // Current state of this document; applicable only to a top-level document
+	AccCtx AccessContext `json:"AccessContext"` // Originating access context of this document; applicable only to a root document
+	State  DocState      `json:"DocState"`      // Current state of this document; applicable only to a root document
 
-	User  UserID    `json:"User"`  // Creator of this document
+	Group GroupID   `json:"Group"` // Creator of this document
 	Ctime time.Time `json:"Ctime"` // Creation time of this (possibly child) document
 
-	Title string `json:"Title"` // Human-readable title; applicable only for top-level documents
+	Title string `json:"Title"` // Human-readable title; applicable only for root documents
 	Data  []byte `json:"Data"`  // Primary content of the document
 }
 
@@ -82,25 +165,16 @@ var Documents _Documents
 //
 // N.B. Blobs, tags and children documents have to be associated with
 // this document, if needed, through appropriate separate calls.
-func (_Documents) New(otx *sql.Tx, acID AccessContextID,
-	user UserID, dtype DocTypeID, ptype DocTypeID, pid DocumentID,
-	title string, data []byte) (DocumentID, error) {
-	if user <= 0 || acID <= 0 || dtype <= 0 || ptype < 0 || pid < 0 {
-		return 0, errors.New("all identifiers should be positive integers; parent document references should be zero or positive integers")
+func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
+	dtype, ptype DocTypeID, pid DocumentID, title string, data []byte) (DocumentID, error) {
+	if group <= 0 || acID <= 0 || dtype <= 0 {
+		return 0, errors.New("all identifiers should be positive integers")
 	}
 	if len(data) == 0 {
 		return 0, errors.New("document's body should be non-empty")
 	}
 
-	if pid > 0 {
-		// A child document does not have its own title.
-		outer, err := Documents.Get(otx, ptype, pid)
-		if err != nil {
-			return 0, err
-		}
-		title = outer.Title
-	}
-
+	var err error
 	q := `
 	SELECT docstate_id
 	FROM wf_workflows
@@ -109,7 +183,7 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID,
 	`
 	var dsid int64
 	row := db.QueryRow(q, dtype)
-	err := row.Scan(&dsid)
+	err = row.Scan(&dsid)
 	if err != nil {
 		switch {
 		case err == sql.ErrNoRows:
@@ -118,6 +192,16 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID,
 		default:
 			return 0, err
 		}
+	}
+
+	var path string
+	var pdoc *Document
+	if pid > 0 {
+		pdoc, err = Documents.Get(nil, ptype, pid)
+		if err != nil {
+			return 0, err
+		}
+		path = pdoc.Path + fmt.Sprintf("%d:%d/", ptype, pid)
 	}
 
 	var tx *sql.Tx
@@ -132,10 +216,10 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID,
 	}
 
 	tbl := DocTypes.docStorName(dtype)
-	q2 := `INSERT INTO ` + tbl + `(orig_ac_id, ac_id, docstate_id, user_id, ctime, title, data)
-	VALUES (?, ?, ?, ?, NOW(), ?, ?)
+	q2 := `INSERT INTO ` + tbl + `(path, ac_id, docstate_id, group_id, ctime, title, data)
+	VALUES (?, ?, ?, NOW(), ?, ?)
 	`
-	res, err := tx.Exec(q2, acID, acID, dsid, user, title, data)
+	res, err := tx.Exec(q2, path, acID, dsid, group, title, data)
 	if err != nil {
 		return 0, err
 	}
@@ -179,9 +263,10 @@ func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error
 
 	tbl := DocTypes.docStorName(dtype)
 	q := `
-	SELECT id, user_id, docstate_id, ctime, title, data
-	FROM ` + tbl + `
-	ORDER BY id
+	SELECT docs.id, docs.path, docs.group_id, docs.docstate_id, dsm.name, docs.ctime, docs.title
+	FROM ` + tbl + ` docs
+	JOIN wf_docstates_master dsm ON dsm.id = docs.docstate_id
+	ORDER BY docs.id
 	LIMIT ? OFFSET ?
 	`
 	rows, err := db.Query(q, limit, offset)
@@ -193,7 +278,7 @@ func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error
 	ary := make([]*Document, 0, 10)
 	for rows.Next() {
 		var elem Document
-		err = rows.Scan(&elem.ID, &elem.User, &elem.State, &elem.Ctime, &elem.Title, &elem.Data)
+		err = rows.Scan(&elem.ID, &elem.Path, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &elem.Title)
 		if err != nil {
 			return nil, err
 		}
@@ -214,11 +299,11 @@ func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error
 // fetched separately.
 func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	tbl := DocTypes.docStorName(dtype)
-	var d Document
+	var elem Document
 	q := `
-	SELECT docs.user_id, docs.docstate_id, docs.ctime, docs.title, docs.data, states.name
+	SELECT docs.path, docs.group_id, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
 	FROM ` + tbl + ` AS docs
-	JOIN wf_docstates_master states ON docs.docstate_id = states.id
+	JOIN wf_docstates_master dsm ON docs.docstate_id = dsm.id
 	WHERE docs.id = ?
 	`
 
@@ -228,20 +313,20 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	} else {
 		row = otx.QueryRow(q, id, dtype)
 	}
-	err := row.Scan(&d.User, &d.State.ID, &d.Ctime, &d.Title, &d.Data, &d.State.Name)
+	err := row.Scan(&elem.Path, &elem.Group, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
 	if err != nil {
 		return nil, err
 	}
 	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
 	row = db.QueryRow(q, dtype)
-	err = row.Scan(&d.DocType.Name)
+	err = row.Scan(&elem.DocType.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	d.ID = id
-	d.DocType.ID = dtype
-	return &d, nil
+	elem.ID = id
+	elem.DocType.ID = dtype
+	return &elem, nil
 }
 
 // GetParent answers the identifiers of the parent document of the
@@ -284,7 +369,7 @@ func (_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state Do
 }
 
 // SetTitle sets the title of the document.
-func (_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, title string) error {
+func (_Documents) SetTitle(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, title string) error {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return errors.New("document title should not be empty")
@@ -308,15 +393,15 @@ func (_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id Documen
 	}
 
 	tbl := DocTypes.docStorName(dtype)
-	var duser UserID
-	q = `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	var dgroup GroupID
+	q = `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
 	row = db.QueryRow(q, id)
-	err = row.Scan(&duser)
+	err = row.Scan(&dgroup)
 	if err != nil {
 		return err
 	}
-	if duser != user {
-		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	if dgroup != group {
+		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
 	}
 
 	var tx *sql.Tx
@@ -346,21 +431,21 @@ func (_Documents) SetTitle(otx *sql.Tx, user UserID, dtype DocTypeID, id Documen
 }
 
 // SetData sets the data of the document.
-func (_Documents) SetData(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, data []byte) error {
+func (_Documents) SetData(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, data []byte) error {
 	if data == nil {
 		return errors.New("document data should not be empty")
 	}
 
 	tbl := DocTypes.docStorName(dtype)
-	var duser UserID
-	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	var dgroup GroupID
+	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&duser)
+	err := row.Scan(&dgroup)
 	if err != nil {
 		return err
 	}
-	if duser != user {
-		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	if dgroup != group {
+		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
 	}
 
 	var tx *sql.Tx
@@ -464,21 +549,21 @@ func (_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
 }
 
 // AddBlob adds the path to an enclosure to this document.
-func (_Documents) AddBlob(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, blob *Blob) error {
+func (_Documents) AddBlob(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, blob *Blob) error {
 	if blob == nil {
 		return errors.New("blob should be non-nil")
 	}
 
 	tbl := DocTypes.docStorName(dtype)
-	var duser UserID
-	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	var dgroup GroupID
+	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&duser)
+	err := row.Scan(&dgroup)
 	if err != nil {
 		return err
 	}
-	if duser != user {
-		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	if dgroup != group {
+		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
 	}
 
 	// Verify the given checksum.
@@ -585,7 +670,7 @@ func (_Documents) Tags(dtype DocTypeID, id DocumentID) ([]string, error) {
 // Tags are converted to lower case (as per normal Unicode casing)
 // before getting associated with documents.  Also, embedded spaces,
 // if any, are retained.
-func (_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+func (_Documents) AddTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return errors.New("tag should not be empty")
@@ -593,15 +678,15 @@ func (_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentI
 	tag = strings.ToLower(tag)
 
 	tbl := DocTypes.docStorName(dtype)
-	var duser UserID
-	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	var dgroup GroupID
+	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&duser)
+	err := row.Scan(&dgroup)
 	if err != nil {
 		return err
 	}
-	if duser != user {
-		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	if dgroup != group {
+		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
 	}
 
 	// A child document does not have its own tags.
@@ -654,7 +739,7 @@ func (_Documents) AddTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentI
 }
 
 // RemoveTag disassociates the given tag from this document.
-func (_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id DocumentID, tag string) error {
+func (_Documents) RemoveTag(otx *sql.Tx, group GroupID, dtype DocTypeID, id DocumentID, tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return errors.New("tag should not be empty")
@@ -662,15 +747,15 @@ func (_Documents) RemoveTag(otx *sql.Tx, user UserID, dtype DocTypeID, id Docume
 	tag = strings.ToLower(tag)
 
 	tbl := DocTypes.docStorName(dtype)
-	var duser UserID
-	q := `SELECT user FROM ` + tbl + ` WHERE id = ?`
+	var dgroup GroupID
+	q := `SELECT group_id FROM ` + tbl + ` WHERE id = ?`
 	row := db.QueryRow(q, id)
-	err := row.Scan(&duser)
+	err := row.Scan(&dgroup)
 	if err != nil {
 		return err
 	}
-	if duser != user {
-		return fmt.Errorf("author mismatch -- original user : %d, current user : %d", duser, user)
+	if dgroup != group {
+		return fmt.Errorf("author mismatch -- original group : %d, current group : %d", dgroup, group)
 	}
 
 	var tx *sql.Tx

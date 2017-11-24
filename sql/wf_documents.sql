@@ -1,16 +1,16 @@
 -- CREATE TABLE wf_documents_<DOCTYPE_ID> (
 --     id INT NOT NULL AUTO_INCREMENT,
---     orig_ac_id INT NOT NULL,
+--     path VARCHAR(1000) NOT NULL,
 --     ac_id INT NOT NULL,
 --     docstate_id INT NOT NULL,
---     user_id INT NOT NULL,
+--     group_id INT NOT NULL,
 --     ctime TIMESTAMP NOT NULL,
 --     title VARCHAR(250) NOT NULL,
 --     data BLOB NOT NULL,
 --     PRIMARY KEY (id),
---     FOREIGN KEY (orig_ac_id) REFERENCES wf_access_contexts(id),
 --     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
---     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id)
+--     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
+--     FOREIGN KEY (group_id) REFERENCES wf_groups_master(id)
 -- );
 
 --
