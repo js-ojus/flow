@@ -687,6 +687,64 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, gid, rep
 	return nil
 }
 
+// IncludesGroup answers `true` if the given group is included in this
+// access context.
+func (_AccessContexts) IncludesGroup(id AccessContextID, gid GroupID) (bool, error) {
+	if gid <= 0 {
+		return false, errors.New("group ID should be a positive integer")
+	}
+
+	q := `
+	SELECT reports_to
+	FROM wf_ac_group_hierarchy
+	WHERE ac_id = ?
+	AND group_id = ?
+	`
+	var repTo int64
+	row := db.QueryRow(q, id, gid)
+	err := row.Scan(&repTo)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+// IncludesUser answers `true` if the given user is included in this
+// access context.
+func (_AccessContexts) IncludesUser(id AccessContextID, uid UserID) (bool, error) {
+	if uid <= 0 {
+		return false, errors.New("user ID should be a positive integer")
+	}
+
+	q := `
+	SELECT agh.reports_to
+	FROM wf_ac_group_hierarchy agh
+	WHERE agh.ac_id = ?
+	AND agh.group_id = (
+		SELECT gm.id
+		FROM wf_groups_master gm
+		JOIN wf_group_users gu ON gu.group_id = gm.id
+		WHERE gu.user_id = ?
+		AND gm.group_type = 'S'
+	)
+	`
+	var repTo int64
+	row := db.QueryRow(q, id, uid)
+	err := row.Scan(&repTo)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 // GroupPermissions answers a list of the permissions available to the
 // given user in this access context.
 func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[DocTypeID][]DocAction, error) {
