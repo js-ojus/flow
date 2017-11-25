@@ -247,13 +247,26 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 	return DocumentID(id), nil
 }
 
-// List answers a subset of the documents of the given document type,
-// based on the input specification.
+// DocumentsListInput can be used to specify a set of filter
+// conditions to narrow down document listings.
+type DocumentsListInput struct {
+	DocTypeID                 // Documents of this type are listed; required
+	AccessContextID           // Access context from within which to list; required
+	GroupID                   // List documents created by this (singleton) group
+	DocStateID                // List documents currently in this state
+	CtimeStarting   time.Time // List documents created after this time
+	CtimeBefore     time.Time // List documents created before this time
+	TitleContains   string    // List documents whose title contains the given text; expensive operation
+	RootOnly        bool      // List only root (top-level) documents
+}
+
+// List answers a subset of the documents based on the input
+// specification.
 //
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error) {
+func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Document, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -261,15 +274,65 @@ func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error
 		limit = math.MaxInt64
 	}
 
-	tbl := DocTypes.docStorName(dtype)
+	// Base query.
+
+	tbl := DocTypes.docStorName(input.DocTypeID)
 	q := `
 	SELECT docs.id, docs.path, docs.group_id, docs.docstate_id, dsm.name, docs.ctime, docs.title
 	FROM ` + tbl + ` docs
 	JOIN wf_docstates_master dsm ON dsm.id = docs.docstate_id
-	ORDER BY docs.id
+	`
+
+	// Process input specification.
+
+	args := []interface{}{input.DocTypeID, input.AccessContextID}
+	q += `WHERE docs.doctype_id = ?
+	AND docs.ac_id = ?
+	`
+
+	if input.GroupID > 0 {
+		q += `AND docs.group_id = ?
+		`
+		args = append(args, input.GroupID)
+	}
+
+	if input.DocStateID > 0 {
+		q += `AND docs.docstate_id = ?
+		`
+		args = append(args, input.DocStateID)
+	}
+
+	if !input.CtimeStarting.IsZero() {
+		q += `AND docs.ctime >= ?
+		`
+		args = append(args, input.CtimeStarting)
+	}
+
+	if !input.CtimeBefore.IsZero() {
+		q += `AND docs.ctime < ?
+		`
+		args = append(args, input.CtimeBefore)
+	}
+
+	if input.TitleContains != "" {
+		q += `AND docs.title LIKE ?
+		`
+		args = append(args, "%"+input.TitleContains+"%")
+	}
+
+	if input.RootOnly {
+		q += `AND docs.path = ''
+		`
+	}
+
+	q += `ORDER BY docs.id
 	LIMIT ? OFFSET ?
 	`
-	rows, err := db.Query(q, limit, offset)
+	args = append(args, limit, offset)
+
+	// Fetch document data.
+
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -278,11 +341,15 @@ func (_Documents) List(dtype DocTypeID, offset, limit int64) ([]*Document, error
 	ary := make([]*Document, 0, 10)
 	for rows.Next() {
 		var elem Document
-		err = rows.Scan(&elem.ID, &elem.Path, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &elem.Title)
+		var title sql.NullString
+		err = rows.Scan(&elem.ID, &elem.Path, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &title)
 		if err != nil {
 			return nil, err
 		}
-		elem.DocType.ID = dtype
+		elem.DocType.ID = input.DocTypeID
+		if title.Valid {
+			elem.Title = title.String
+		}
 		ary = append(ary, &elem)
 	}
 	if err = rows.Err(); err != nil {
