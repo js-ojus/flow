@@ -105,7 +105,7 @@ func (_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		docstate_id INT NOT NULL,
 		group_id INT NOT NULL,
 		ctime TIMESTAMP NOT NULL,
-		title VARCHAR(250) NOT NULL,
+		title VARCHAR(250) NULL,
 		data BLOB NOT NULL,
 		PRIMARY KEY (id),
 		FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
