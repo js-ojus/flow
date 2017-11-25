@@ -69,8 +69,7 @@ func TestFlow01(t *testing.T) {
 
 	// Connect to the database.
 	driver, connStr := "mysql", "travis@/flow"
-	tdb := fatal1(sql.Open(driver, connStr))
-	db := tdb.(*sql.DB)
+	db := fatal1(sql.Open(driver, connStr)).(*sql.DB)
 	defer db.Close()
 	RegisterDB(db)
 
@@ -86,80 +85,57 @@ func TestFlow01(t *testing.T) {
 	// Create operations.
 	t.Run("Create", func(t *testing.T) {
 		t.Run("DocTypes", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			tdt := fatal1(DocTypes.New(tx, "STOR_REQ"))
-			dtID1 = tdt.(DocTypeID)
-			tdt = fatal1(DocTypes.New(tx, "COMPUTE_REQ"))
-			dtID2 = tdt.(DocTypeID)
+			dtID1 = fatal1(DocTypes.New(tx, "STOR_REQ")).(DocTypeID)
+			dtID2 = fatal1(DocTypes.New(tx, "COMPUTE_REQ")).(DocTypeID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("DocStates", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			tds := fatal1(DocStates.New(tx, dtID1, "INITIAL"))
-			dsID1 = tds.(DocStateID)
-			tds = fatal1(DocStates.New(tx, dtID1, "PENDING_APPROVAL"))
-			dsID2 = tds.(DocStateID)
-			tds = fatal1(DocStates.New(tx, dtID1, "APPROVED"))
-			dsID3 = tds.(DocStateID)
-			tds = fatal1(DocStates.New(tx, dtID1, "REJECTED"))
-			dsID4 = tds.(DocStateID)
-			tds = fatal1(DocStates.New(tx, dtID1, "DISCARDED"))
-			dsID5 = tds.(DocStateID)
+			dsID1 = fatal1(DocStates.New(tx, dtID1, "INITIAL")).(DocStateID)
+			dsID2 = fatal1(DocStates.New(tx, dtID1, "PENDING_APPROVAL")).(DocStateID)
+			dsID3 = fatal1(DocStates.New(tx, dtID1, "APPROVED")).(DocStateID)
+			dsID4 = fatal1(DocStates.New(tx, dtID1, "REJECTED")).(DocStateID)
+			dsID5 = fatal1(DocStates.New(tx, dtID1, "DISCARDED")).(DocStateID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("DocActions", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			tda := fatal1(DocActions.New(tx, "INITIALISE"))
-			daID1 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "NEW"))
-			daID2 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "GET"))
-			daID3 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "UPDATE"))
-			daID4 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "DELETE"))
-			daID5 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "APPROVE"))
-			daID6 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "REJECT"))
-			daID7 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "RETURN"))
-			daID8 = tda.(DocActionID)
-			tda = fatal1(DocActions.New(tx, "DISCARD"))
-			daID9 = tda.(DocActionID)
+			daID1 = fatal1(DocActions.New(tx, "INITIALISE")).(DocActionID)
+			daID2 = fatal1(DocActions.New(tx, "NEW")).(DocActionID)
+			daID3 = fatal1(DocActions.New(tx, "GET")).(DocActionID)
+			daID4 = fatal1(DocActions.New(tx, "UPDATE")).(DocActionID)
+			daID5 = fatal1(DocActions.New(tx, "DELETE")).(DocActionID)
+			daID6 = fatal1(DocActions.New(tx, "APPROVE")).(DocActionID)
+			daID7 = fatal1(DocActions.New(tx, "REJECT")).(DocActionID)
+			daID8 = fatal1(DocActions.New(tx, "RETURN")).(DocActionID)
+			daID9 = fatal1(DocActions.New(tx, "DISCARD")).(DocActionID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("Roles", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			tr := fatal1(Roles.New(tx, "ADMIN"))
-			roleID1 = tr.(RoleID)
-			tr = fatal1(Roles.New(tx, "RESEARCH_ANALYST"))
-			roleID2 = tr.(RoleID)
+			roleID1 = fatal1(Roles.New(tx, "ADMIN")).(RoleID)
+			roleID2 = fatal1(Roles.New(tx, "RESEARCH_ANALYST")).(RoleID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("Users", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			res, err := tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
@@ -169,8 +145,7 @@ func TestFlow01(t *testing.T) {
 			}
 			uid, _ := res.LastInsertId()
 			uID1 = UserID(uid)
-			tg := fatal1(Groups.NewSingleton(tx, uID1))
-			gID1 = tg.(GroupID)
+			gID1 = fatal1(Groups.NewSingleton(tx, uID1)).(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 2', 'LN 2', 'email2@example.com', 1)`)
@@ -179,8 +154,7 @@ func TestFlow01(t *testing.T) {
 			}
 			uid, _ = res.LastInsertId()
 			uID2 = UserID(uid)
-			tg = fatal1(Groups.NewSingleton(tx, uID2))
-			gID2 = tg.(GroupID)
+			gID2 = fatal1(Groups.NewSingleton(tx, uID2)).(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 3', 'LN 3', 'email3@example.com', 1)`)
@@ -189,8 +163,7 @@ func TestFlow01(t *testing.T) {
 			}
 			uid, _ = res.LastInsertId()
 			uID3 = UserID(uid)
-			tg = fatal1(Groups.NewSingleton(tx, uID3))
-			gID3 = tg.(GroupID)
+			gID3 = fatal1(Groups.NewSingleton(tx, uID3)).(GroupID)
 
 			res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
 			VALUES('FN 4', 'LN 4', 'email4@example.com', 1)`)
@@ -199,29 +172,23 @@ func TestFlow01(t *testing.T) {
 			}
 			uid, _ = res.LastInsertId()
 			uID4 = UserID(uid)
-			tg = fatal1(Groups.NewSingleton(tx, uID4))
-			gID4 = tg.(GroupID)
+			gID4 = fatal1(Groups.NewSingleton(tx, uID4)).(GroupID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("Groups", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			td := fatal1(Groups.New(tx, "RAs", "G"))
-			gID5 = td.(GroupID)
-
-			td = fatal1(Groups.New(tx, "PIs", "G"))
-			gID6 = td.(GroupID)
+			gID5 = fatal1(Groups.New(tx, "RAs", "G")).(GroupID)
+			gID6 = fatal1(Groups.New(tx, "PIs", "G")).(GroupID)
 
 			fatal0(tx.Commit())
 		})
 
 		t.Run("GroupsAddUsers", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			fatal0(Groups.AddUser(tx, gID5, uID1))
@@ -239,58 +206,50 @@ func TestFlow01(t *testing.T) {
 	// Entity update operations.
 	t.Run("Update", func(t *testing.T) {
 		t.Run("DocTypeRename", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			error0(DocTypes.Rename(tx, dtID1, "STORAGE_REQ"))
 
 			fatal0(tx.Commit())
 
-			tobj := error1(DocTypes.Get(dtID1))
-			obj := tobj.(*DocType)
+			obj := error1(DocTypes.Get(dtID1)).(*DocType)
 			assertEqual("STORAGE_REQ", obj.Name, "")
 		})
 
 		t.Run("DocStateRename", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			error0(DocStates.Rename(tx, dsID1, "DRAFT"))
 
 			fatal0(tx.Commit())
 
-			tobj := error1(DocStates.Get(dsID1))
-			obj := tobj.(*DocState)
+			obj := error1(DocStates.Get(dsID1)).(*DocState)
 			assertEqual("DRAFT", obj.Name, "")
 		})
 
 		t.Run("DocActionRename", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			error0(DocActions.Rename(tx, daID1, "LIST"))
 
 			fatal0(tx.Commit())
 
-			tobj := error1(DocActions.Get(daID1))
-			obj := tobj.(*DocAction)
+			obj := error1(DocActions.Get(daID1)).(*DocAction)
 			assertEqual("LIST", obj.Name, "")
 		})
 
 		t.Run("GroupRename", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			error0(Groups.Rename(tx, gID5, "Research Associates"))
 
 			fatal0(tx.Commit())
 
-			tobj := error1(Groups.Get(gID5))
-			obj := tobj.(*Group)
+			obj := error1(Groups.Get(gID5)).(*Group)
 			assertEqual("Research Associates", obj.Name, "")
 		})
 	})
@@ -298,8 +257,7 @@ func TestFlow01(t *testing.T) {
 	// Entity deletion operations.
 	t.Run("Delete", func(t *testing.T) {
 		t.Run("GroupsDeleteUsers", func(t *testing.T) {
-			ttx := fatal1(db.Begin())
-			tx := ttx.(*sql.Tx)
+			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
 			error0(Groups.RemoveUser(tx, gID6, uID2))
@@ -310,8 +268,7 @@ func TestFlow01(t *testing.T) {
 
 	// Tear down.
 	t.Run("TearDown", func(t *testing.T) {
-		ttx := fatal1(db.Begin())
-		tx := ttx.(*sql.Tx)
+		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
 		error1(tx.Exec(`DELETE FROM wf_ac_group_roles`))
