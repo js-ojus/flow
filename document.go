@@ -155,6 +155,18 @@ type _Documents struct{}
 // this system.
 var Documents _Documents
 
+// DocumentsNewInput specifies the initial data with which a new
+// document has to be created in the system.
+type DocumentsNewInput struct {
+	DocTypeID                  // Type of the new document; required
+	AccessContextID            // Access context in which the document should be created; required
+	GroupID                    // (Singleton) group of the creator; required
+	ParentType      DocTypeID  // Document type of the parent document, if any
+	ParentID        DocumentID // Unique identifier of the parent document, if any
+	Title           string     // Title of the new document; applicable to only root (top-level) documents
+	Data            []byte     // Body of the new document; required
+}
+
 // New creates and initialises a document.
 //
 // The document created through this method has a life cycle that is
@@ -165,15 +177,15 @@ var Documents _Documents
 //
 // N.B. Blobs, tags and children documents have to be associated with
 // this document, if needed, through appropriate separate calls.
-func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
-	dtype, ptype DocTypeID, pid DocumentID, title string, data []byte) (DocumentID, error) {
-	if group <= 0 || acID <= 0 || dtype <= 0 {
+func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error) {
+	if input.DocTypeID <= 0 || input.AccessContextID <= 0 || input.GroupID <= 0 {
 		return 0, errors.New("all identifiers should be positive integers")
 	}
-	if len(data) == 0 {
+	if len(input.Data) == 0 {
 		return 0, errors.New("document's body should be non-empty")
 	}
 
+	var dsid int64
 	var err error
 	q := `
 	SELECT docstate_id
@@ -181,8 +193,7 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 	WHERE doctype_id = ?
 	AND active = 1
 	`
-	var dsid int64
-	row := db.QueryRow(q, dtype)
+	row := db.QueryRow(q, input.DocTypeID)
 	err = row.Scan(&dsid)
 	if err != nil {
 		switch {
@@ -195,13 +206,16 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 	}
 
 	var path DocPath
-	if pid > 0 {
-		pdoc, err := Documents.Get(nil, ptype, pid)
+	if input.ParentID > 0 {
+		pdoc, err := Documents.Get(nil, input.ParentType, input.ParentID)
 		if err != nil {
 			return 0, err
 		}
 		path = pdoc.Path
-		path.Append(ptype, pid)
+		path.Append(input.ParentType, input.ParentID)
+
+		// Child document does not have its own state.
+		dsid = 0
 	}
 
 	var tx *sql.Tx
@@ -215,11 +229,11 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 		tx = otx
 	}
 
-	tbl := DocTypes.docStorName(dtype)
+	tbl := DocTypes.docStorName(input.DocTypeID)
 	q2 := `INSERT INTO ` + tbl + `(path, ac_id, docstate_id, group_id, ctime, title, data)
 	VALUES (?, ?, ?, NOW(), ?, ?)
 	`
-	res, err := tx.Exec(q2, path, acID, dsid, group, title, data)
+	res, err := tx.Exec(q2, path, input.AccessContextID, dsid, input.GroupID, input.Title, input.Data)
 	if err != nil {
 		return 0, err
 	}
@@ -232,7 +246,7 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 	INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
 	VALUES (?, ?, ?, ?)
 	`
-	res, err = tx.Exec(q2, ptype, pid, dtype, id)
+	res, err = tx.Exec(q2, input.ParentType, input.ParentID, input.DocTypeID, id)
 	if err != nil {
 		return 0, err
 	}
@@ -247,8 +261,8 @@ func (_Documents) New(otx *sql.Tx, acID AccessContextID, group GroupID,
 	return DocumentID(id), nil
 }
 
-// DocumentsListInput can be used to specify a set of filter
-// conditions to narrow down document listings.
+// DocumentsListInput specifies a set of filter conditions to narrow
+// down document listings.
 type DocumentsListInput struct {
 	DocTypeID                 // Documents of this type are listed; required
 	AccessContextID           // Access context from within which to list; required
