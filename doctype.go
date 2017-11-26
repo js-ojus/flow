@@ -364,8 +364,7 @@ func (_DocTypes) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 
 // RemoveTransition disassociates a target document state with a
 // document action performed on documents in the given current state.
-func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
-	action DocActionID, toState DocStateID) error {
+func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID, action DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -382,9 +381,8 @@ func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID
 	WHERE doctype_id = ?
 	AND from_state_id =?
 	AND docaction_id = ?
-	AND to_state_id = ?
 	`
-	_, err := tx.Exec(q, dtype, state, action, toState)
+	_, err := tx.Exec(q, dtype, state, action)
 	if err != nil {
 		return err
 	}
