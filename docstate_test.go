@@ -22,8 +22,7 @@ import (
 )
 
 var (
-	storReqStates = []string{"DRAFT", "REQ_PENDING", "APPROVED", "REJECTED"}
-	storRelStates = []string{"DRAFT", "REQ_PENDING", "APPROVED", "REJECTED"}
+	states = []string{"DRAFT", "REQ_PENDING", "APPROVED", "REJECTED"}
 )
 
 // Driver test function.
@@ -88,16 +87,10 @@ func TestDocStates01(t *testing.T) {
 
 		// Add document states.
 		var ds DocStateID
-		for _, name := range storReqStates {
-			_, err = DocStates.New(tx, dtypeStorReqID, name)
+		for _, name := range states {
+			ds, err = DocStates.New(tx, name)
 			if err != nil {
-				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorReqID, name, err)
-			}
-		}
-		for _, name := range storRelStates {
-			ds, err = DocStates.New(tx, dtypeStorRelID, name)
-			if err != nil {
-				t.Fatalf("error creating document type:state '%d:%s' : %v\n", dtypeStorRelID, name, err)
+				t.Fatalf("error creating document state '%s' : %v\n", name, err)
 			}
 		}
 
@@ -112,9 +105,9 @@ func TestDocStates01(t *testing.T) {
 			t.Fatalf("error getting document state '1' : %v\n", err)
 		}
 
-		_, err = DocStates.GetByName(dtypeStorReqID, storReqStates[1])
+		_, err = DocStates.GetByName(states[1])
 		if err != nil {
-			t.Fatalf("error getting document type:state '%d:%s' : %v\n", dtypeStorReqID, storReqStates[1], err)
+			t.Fatalf("error getting document type:state '%s' : %v\n", states[1], err)
 		}
 
 		_, err = DocStates.List(0, 0)
@@ -145,7 +138,7 @@ func TestDocStates01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = DocStates.Rename(tx, ds, storRelStates[len(storRelStates)-1])
+		err = DocStates.Rename(tx, ds, states[len(states)-1])
 		if err != nil {
 			t.Fatalf("error renaming document state '1' : %v\n", err)
 		}
