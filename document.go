@@ -299,9 +299,8 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 
 	// Process input specification.
 
-	args := []interface{}{input.DocTypeID, input.AccessContextID}
-	q += `WHERE docs.doctype_id = ?
-	AND docs.ac_id = ?
+	args := []interface{}{input.AccessContextID}
+	q += `WHERE docs.ac_id = ?
 	`
 
 	if input.GroupID > 0 {
@@ -390,9 +389,9 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 
 	var row *sql.Row
 	if otx == nil {
-		row = db.QueryRow(q, id, dtype)
+		row = db.QueryRow(q, id)
 	} else {
-		row = otx.QueryRow(q, id, dtype)
+		row = otx.QueryRow(q, id)
 	}
 	err := row.Scan(&elem.Path, &elem.Group, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
 	if err != nil {
