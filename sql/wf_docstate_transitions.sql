@@ -13,5 +13,5 @@ CREATE TABLE wf_docstate_transitions (
     FOREIGN KEY (from_state_id) REFERENCES wf_docstates_master(id),
     FOREIGN KEY (docaction_id) REFERENCES wf_docactions_master(id),
     FOREIGN KEY (to_state_id) REFERENCES wf_docstates_master(id),
-    UNIQUE (doctype_id, from_state_id, docaction_id)
+    UNIQUE (doctype_id, from_state_id, docaction_id, to_state_id)
 );

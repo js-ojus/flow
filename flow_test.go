@@ -98,11 +98,11 @@ func TestFlow01(t *testing.T) {
 			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			dsID1 = fatal1(DocStates.New(tx, dtID1, "INITIAL")).(DocStateID)
-			dsID2 = fatal1(DocStates.New(tx, dtID1, "PENDING_APPROVAL")).(DocStateID)
-			dsID3 = fatal1(DocStates.New(tx, dtID1, "APPROVED")).(DocStateID)
-			dsID4 = fatal1(DocStates.New(tx, dtID1, "REJECTED")).(DocStateID)
-			dsID5 = fatal1(DocStates.New(tx, dtID1, "DISCARDED")).(DocStateID)
+			dsID1 = fatal1(DocStates.New(tx, "INITIAL")).(DocStateID)
+			dsID2 = fatal1(DocStates.New(tx, "PENDING_APPROVAL")).(DocStateID)
+			dsID3 = fatal1(DocStates.New(tx, "APPROVED")).(DocStateID)
+			dsID4 = fatal1(DocStates.New(tx, "REJECTED")).(DocStateID)
+			dsID5 = fatal1(DocStates.New(tx, "DISCARDED")).(DocStateID)
 
 			fatal0(tx.Commit())
 		})

@@ -235,3 +235,166 @@ func (_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 
 	return nil
 }
+
+// Transition holds the information of which action results in which
+// state.
+type Transition struct {
+	Upon DocAction // If user/system has performed this action
+	To   DocState  // Document transitions into this state
+}
+
+// TransitionMap holds the state transitions defined for this document
+// type.  It lays out which actions result in which target states,
+// given current states.
+type TransitionMap struct {
+	From        DocState // When document is in this state
+	Transitions map[DocActionID]Transition
+}
+
+// Transitions answers the possible document states into which a
+// document currently in the given state can transition.
+func (_DocTypes) Transitions(dtype DocTypeID) (map[DocStateID]*TransitionMap, error) {
+	q := `
+	SELECT dst.from_state_id, dsm1.name, dst.docaction_id, dam.name, dst.to_state_id, dsm2.name
+	FROM wf_docstate_transitions dst
+	JOIN wf_docstates_master dsm1 ON dsm1.id = dst.from_state_id
+	JOIN wf_docstates_master dsm2 ON dsm2.id = dst.to_state_id
+	JOIN wf_docactions_master dam ON dam.id = dst.docaction_id
+	WHERE dst.doctype_id = ?
+	`
+	rows, err := db.Query(q, dtype)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := map[DocStateID]*TransitionMap{}
+	for rows.Next() {
+		var dsfrom DocState
+		var t Transition
+		err := rows.Scan(&dsfrom.ID, &dsfrom.Name, &t.Upon.ID, &t.Upon.Name, &t.To.ID, &t.To.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		var elem *TransitionMap
+		ok := false
+		if elem, ok = res[dsfrom.ID]; !ok {
+			elem = &TransitionMap{}
+			elem.From = dsfrom
+			elem.Transitions = map[DocActionID]Transition{}
+		}
+
+		elem.Transitions[t.Upon.ID] = t
+		res[dsfrom.ID] = elem
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// _Transitions answers the possible document states into which a
+// document currently in the given state can transition.  Only
+// identifiers are answered in the map.
+func (_DocTypes) _Transitions(dtype DocTypeID, state DocStateID) (map[DocActionID]DocStateID, error) {
+	q := `
+	SELECT docaction_id, to_state_id
+	FROM wf_docstate_transitions
+	WHERE doctype_id = ?
+	AND from_state_id = ?
+	`
+	rows, err := db.Query(q, dtype, state)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	hash := make(map[DocActionID]DocStateID)
+	for rows.Next() {
+		var da DocActionID
+		var ds DocStateID
+		err := rows.Scan(&da, &ds)
+		if err != nil {
+			return nil, err
+		}
+		hash[da] = ds
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return hash, nil
+}
+
+// AddTransition associates a target document state with a document
+// action performed on documents in the given current state.
+func (_DocTypes) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+	action DocActionID, toState DocStateID) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	INSERT INTO wf_docstate_transitions(doctype_id, from_state_id, docaction_id, to_state_id)
+	VALUES(?, ?, ?, ?)
+	`
+	_, err := tx.Exec(q, dtype, state, action, toState)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveTransition disassociates a target document state with a
+// document action performed on documents in the given current state.
+func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
+	action DocActionID, toState DocStateID) error {
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	DELETE FROM wf_docstate_transitions
+	WHERE doctype_id = ?
+	AND from_state_id =?
+	AND docaction_id = ?
+	AND to_state_id = ?
+	`
+	_, err := tx.Exec(q, dtype, state, action, toState)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

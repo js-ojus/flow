@@ -69,7 +69,7 @@ type Node struct {
 // Transitions answers the possible document states into which a
 // document currently in the given state can transition.
 func (n *Node) Transitions() (map[DocActionID]DocStateID, error) {
-	return DocStates._Transitions(n.DocType, n.State)
+	return DocTypes._Transitions(n.DocType, n.State)
 }
 
 // SetFunc registers the given node function with this node.
