@@ -569,7 +569,7 @@ func (_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 // GetBlob retrieves the requested blob from the specified document,
 // if one such exists.  Lookup happens based on the given blob name.
 // The retrieved blob is copied into the specified path.
-func (_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
+func (_Documents) GetBlob(dtype DocTypeID, id DocumentID, blob *Blob) error {
 	if blob == nil {
 		return errors.New("blob should be non-nil")
 	}
@@ -681,6 +681,76 @@ func (_Documents) AddBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, blob *Blo
 	}
 
 	success = true
+	return nil
+}
+
+// DeleteBlob deletes the given blob from the specified document.
+func (_Documents) DeleteBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, sha1 string) error {
+	if sha1 == "" {
+		return errors.New("SHA1 sum should be non-empty")
+	}
+
+	var tx *sql.Tx
+	if otx == nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	} else {
+		tx = otx
+	}
+
+	q := `
+	SELECT COUNT(*)
+	FROM wf_document_blobs
+	WHERE sha1sum = ?
+	`
+	var count int64
+	row := tx.QueryRow(q, sha1)
+	err := row.Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		q = `
+		SELECT path
+		FROM wf_document_blobs
+		WHERE doctype_id = ?
+		AND doc_id = ?
+		AND sha1sum = ?
+		`
+		var path string
+		row = tx.QueryRow(q, dtype, id, sha1)
+		err = row.Scan(&path)
+		if err != nil {
+			return err
+		}
+
+		err = os.Remove(path)
+		if err != nil {
+			return err
+		}
+	}
+
+	q = `
+	DELETE FROM wf_document_blobs
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	AND sha1sum = ?
+	`
+	_, err = tx.Exec(q, dtype, id, sha1)
+	if err != nil {
+		return err
+	}
+
+	if otx == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
