@@ -52,11 +52,9 @@ type AccessContextID int64
 //     - IN:south:HYD:BR-101
 //     - sbu-08/client-0249/prj-006348
 type AccessContext struct {
-	ID         AccessContextID           `json:"ID"`                       // Unique identifier of this access context
-	Name       string                    `json:"Name"`                     // Globally-unique namespace; can be a department, project, location, branch, etc.
-	Active     bool                      `json:"Active"`                   // Can a workflow be initiated in this context?
-	GroupRoles map[GroupID]*AcGroupRoles `json:"GroupRoles,omitempty"`     // Mapping of groups to their roles.
-	GroupHier  map[GroupID]*AcGroup      `json:"GroupHierarchy,omitempty"` // Mapping of users to their hierarchy.
+	ID     AccessContextID `json:"ID"`               // Unique identifier of this access context
+	Name   string          `json:"Name,omitempty"`   // Globally-unique namespace; can be a department, project, location, branch, etc.
+	Active bool            `json:"Active,omitempty"` // Can a workflow be initiated in this context?
 }
 
 // AcGroupRoles holds the information of the various roles that each
@@ -369,7 +367,7 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
-func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit int64) (map[GroupID]*AcGroupRoles, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -387,15 +385,13 @@ func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit
 	ORDER BY agrs.group_id
 	LIMIT ? OFFSET ?
 	`
-	var elem AccessContext
 	rows, err := db.Query(q, id, gid, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	elem.ID = id
-	elem.GroupRoles = make(map[GroupID]*AcGroupRoles)
+	grs := make(map[GroupID]*AcGroupRoles)
 	var curGid int64
 	for rows.Next() {
 		var gid int64
@@ -408,19 +404,19 @@ func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit
 
 		var gr *AcGroupRoles
 		if curGid == gid {
-			gr = elem.GroupRoles[GroupID(gid)]
+			gr = grs[GroupID(gid)]
 		} else {
 			gr = &AcGroupRoles{Group: gname, Roles: make([]Role, 0, 4)}
 			curGid = gid
 		}
 		gr.Roles = append(gr.Roles, role)
-		elem.GroupRoles[GroupID(gid)] = gr
+		grs[GroupID(gid)] = gr
 	}
 	if rows.Err() != nil {
 		return nil, err
 	}
 
-	return &elem, nil
+	return grs, nil
 }
 
 // AddGroupRole assigns the specified role to the given group, if it
@@ -489,7 +485,7 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 }
 
 // Groups retrieves the users included in this access context.
-func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (*AccessContext, error) {
+func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (map[GroupID]*AcGroup, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -505,15 +501,13 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (*AccessC
 	ORDER BY auh.group_id
 	LIMIT ? OFFSET ?
 	`
-	var elem AccessContext
 	rows, err := db.Query(q, id, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	elem.ID = id
-	elem.GroupHier = make(map[GroupID]*AcGroup)
+	gh := make(map[GroupID]*AcGroup)
 	for rows.Next() {
 		var g AcGroup
 		err = rows.Scan(&g.ID, &g.Name, &g.GroupType, &g.ReportsTo)
@@ -521,13 +515,13 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (*AccessC
 			return nil, err
 		}
 
-		elem.GroupHier[GroupID(g.ID)] = &g
+		gh[GroupID(g.ID)] = &g
 	}
 	if rows.Err() != nil {
 		return nil, err
 	}
 
-	return &elem, nil
+	return gh, nil
 }
 
 // AddGroup adds the given group to this access context, with the
