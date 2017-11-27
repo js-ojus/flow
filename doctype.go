@@ -253,7 +253,7 @@ type TransitionMap struct {
 
 // Transitions answers the possible document states into which a
 // document currently in the given state can transition.
-func (_DocTypes) Transitions(dtype DocTypeID) (map[DocStateID]*TransitionMap, error) {
+func (_DocTypes) Transitions(dtype DocTypeID, from DocStateID) (map[DocStateID]*TransitionMap, error) {
 	q := `
 	SELECT dst.from_state_id, dsm1.name, dst.docaction_id, dam.name, dst.to_state_id, dsm2.name
 	FROM wf_docstate_transitions dst
@@ -262,7 +262,16 @@ func (_DocTypes) Transitions(dtype DocTypeID) (map[DocStateID]*TransitionMap, er
 	JOIN wf_docactions_master dam ON dam.id = dst.docaction_id
 	WHERE dst.doctype_id = ?
 	`
-	rows, err := db.Query(q, dtype)
+	var rows *sql.Rows
+	var err error
+	if from > 0 {
+		q += `AND dst.from_state_id = ?
+		`
+		rows, err = db.Query(q, dtype, from)
+	} else {
+		rows, err = db.Query(q, dtype)
+	}
+
 	if err != nil {
 		return nil, err
 	}
