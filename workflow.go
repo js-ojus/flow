@@ -200,8 +200,8 @@ func (_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
-	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
-	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
+	JOIN wf_doctypes_master dtm ON dtm.id = wf.doctype_id
+	JOIN wf_docstates_master dsm ON dsm.id = wf.docstate_id
 	WHERE wf.id = ?
 	`
 	row := db.QueryRow(q, id)
@@ -215,7 +215,32 @@ func (_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	return &elem, nil
 }
 
-// Get retrieves the details of the requested workflow from the
+// GetByDocType retrieves the details of the requested workflow from
+// the database.
+//
+// N.B.  This method retrieves the primary information of the
+// workflow.  Information of the nodes comprising this workflow have
+// to be fetched separately.
+func (_Workflows) GetByDocType(dtid DocTypeID) (*Workflow, error) {
+	q := `
+	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
+	FROM wf_workflows wf
+	JOIN wf_doctypes_master dtm ON dtm.id = wf.doctype_id
+	JOIN wf_docstates_master dsm ON dsm.id = wf.docstate_id
+	WHERE wf.doctype_id = ?
+	`
+	row := db.QueryRow(q, dtid)
+	var elem Workflow
+	err := row.Scan(&elem.ID, &elem.Name, &elem.DocType.ID, &elem.DocType.Name,
+		&elem.BeginState.ID, &elem.BeginState.Name, &elem.Active)
+	if err != nil {
+		return nil, err
+	}
+
+	return &elem, nil
+}
+
+// GetByName retrieves the details of the requested workflow from the
 // database.
 //
 // N.B.  This method retrieves the primary information of the
