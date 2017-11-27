@@ -163,7 +163,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Post messages.
 		msg := n.nfunc(doc, event)
 		if len(recipients) == 0 {
-			recipients, err = tnode.determineRecipients(otx, event.User)
+			recipients, err = tnode.determineRecipients(otx, event.Group)
 			if err != nil {
 				return 0, err
 			}
@@ -214,19 +214,16 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, stat
 // determineRecipients takes the document type and access context into
 // account, and determines the list of groups to which the
 // notification should be posted.
-func (n *Node) determineRecipients(otx *sql.Tx, user UserID) ([]GroupID, error) {
+func (n *Node) determineRecipients(otx *sql.Tx, group GroupID) ([]GroupID, error) {
 	q := `
-	SELECT c.id
-	FROM wf_ac_user_hierarchy a
-	JOIN wf_group_users b ON b.user_id = a.reports_to
-	JOIN wf_groups_master c ON c.id = b.group_id
-	WHERE a.ac_id = ?
-	AND a.user_id = ?
-	AND c.group_type = 'S'
-	ORDER BY c.id
+	SELECT reports_to
+	FROM wf_ac_group_hierarchy
+	WHERE ac_id = ?
+	AND group_id = ?
+	ORDER BY group_id
 	LIMIT 1
 	`
-	rows, err := otx.Query(q, n.AccCtx, user)
+	rows, err := otx.Query(q, n.AccCtx, group)
 	if err != nil {
 		return nil, err
 	}
