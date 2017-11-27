@@ -51,7 +51,7 @@ type DocEvent struct {
 	DocID   DocumentID  `json:"DocID"`     // Document to which this event is to be applied
 	State   DocStateID  `json:"DocState"`  // Current state of the document must equal this
 	Action  DocActionID `json:"DocAction"` // Action performed by the user
-	User    UserID      `json:"User"`      // User who caused this action
+	Group   GroupID     `json:"Group"`     // Group (singleton) who caused this action
 	Text    string      `json:"Text"`      // Comment or other content
 	Ctime   time.Time   `json:"Ctime"`     // Time at which the event occurred
 	Status  EventStatus `json:"Status"`    // Status of this event
@@ -87,10 +87,10 @@ var DocEvents _DocEvents
 
 // New creates and initialises an event that transforms the document
 // that it refers to.
-func (_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did DocumentID,
+func (_DocEvents) New(otx *sql.Tx, group GroupID, dtype DocTypeID, did DocumentID,
 	state DocStateID, action DocActionID, text string) (DocEventID, error) {
-	if user <= 0 {
-		return 0, errors.New("user ID should be a positive integer")
+	if group <= 0 {
+		return 0, errors.New("group ID should be a positive integer")
 	}
 
 	var tx *sql.Tx
@@ -105,10 +105,10 @@ func (_DocEvents) New(otx *sql.Tx, user UserID, dtype DocTypeID, did DocumentID,
 	}
 
 	q := `
-	INSERT INTO wf_docevents(doctype_id, doc_id, docstate_id, docaction_id, user_id, data, ctime, status)
-	VALUES(?, ?, ?, ?, ?, NOW(), 'P')
+	INSERT INTO wf_docevents(doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status)
+	VALUES(?, ?, ?, ?, ?, ?, NOW(), 'P')
 	`
-	res, err := tx.Exec(q, dtype, did, state, action, text)
+	res, err := tx.Exec(q, dtype, did, state, action, group, text)
 	if err != nil {
 		return 0, err
 	}
@@ -145,7 +145,7 @@ func (_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, er
 	}
 
 	q := `
-	SELECT *
+	SELECT id, doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status
 	FROM wf_docevents
 	`
 	switch status {
@@ -180,7 +180,7 @@ func (_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, er
 	ary := make([]*DocEvent, 0, 10)
 	for rows.Next() {
 		var elem DocEvent
-		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.User, &text, &elem.Ctime, &dstatus)
+		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.Group, &text, &elem.Ctime, &dstatus)
 		if err != nil {
 			return nil, err
 		}
@@ -216,8 +216,13 @@ func (_DocEvents) Get(eid DocEventID) (*DocEvent, error) {
 	var text sql.NullString
 	var dstatus string
 	var elem DocEvent
-	row := db.QueryRow("SELECT * FROM wf_docevents WHERE id = ?", eid)
-	err := row.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.User, &text, &elem.Ctime, &dstatus)
+	q := `
+	SELECT id, doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status
+	FROM wf_docevents
+	WHERE id = ?
+	`
+	row := db.QueryRow(q, eid)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.State, &elem.Action, &elem.Group, &text, &elem.Ctime, &dstatus)
 	if err != nil {
 		return nil, err
 	}
