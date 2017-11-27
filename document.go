@@ -110,7 +110,7 @@ func (p *DocPath) Append(dtid DocTypeID, did DocumentID) error {
 type Blob struct {
 	Name    string `json:"Name"`           // User-given name to the binary object
 	Path    string `json:"Path,omitempty"` // Path to the stored binary object
-	Sha1Sum string `json:"Sha1sum"`        // SHA1 checksum of the binary object
+	SHA1Sum string `json:"SHA1sum"`        // SHA1 checksum of the binary object
 }
 
 // DocumentID is the type of unique document identifiers.
@@ -411,7 +411,7 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 
 // GetParent answers the identifiers of the parent document of the
 // specified document.
-func (_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, DocumentID, error) {
+func (_Documents) GetParent(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	q := `
 	SELECT parent_doctype_id, parent_id
 	FROM wf_document_children
@@ -419,14 +419,19 @@ func (_Documents) GetParent(dtype DocTypeID, id DocumentID) (DocTypeID, Document
 	AND child_id = ?
 	LIMIT 1
 	`
-	row := db.QueryRow(q, dtype, id)
-	var dtid, did int64
-	err := row.Scan(&dtid, &did)
+	var row *sql.Row
+	if otx == nil {
+		row = db.QueryRow(q, dtype, id)
+	} else {
+		row = otx.QueryRow(q, dtype, id)
+	}
+	var ptid, pid int64
+	err := row.Scan(&ptid, &pid)
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 
-	return DocTypeID(dtid), DocumentID(did), nil
+	return Documents.Get(otx, DocTypeID(ptid), DocumentID(pid))
 }
 
 // setState sets the new state of the document.
@@ -547,7 +552,7 @@ func (_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
 
 	for rows.Next() {
 		var b Blob
-		err = rows.Scan(&b.Name, &b.Sha1Sum)
+		err = rows.Scan(&b.Name, &b.SHA1Sum)
 		if err != nil {
 			return nil, err
 		}
@@ -570,18 +575,19 @@ func (_Documents) GetBlob(dtype DocTypeID, id Document, blob *Blob) error {
 	}
 
 	q := `
-	SELECT name, path, sha1sum
+	SELECT name, path
 	FROM wf_document_blobs
 	WHERE doctype_id = ?
 	AND doc_id = ?
-	AND name = ?
+	AND sha1sum = ?
 	`
-	row := db.QueryRow(q, dtype, id, blob.Name)
+	row := db.QueryRow(q, dtype, id, blob.SHA1Sum)
 	var b Blob
-	err := row.Scan(&b.Name, &b.Path, &b.Sha1Sum)
+	err := row.Scan(&b.Name, &b.Path)
 	if err != nil {
 		return err
 	}
+	b.SHA1Sum = blob.SHA1Sum
 
 	// Copy the blob into the destination path given.
 
@@ -621,8 +627,8 @@ func (_Documents) AddBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, blob *Blo
 		return err
 	}
 	csum := fmt.Sprintf("%x", h.Sum(nil))
-	if blob.Sha1Sum != csum {
-		return fmt.Errorf("checksum mismatch -- given SHA1 sum : %s, computed SHA1 sum : %s", blob.Sha1Sum, csum)
+	if blob.SHA1Sum != csum {
+		return fmt.Errorf("checksum mismatch -- given SHA1 sum : %s, computed SHA1 sum : %s", blob.SHA1Sum, csum)
 	}
 
 	// Store the blob in the appropriate path.
