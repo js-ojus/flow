@@ -231,7 +231,7 @@ func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error)
 
 	tbl := DocTypes.docStorName(input.DocTypeID)
 	q2 := `INSERT INTO ` + tbl + `(path, ac_id, docstate_id, group_id, ctime, title, data)
-	VALUES (?, ?, ?, NOW(), ?, ?)
+	VALUES (?, ?, ?, ?, NOW(), ?, ?)
 	`
 	res, err := tx.Exec(q2, path, input.AccessContextID, dsid, input.GroupID, input.Title, input.Data)
 	if err != nil {
