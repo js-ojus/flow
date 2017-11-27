@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -128,6 +129,18 @@ func (_DocEvents) New(otx *sql.Tx, group GroupID, dtype DocTypeID, did DocumentI
 	return DocEventID(id), nil
 }
 
+// DocEventsListInput specifies a set of filter conditions to narrow
+// down document listings.
+type DocEventsListInput struct {
+	DocTypeID                   // Events on documents of this type are listed
+	AccessContextID             // Access context from within which to list
+	GroupID                     // List events created by this (singleton) group
+	DocStateID                  // List events acting on this state
+	CtimeStarting   time.Time   // List events created after this time
+	CtimeBefore     time.Time   // List events created before this time
+	Status          EventStatus // List events that are in this state of application
+}
+
 // List answers a subset of document events, based on the input
 // specification.
 //
@@ -136,7 +149,7 @@ func (_DocEvents) New(otx *sql.Tx, group GroupID, dtype DocTypeID, did DocumentI
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, error) {
+func (_DocEvents) List(input *DocEventsListInput, offset, limit int64) ([]*DocEvent, error) {
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -144,32 +157,70 @@ func (_DocEvents) List(status EventStatus, offset, limit int64) ([]*DocEvent, er
 		limit = math.MaxInt64
 	}
 
+	// Base query.
+
 	q := `
-	SELECT id, doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status
-	FROM wf_docevents
+	SELECT de.id, de.doctype_id, de.doc_id, de.docstate_id, de.docaction_id, de.group_id, de.data, de.ctime, de.status
+	FROM wf_docevents de
 	`
-	switch status {
+
+	// Process input specification.
+
+	where := []string{}
+	args := []interface{}{}
+
+	if input.AccessContextID > 0 {
+		tbl := DocTypes.docStorName(input.DocTypeID)
+		q += `JOIN ` + tbl + ` docs ON docs.id = de.doc_id
+		`
+		where = append(where, `docs.ac_id = ?`)
+		args = append(args, input.AccessContextID)
+	}
+
+	switch input.Status {
 	case EventStatusAll:
 		// Intentionally left blank
 
 	case EventStatusApplied:
-		q = q + `
-		WHERE status = 'A'
-		`
+		where = append(where, `status = 'A'`)
 
 	case EventStatusPending:
-		q = q + `
-		WHERE status = 'P'
-		`
+		where = append(where, `status = 'P'`)
 
 	default:
-		return nil, fmt.Errorf("unknown event status specified in filter : %d", status)
+		return nil, fmt.Errorf("unknown event status specified in filter : %d", input.Status)
 	}
-	q = q + `
-	ORDER BY id
+
+	if input.GroupID > 0 {
+		where = append(where, `de.group_id = ?`)
+		args = append(args, input.GroupID)
+	}
+
+	if input.DocStateID > 0 {
+		where = append(where, `de.docstate_id = ?`)
+		args = append(args, input.DocStateID)
+	}
+
+	if !input.CtimeStarting.IsZero() {
+		where = append(where, `de.ctime >= ?`)
+		args = append(args, input.CtimeStarting)
+	}
+
+	if !input.CtimeBefore.IsZero() {
+		where = append(where, `de.ctime < ?`)
+		args = append(args, input.CtimeBefore)
+	}
+
+	if len(where) > 0 {
+		q += ` WHERE ` + strings.Join(where, ` AND `)
+	}
+
+	q += `
+	ORDER BY de.id
 	LIMIT ? OFFSET ?
 	`
-	rows, err := db.Query(q, limit, offset)
+	args = append(args, limit, offset)
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
