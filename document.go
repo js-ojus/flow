@@ -299,46 +299,41 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 
 	// Process input specification.
 
+	where := []string{}
 	args := []interface{}{input.AccessContextID}
 	q += `WHERE docs.ac_id = ?
 	`
 
 	if input.GroupID > 0 {
-		q += `AND docs.group_id = ?
-		`
+		where = append(where, `docs.group_id = ?`)
 		args = append(args, input.GroupID)
 	}
 
 	if input.DocStateID > 0 {
-		q += `AND docs.docstate_id = ?
-		`
+		where = append(where, `docs.docstate_id = ?`)
 		args = append(args, input.DocStateID)
 	}
 
 	if !input.CtimeStarting.IsZero() {
-		q += `AND docs.ctime >= ?
-		`
+		where = append(where, `docs.ctime >= ?`)
 		args = append(args, input.CtimeStarting)
 	}
 
 	if !input.CtimeBefore.IsZero() {
-		q += `AND docs.ctime < ?
-		`
+		where = append(where, `docs.ctime < ?`)
 		args = append(args, input.CtimeBefore)
 	}
 
 	if input.TitleContains != "" {
-		q += `AND docs.title LIKE ?
-		`
+		where = append(where, `docs.title LIKE ?`)
 		args = append(args, "%"+input.TitleContains+"%")
 	}
 
 	if input.RootOnly {
-		q += `AND docs.path = ''
-		`
+		where = append(where, `docs.path = ''`)
 	}
 
-	q += `ORDER BY docs.id
+	q += strings.Join(where, ` AND `) + ` ORDER BY docs.id
 	LIMIT ? OFFSET ?
 	`
 	args = append(args, limit, offset)
