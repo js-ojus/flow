@@ -86,12 +86,25 @@ type _DocEvents struct{}
 // DocEvents exposes a resource-like interface to document events.
 var DocEvents _DocEvents
 
+// DocEventsNewInput holds information needed to create a new document
+// event in the system.
+type DocEventsNewInput struct {
+	DocTypeID          // Type of the document; required
+	DocumentID         // Unique identifier of the document; required
+	DocStateID         // Document must be in this state for this event to be applied; required
+	DocActionID        // Action performed by `Group`; required
+	GroupID            // Group (user) who performed the action that raised this event; required
+	Text        string // Any comments or notes
+}
+
 // New creates and initialises an event that transforms the document
 // that it refers to.
-func (_DocEvents) New(otx *sql.Tx, group GroupID, dtype DocTypeID, did DocumentID,
-	state DocStateID, action DocActionID, text string) (DocEventID, error) {
-	if group <= 0 {
-		return 0, errors.New("group ID should be a positive integer")
+func (_DocEvents) New(otx *sql.Tx, input *DocEventsNewInput) (DocEventID, error) {
+	if input.DocumentID <= 0 {
+		return 0, errors.New("document ID should be a positive integer")
+	}
+	if input.Text == "" {
+		return 0, errors.New("please add comments or notes")
 	}
 
 	var tx *sql.Tx
@@ -109,7 +122,7 @@ func (_DocEvents) New(otx *sql.Tx, group GroupID, dtype DocTypeID, did DocumentI
 	INSERT INTO wf_docevents(doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status)
 	VALUES(?, ?, ?, ?, ?, ?, NOW(), 'P')
 	`
-	res, err := tx.Exec(q, dtype, did, state, action, group, text)
+	res, err := tx.Exec(q, input.DocTypeID, input.DocumentID, input.DocStateID, input.DocActionID, input.GroupID, input.Text)
 	if err != nil {
 		return 0, err
 	}
