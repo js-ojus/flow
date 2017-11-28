@@ -51,7 +51,7 @@ func TestDocStates01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		_, err = tx.Exec(`DELETE FROM wf_docstates_master`)
+		_, err = tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`)
 		if err != nil {
 			t.Fatalf("error running transaction : %v\n", err)
 		}
