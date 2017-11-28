@@ -28,26 +28,36 @@ import (
 // and out of mailboxes to facilitate reassignments under specific or
 // extraordinary conditions.
 type Mailbox struct {
-	GroupID GroupID `json:"GroupID"` // Group (or singleton user) owner of this mailbox
+	GroupID `json:"GroupID"` // Group (or singleton user) owner of this mailbox
 }
 
-// Count answers the number of messages in this mailbox.  Specifying
-// `true` for `unread` fetches a count of unread messages.
-func (mb *Mailbox) Count(unread bool) (int64, error) {
+// _Mailboxes provides a resource-like interface to group virtual
+// mailboxes.
+type _Mailboxes struct {
+	// Intentionally left blank.
+}
+
+// Mailboxes is the singleton instance of `_Mailboxes`.
+var Mailboxes _Mailboxes
+
+// Count answers the number of messages in the given group's virtual
+// mailbox. Specifying `true` for `unread` fetches a count of unread
+// messages.
+func (_Mailboxes) Count(gid GroupID, unread bool) (int64, error) {
+	if gid <= 0 {
+		return 0, errors.New("group ID should be a positive integer")
+	}
+
 	q := `
-	SELECT COUNT(*)
+	SELECT COUNT(id)
 	FROM wf_mailboxes
 	WHERE group_id = ?
 	`
 	if unread {
-		q = q + "AND unread = 1"
+		q += `AND unread = 1`
 	}
-	q = q + `
-	ORDER BY id
-	LIMIT ? OFFSET ?
-	`
 
-	row := db.QueryRow(q, mb.GroupID)
+	row := db.QueryRow(q, gid)
 	var n int64
 	err := row.Scan(&n)
 	if err != nil {
@@ -57,13 +67,16 @@ func (mb *Mailbox) Count(unread bool) (int64, error) {
 	return n, nil
 }
 
-// List answers a list of the messages in this mailbox, as per the
-// given specification.
+// List answers a list of the messages in the given group's virtual
+// mailbox, as per the given specification.
 //
 // Result set begins with ID >= `offset`, and has not more than
 // `limit` elements.  A value of `0` for `offset` fetches from the
 // beginning, while a value of `0` for `limit` fetches until the end.
-func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
+func (_Mailboxes) List(gid GroupID, offset, limit int64, unread bool) ([]*Message, error) {
+	if gid <= 0 {
+		return nil, errors.New("group ID should be a positive integer")
+	}
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit must be non-negative integers")
 	}
@@ -74,7 +87,7 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	q := `
 	SELECT msgs.id, msgs.doctype_id, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
 	FROM wf_messages msgs
-	JOIN wf_mailboxes mbs ON msgs.id = mbs.message_id
+	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
 	WHERE mbs.group_id = ?
 	`
 	if unread {
@@ -85,7 +98,7 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	LIMIT ? OFFSET ?
 	`
 
-	rows, err := db.Query(q, limit, offset)
+	rows, err := db.Query(q, gid, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +120,14 @@ func (mb *Mailbox) List(offset, limit int64, unread bool) ([]*Message, error) {
 	return ary, nil
 }
 
-// ReassignMessage removes the message with the given ID from this
-// mailbox, and delivers it to the given other mailbox.
-func (mb *Mailbox) ReassignMessage(otx *sql.Tx, msgID MessageID, gid GroupID) error {
+// ReassignMessage removes the message with the given ID from its
+// current mailbox, and delivers it to the given other group's
+// mailbox.
+func (_Mailboxes) ReassignMessage(otx *sql.Tx, cgid, ngid GroupID, msgID MessageID) error {
+	if cgid <= 0 || ngid <= 0 || msgID <= 0 {
+		return errors.New("all identifiers should be positive integers")
+	}
+
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -126,7 +144,7 @@ func (mb *Mailbox) ReassignMessage(otx *sql.Tx, msgID MessageID, gid GroupID) er
 	WHERE group_id = ?
 	AND message_id = ?
 	`
-	_, err := tx.Exec(q, gid, mb.GroupID, msgID)
+	_, err := tx.Exec(q, ngid, cgid, msgID)
 	if err != nil {
 		return err
 	}
