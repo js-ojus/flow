@@ -11,5 +11,6 @@ CREATE TABLE wf_messages (
     data TEXT NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
-    FOREIGN KEY (docevent_id) REFERENCES wf_docevents(id)
+    FOREIGN KEY (docevent_id) REFERENCES wf_docevents(id),
+    UNIQUE (doctype_id, doc_id, docevent_id)
 );
