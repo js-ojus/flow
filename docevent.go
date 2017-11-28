@@ -182,6 +182,11 @@ func (_DocEvents) List(input *DocEventsListInput, offset, limit int64) ([]*DocEv
 	where := []string{}
 	args := []interface{}{}
 
+	if input.DocTypeID > 0 {
+		where = append(where, `de.doctype_id = ?`)
+		args = append(args, input.DocTypeID)
+	}
+
 	if input.AccessContextID > 0 {
 		tbl := DocTypes.docStorName(input.DocTypeID)
 		q += `JOIN ` + tbl + ` docs ON docs.id = de.doc_id
