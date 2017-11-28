@@ -145,7 +145,7 @@ type Document struct {
 	Ctime time.Time `json:"Ctime"` // Creation time of this (possibly child) document
 
 	Title string `json:"Title"` // Human-readable title; applicable only for root documents
-	Data  []byte `json:"Data"`  // Primary content of the document
+	Data  string `json:"Data"`  // Primary content of the document
 }
 
 // Unexported type, only for convenience methods.
@@ -164,7 +164,7 @@ type DocumentsNewInput struct {
 	ParentType      DocTypeID  // Document type of the parent document, if any
 	ParentID        DocumentID // Unique identifier of the parent document, if any
 	Title           string     // Title of the new document; applicable to only root (top-level) documents
-	Data            []byte     // Body of the new document; required
+	Data            string     // Body of the new document; required
 }
 
 // New creates and initialises a document.
@@ -496,8 +496,8 @@ func (_Documents) SetTitle(otx *sql.Tx, dtype DocTypeID, id DocumentID, title st
 }
 
 // SetData sets the data of the document.
-func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data []byte) error {
-	if data == nil {
+func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data string) error {
+	if data == "" {
 		return errors.New("document data should not be empty")
 	}
 
