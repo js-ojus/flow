@@ -333,7 +333,12 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 		where = append(where, `docs.path = ''`)
 	}
 
-	q += strings.Join(where, ` AND `) + ` ORDER BY docs.id
+	if len(where) > 0 {
+		q += ` AND ` + strings.Join(where, ` AND `)
+	}
+
+	q += `
+	ORDER BY docs.id
 	LIMIT ? OFFSET ?
 	`
 	args = append(args, limit, offset)
