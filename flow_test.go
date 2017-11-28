@@ -281,7 +281,7 @@ func TestFlow01(t *testing.T) {
 		error1(tx.Exec(`DELETE FROM wf_roles_master`))
 
 		error1(tx.Exec(`DELETE FROM wf_docactions_master`))
-		error1(tx.Exec(`DELETE FROM wf_docstates_master`))
+		error1(tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`))
 		error1(tx.Exec(`DELETE FROM wf_doctypes_master`))
 
 		fatal0(tx.Commit())

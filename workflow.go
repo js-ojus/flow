@@ -110,6 +110,12 @@ func (_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocStateI
 	if name == "" {
 		return 0, errors.New("name should not be empty")
 	}
+	if dtype <= 0 {
+		return 0, errors.New("document type should be a positive integer")
+	}
+	if state <= 1 {
+		return 0, errors.New("initial document state should be an integer > 1")
+	}
 
 	var tx *sql.Tx
 	if otx == nil {
