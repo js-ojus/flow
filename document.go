@@ -404,8 +404,7 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	return &elem, nil
 }
 
-// GetParent answers the identifiers of the parent document of the
-// specified document.
+// GetParent answers the parent document of the specified document.
 func (_Documents) GetParent(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	q := `
 	SELECT parent_doctype_id, parent_id
@@ -439,10 +438,10 @@ func (_Documents) setState(otx *sql.Tx, dtype DocTypeID, id DocumentID, state Do
 	var q string
 	var err error
 	if ac > 0 {
-		q = `UPDATE ` + tbl + ` SET state = ?, ac_id = ? WHERE doc_id = ?`
+		q = `UPDATE ` + tbl + ` SET docstate_id = ?, ac_id = ? WHERE id = ?`
 		_, err = otx.Exec(q, state, ac, id)
 	} else {
-		q = `UPDATE ` + tbl + ` SET state = ? WHERE doc_id = ?`
+		q = `UPDATE ` + tbl + ` SET docstate_id = ? WHERE id = ?`
 		_, err = otx.Exec(q, state, id)
 	}
 	return err
