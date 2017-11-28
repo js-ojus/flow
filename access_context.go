@@ -782,6 +782,45 @@ func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[Do
 	return res, nil
 }
 
+// GroupPermissionsByDocType answers a list of the permissions
+// available on the given document type, to the given user, in this
+// access context.
+func (_AccessContexts) GroupPermissionsByDocType(id AccessContextID, dtype DocTypeID, gid GroupID) ([]DocAction, error) {
+	if id <= 0 || dtype <= 0 || gid <= 0 {
+		return nil, errors.New("all identifiers should be positive integers")
+	}
+
+	q := `
+	SELECT acpv.docaction_id, dam.name
+	FROM wf_ac_perms_v acpv
+	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	WHERE acpv.ac_id = ?
+	AND acpv.doctype_id = ?
+	AND acpv.group_id = ?
+	`
+	rows, err := db.Query(q, id, dtype, gid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := []DocAction{}
+	for rows.Next() {
+		var da DocAction
+		err = rows.Scan(&da.ID, &da.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, da)
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // UserHasPermission answers `true` if the given user has the
 // requested action enabled on the specified document type; `false`
 // otherwise.
