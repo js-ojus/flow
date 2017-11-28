@@ -118,6 +118,23 @@ func (_DocEvents) New(otx *sql.Tx, input *DocEventsNewInput) (DocEventID, error)
 		tx = otx
 	}
 
+	// Workflow is tracked at the level of root documents.
+
+	doc, err := Documents.Get(tx, input.DocTypeID, input.DocumentID)
+	if err != nil {
+		return 0, err
+	}
+	rdtid, rdid, err := doc.Path.Root()
+	if err != nil {
+		return 0, err
+	}
+	if rdid > 0 { // A different document is the root.
+		input.DocTypeID = rdtid
+		input.DocumentID = rdid
+	}
+
+	// Register the event using the root document.
+
 	q := `
 	INSERT INTO wf_docevents(doctype_id, doc_id, docstate_id, docaction_id, group_id, data, ctime, status)
 	VALUES(?, ?, ?, ?, ?, ?, NOW(), 'P')
