@@ -334,7 +334,7 @@ func (_Nodes) Get(id NodeID) (*Node, error) {
 		return nil, err
 	}
 	if acID.Valid {
-		acID.Scan(&elem.AccCtx)
+		elem.AccCtx = AccessContextID(acID.Int64)
 	}
 
 	elem.nfunc = defNodeFunc
@@ -353,12 +353,12 @@ func (_Nodes) GetByState(dtype DocTypeID, state DocStateID) (*Node, error) {
 	AND docstate_id = ?
 	`
 	row := db.QueryRow(q, dtype, state)
-	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &elem.Wflow, &elem.Name, &elem.NodeType)
+	err := row.Scan(&elem.ID, &elem.DocType, &elem.State, &acID, &elem.Wflow, &elem.Name, &elem.NodeType)
 	if err != nil {
 		return nil, err
 	}
 	if acID.Valid {
-		acID.Scan(&elem.AccCtx)
+		elem.AccCtx = AccessContextID(acID.Int64)
 	}
 
 	elem.nfunc = defNodeFunc
