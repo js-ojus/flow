@@ -144,8 +144,8 @@ type Document struct {
 	Group GroupID   `json:"Group"` // Creator of this document
 	Ctime time.Time `json:"Ctime"` // Creation time of this (possibly child) document
 
-	Title string `json:"Title"` // Human-readable title; applicable only for root documents
-	Data  string `json:"Data"`  // Primary content of the document
+	Title string `json:"Title"`          // Human-readable title; applicable only for root documents
+	Data  string `json:"Data,omitempty"` // Primary content of the document
 }
 
 // Unexported type, only for convenience methods.
