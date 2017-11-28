@@ -186,26 +186,8 @@ func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error)
 	}
 
 	var dsid int64
-	var err error
-	q := `
-	SELECT docstate_id
-	FROM wf_workflows
-	WHERE doctype_id = ?
-	AND active = 1
-	`
-	row := db.QueryRow(q, input.DocTypeID)
-	err = row.Scan(&dsid)
-	if err != nil {
-		switch {
-		case err == sql.ErrNoRows:
-			return 0, errors.New("no active workflow is defined for the given document type")
-
-		default:
-			return 0, err
-		}
-	}
-
 	var path DocPath
+	var err error
 	if input.ParentID > 0 {
 		pdoc, err := Documents.Get(nil, input.ParentType, input.ParentID)
 		if err != nil {
@@ -215,7 +197,25 @@ func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error)
 		path.Append(input.ParentType, input.ParentID)
 
 		// Child document does not have its own state.
-		dsid = 0
+		dsid = 1 // `__RESERVED_CHILD_STATE__`
+	} else {
+		q := `
+		SELECT docstate_id
+		FROM wf_workflows
+		WHERE doctype_id = ?
+		AND active = 1
+		`
+		row := db.QueryRow(q, input.DocTypeID)
+		err = row.Scan(&dsid)
+		if err != nil {
+			switch {
+			case err == sql.ErrNoRows:
+				return 0, errors.New("no active workflow is defined for the given document type")
+
+			default:
+				return 0, err
+			}
+		}
 	}
 
 	var tx *sql.Tx
