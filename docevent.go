@@ -94,14 +94,14 @@ type DocEventsNewInput struct {
 	DocStateID         // Document must be in this state for this event to be applied; required
 	DocActionID        // Action performed by `Group`; required
 	GroupID            // Group (user) who performed the action that raised this event; required
-	Text        string // Any comments or notes
+	Text        string // Any comments or notes; required
 }
 
 // New creates and initialises an event that transforms the document
 // that it refers to.
 func (_DocEvents) New(otx *sql.Tx, input *DocEventsNewInput) (DocEventID, error) {
-	if input.DocumentID <= 0 {
-		return 0, errors.New("document ID should be a positive integer")
+	if input.DocTypeID <= 0 || input.DocumentID <= 0 || input.DocStateID <= 0 || input.DocActionID <= 0 || input.GroupID <= 0 {
+		return 0, errors.New("all identifiers should be positive integers")
 	}
 	if input.Text == "" {
 		return 0, errors.New("please add comments or notes")
