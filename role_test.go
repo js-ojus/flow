@@ -164,7 +164,7 @@ func TestRoles01(t *testing.T) {
 			}
 		}
 
-		err = Roles.AddPermission(tx, adminID, dtypeStorReqID, da)
+		err = Roles.AddPermissions(tx, adminID, dtypeStorReqID, []DocActionID{da})
 		if err != nil {
 			t.Fatalf("error adding permission : %v\n", err)
 		}
@@ -198,7 +198,7 @@ func TestRoles01(t *testing.T) {
 		}
 		defer tx.Rollback()
 
-		err = Roles.RemovePermission(tx, adminID, dtypeStorReqID, da)
+		err = Roles.RemovePermissions(tx, adminID, dtypeStorReqID, []DocActionID{da})
 		if err != nil {
 			t.Fatalf("error removing permission : %v\n", err)
 		}
