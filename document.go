@@ -242,13 +242,15 @@ func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error)
 		return 0, err
 	}
 
-	q2 = `
-	INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
-	VALUES (?, ?, ?, ?)
-	`
-	res, err = tx.Exec(q2, input.ParentType, input.ParentID, input.DocTypeID, id)
-	if err != nil {
-		return 0, err
+	if input.ParentID > 0 {
+		q2 = `
+		INSERT INTO wf_document_children(parent_doctype_id, parent_id, child_doctype_id, child_id)
+		VALUES (?, ?, ?, ?)
+		`
+		res, err = tx.Exec(q2, input.ParentType, input.ParentID, input.DocTypeID, id)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	if otx == nil {
@@ -427,6 +429,9 @@ func (_Documents) GetParent(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Docum
 	var ptid, pid int64
 	err := row.Scan(&ptid, &pid)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrDocumentNoParent
+		}
 		return nil, err
 	}
 
@@ -803,7 +808,10 @@ func (_Documents) AddTags(otx *sql.Tx, dtype DocTypeID, id DocumentID, tags ...s
 	row := db.QueryRow(q, dtype, id)
 	err := row.Scan(&tid)
 	if err == nil {
-		return errors.New("a child document cannot have its own tags")
+		return ErrDocumentIsChild
+	}
+	if err != sql.ErrNoRows {
+		return err
 	}
 
 	var tx *sql.Tx

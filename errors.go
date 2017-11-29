@@ -38,6 +38,11 @@ const (
 	// ErrDocEventAlreadyApplied : event already applied; nothing to do
 	ErrDocEventAlreadyApplied = Error("ErrDocEventAlreadyApplied : event already applied; nothing to do")
 
+	// ErrDocumentNoParent : document is a root document
+	ErrDocumentNoParent = Error("ErrDocumentNoParent : document is a root document")
+	// ErrDocumentIsChild : cannot have its own state, title or tags
+	ErrDocumentIsChild = Error("ErrDocumentIsChild : cannot have its own state, title or tags")
+
 	// ErrWorkflowInactive : this workflow is currently inactive
 	ErrWorkflowInactive = Error("ErrWorkflowInactive : this workflow is currently inactive")
 	// ErrWorkflowInvalidAction : given action cannot be performed on this document's current state
