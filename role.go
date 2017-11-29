@@ -234,9 +234,9 @@ func (_Roles) Delete(otx *sql.Tx, id RoleID) error {
 	return nil
 }
 
-// AddPermission adds the given action to this role, for the given
+// AddPermissions adds the given actions to this role, for the given
 // document type.
-func (_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
+func (_Roles) AddPermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions []DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -252,9 +252,11 @@ func (_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action Doc
 	INSERT INTO wf_role_docactions(role_id, doctype_id, docaction_id)
 	VALUES(?, ?, ?)
 	`
-	_, err := tx.Exec(q, rid, dtype, action)
-	if err != nil {
-		return err
+	for _, action := range actions {
+		_, err := tx.Exec(q, rid, dtype, action)
+		if err != nil {
+			return err
+		}
 	}
 
 	if otx == nil {
@@ -266,9 +268,9 @@ func (_Roles) AddPermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action Doc
 	return nil
 }
 
-// RemovePermission removes all permissions from this role, for the
+// RemovePermissions removes the given actions from this role, for the
 // given document type.
-func (_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action DocActionID) error {
+func (_Roles) RemovePermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions []DocActionID) error {
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
@@ -286,9 +288,11 @@ func (_Roles) RemovePermission(otx *sql.Tx, rid RoleID, dtype DocTypeID, action 
 	AND doctype_id = ?
 	AND docaction_id = ?
 	`
-	_, err := tx.Exec(q, rid, dtype, action)
-	if err != nil {
-		return err
+	for _, action := range actions {
+		_, err := tx.Exec(q, rid, dtype, action)
+		if err != nil {
+			return err
+		}
 	}
 
 	if otx == nil {
