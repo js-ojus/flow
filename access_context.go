@@ -469,7 +469,7 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 		tx = otx
 	}
 
-	_, err := tx.Exec(`DELETE FROM wf_access_contexts WHERE ns_id = ? AND group_id = ? AND role_id = ?`, id, gid, rid)
+	_, err := tx.Exec(`DELETE FROM wf_ac_group_roles WHERE ac_id = ? AND group_id = ? AND role_id = ?`, id, gid, rid)
 	if err != nil {
 		return err
 	}
