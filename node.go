@@ -45,11 +45,13 @@ type NodeFunc func(*Document, *DocEvent) *Message
 // applicable mailboces.
 func defNodeFunc(d *Document, event *DocEvent) *Message {
 	return &Message{
-		DocType: d.DocType.ID,
-		DocID:   d.ID,
-		Event:   event.ID,
-		Title:   d.Title,
-		Data:    event.Text,
+		DocType: DocType{
+			ID: d.DocType.ID,
+		},
+		DocID: d.ID,
+		Event: event.ID,
+		Title: d.Title,
+		Data:  event.Text,
 	}
 }
 

@@ -118,9 +118,10 @@ func (_Mailboxes) ListByUser(uid UserID, offset, limit int64, unread bool) ([]*M
 	}
 
 	q := `
-	SELECT msgs.id, msgs.doctype_id, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
+	SELECT msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
+	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.group_id = (
 		SELECT gm.id
 		FROM wf_groups_master gm
@@ -146,7 +147,7 @@ func (_Mailboxes) ListByUser(uid UserID, offset, limit int64, unread bool) ([]*M
 	ary := make([]*Message, 0, 10)
 	for rows.Next() {
 		var elem Message
-		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
+		err = rows.Scan(&elem.ID, &elem.DocType.ID, &elem.DocType.Name, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -177,9 +178,10 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 	}
 
 	q := `
-	SELECT msgs.id, msgs.doctype_id, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
+	SELECT msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
+	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.group_id = ?
 	`
 	if unread {
@@ -199,7 +201,7 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 	ary := make([]*Message, 0, 10)
 	for rows.Next() {
 		var elem Message
-		err = rows.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
+		err = rows.Scan(&elem.ID, &elem.DocType.ID, &elem.DocType.Name, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -214,20 +216,21 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 
 // GetMessage answers the requested message from the given user's
 // virtual mailbox.
-func (_Mailboxes) Get(msgID MessageID) (*Message, error) {
+func (_Mailboxes) GetMessage(msgID MessageID) (*Message, error) {
 	if msgID <= 0 {
 		return nil, errors.New("message ID should be positive integers")
 	}
 
 	q := `
-	SELECT msgs.id, msgs.doctype_id, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
+	SELECT msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
+	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.id = ?
 	`
 	row := db.QueryRow(q, msgID)
 	var elem Message
-	err := row.Scan(&elem.ID, &elem.DocType, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
+	err := row.Scan(&elem.ID, &elem.DocType.ID, &elem.DocType.Name, &elem.DocID, &elem.Event, &elem.Title, &elem.Data)
 	if err != nil {
 		return nil, err
 	}
