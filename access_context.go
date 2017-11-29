@@ -715,25 +715,25 @@ func (_AccessContexts) IncludesUser(id AccessContextID, uid UserID) (bool, error
 	}
 
 	q := `
-	SELECT agh.reports_to
+	SELECT COUNT(agh.reports_to)
 	FROM wf_ac_group_hierarchy agh
 	WHERE agh.ac_id = ?
-	AND agh.group_id = (
+	AND agh.group_id IN (
 		SELECT gm.id
 		FROM wf_groups_master gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
-		AND gm.group_type = 'S'
 	)
 	`
-	var repTo int64
+	var count int64
 	row := db.QueryRow(q, id, uid)
-	err := row.Scan(&repTo)
+	err := row.Scan(&count)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, nil
-		}
 		return false, err
+	}
+
+	if count == 0 {
+		return false, nil
 	}
 
 	return true, nil
