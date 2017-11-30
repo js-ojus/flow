@@ -141,7 +141,7 @@ type Document struct {
 	AccCtx AccessContext `json:"AccessContext"` // Originating access context of this document; applicable only to a root document
 	State  DocState      `json:"DocState"`      // Current state of this document; applicable only to a root document
 
-	Group GroupID   `json:"Group"` // Creator of this document
+	Group Group     `json:"Group"` // Creator of this document
 	Ctime time.Time `json:"Ctime"` // Creation time of this (possibly child) document
 
 	Title string `json:"Title"`          // Human-readable title; applicable only for root documents
@@ -294,8 +294,9 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 
 	tbl := DocTypes.docStorName(input.DocTypeID)
 	q := `
-	SELECT docs.id, docs.path, docs.ac_id, docs.group_id, docs.docstate_id, dsm.name, docs.ctime, docs.title
+	SELECT docs.id, docs.path, docs.ac_id, docs.group_id, gm.name, docs.docstate_id, dsm.name, docs.ctime, docs.title
 	FROM ` + tbl + ` docs
+	JOIN wf_groups_master gm ON gm.id = docs.group_id
 	JOIN wf_docstates_master dsm ON dsm.id = docs.docstate_id
 	`
 
@@ -357,7 +358,7 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 	for rows.Next() {
 		var elem Document
 		var title sql.NullString
-		err = rows.Scan(&elem.ID, &elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &title)
+		err = rows.Scan(&elem.ID, &elem.Path, &elem.AccCtx.ID, &elem.Group.ID, &elem.Group.Name, &elem.State.ID, &elem.State.Name, &elem.Ctime, &title)
 		if err != nil {
 			return nil, err
 		}
@@ -391,8 +392,9 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	tbl := DocTypes.docStorName(dtype)
 	var elem Document
 	q := `
-	SELECT docs.path, docs.ac_id, docs.group_id, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
+	SELECT docs.path, docs.ac_id, docs.group_id, gm.name, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
 	FROM ` + tbl + ` AS docs
+	JOIN wf_groups_master gm ON gm.id = docs.group_id
 	JOIN wf_docstates_master dsm ON docs.docstate_id = dsm.id
 	WHERE docs.id = ?
 	`
@@ -403,7 +405,7 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	} else {
 		row = otx.QueryRow(q, id)
 	}
-	err := row.Scan(&elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
+	err := row.Scan(&elem.Path, &elem.AccCtx.ID, &elem.Group.ID, &elem.Group.Name, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
 	if err != nil {
 		return nil, err
 	}
