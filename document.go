@@ -294,8 +294,9 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 
 	tbl := DocTypes.docStorName(input.DocTypeID)
 	q := `
-	SELECT docs.id, docs.path, docs.ac_id, docs.group_id, docs.docstate_id, dsm.name, docs.ctime, docs.title
+	SELECT docs.id, docs.doctype_id, dtm.name, docs.path, docs.ac_id, docs.group_id, docs.docstate_id, dsm.name, docs.ctime, docs.title
 	FROM ` + tbl + ` docs
+	JOIN wf_doctypes_master dtm ON dtm.id = docs.doctype_id
 	JOIN wf_docstates_master dsm ON dsm.id = docs.docstate_id
 	`
 
@@ -357,11 +358,10 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 	for rows.Next() {
 		var elem Document
 		var title sql.NullString
-		err = rows.Scan(&elem.ID, &elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &title)
+		err = rows.Scan(&elem.ID, &elem.DocType.ID, &elem.DocType.Name, &elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.State.ID, &elem.State.Name, &elem.Ctime, &title)
 		if err != nil {
 			return nil, err
 		}
-		elem.DocType.ID = input.DocTypeID
 		if title.Valid {
 			elem.Title = title.String
 		}
@@ -383,8 +383,9 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	tbl := DocTypes.docStorName(dtype)
 	var elem Document
 	q := `
-	SELECT docs.path, docs.ac_id, docs.group_id, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
+	SELECT docs.doctype_id, dtm.name, docs.path, docs.ac_id, docs.group_id, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
 	FROM ` + tbl + ` AS docs
+	JOIN wf_doctypes_master dtm ON dtm.id = docs.doctype_id
 	JOIN wf_docstates_master dsm ON docs.docstate_id = dsm.id
 	WHERE docs.id = ?
 	`
@@ -395,13 +396,7 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	} else {
 		row = otx.QueryRow(q, id)
 	}
-	err := row.Scan(&elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
-	if err != nil {
-		return nil, err
-	}
-	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
-	row = db.QueryRow(q, dtype)
-	err = row.Scan(&elem.DocType.Name)
+	err := row.Scan(&elem.DocType.ID, &elem.DocType.Name, &elem.Path, &elem.AccCtx.ID, &elem.Group, &elem.Ctime, &elem.Title, &elem.Data, &elem.State.ID, &elem.State.Name)
 	if err != nil {
 		return nil, err
 	}
