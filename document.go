@@ -361,7 +361,15 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 		if err != nil {
 			return nil, err
 		}
+
 		elem.DocType.ID = input.DocTypeID
+		q2 := `SELECT name FROM wf_doctypes_master WHERE id = ?`
+		row2 := db.QueryRow(q2, input.DocTypeID)
+		err = row2.Scan(&elem.DocType.Name)
+		if err != nil {
+			return nil, err
+		}
+
 		if title.Valid {
 			elem.Title = title.String
 		}
