@@ -128,7 +128,7 @@ func TestFlow01(t *testing.T) {
 			tx := fatal1(db.Begin()).(*sql.Tx)
 			defer tx.Rollback()
 
-			roleID1 = fatal1(Roles.New(tx, "ADMIN")).(RoleID)
+			roleID1 = fatal1(Roles.New(tx, "PRINCIPAL_INVESTIGATOR")).(RoleID)
 			roleID2 = fatal1(Roles.New(tx, "RESEARCH_ANALYST")).(RoleID)
 
 			fatal0(tx.Commit())
@@ -278,7 +278,7 @@ func TestFlow01(t *testing.T) {
 		error1(tx.Exec(`DELETE FROM wf_group_users`))
 		error1(tx.Exec(`DELETE FROM wf_groups_master`))
 		error1(tx.Exec(`DELETE FROM users_master`))
-		error1(tx.Exec(`DELETE FROM wf_roles_master`))
+		error1(tx.Exec(`DELETE FROM wf_roles_master WHERE id > 2`))
 
 		error1(tx.Exec(`DELETE FROM wf_docactions_master`))
 		error1(tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`))
