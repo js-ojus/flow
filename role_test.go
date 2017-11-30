@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	roles = []string{"ADMIN", "USER"}
+	roles = []string{"ADMIN-USER", "NORMAL-USER"}
 )
 
 // Driver test function.
