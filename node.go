@@ -255,7 +255,7 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 	INSERT INTO wf_messages(doctype_id, doc_id, docevent_id, title, data)
 	VALUES(?, ?, ?, ?, ?)
 	`
-	res, err := otx.Exec(q, msg.DocType, msg.DocID, msg.Event, msg.Title, msg.Data)
+	res, err := otx.Exec(q, msg.DocType.ID, msg.DocID, msg.Event, msg.Title, msg.Data)
 	if err != nil {
 		return err
 	}
