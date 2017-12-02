@@ -16,16 +16,18 @@ package flow
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
 // error0 expects only an error value as its argument.
-func error0(err error) {
+func error0(err error) error {
 	if err != nil {
 		gt.Errorf("%v", err)
 	}
+	return err
 }
 
 // error1 expects a value and an error value as its arguments.
@@ -53,12 +55,12 @@ func fatal1(val1 interface{}, err error) interface{} {
 
 // assertEqual compares the two given values for equality.  In case of
 // a difference, it errors with the given message.
-func assertEqual(expected, observed interface{}, msg string) {
+func assertEqual(expected, observed interface{}, msgs ...string) {
 	if expected == observed {
 		return
 	}
 
-	gt.Errorf("expected : '%v', observed : '%v'\t%s", expected, observed, msg)
+	gt.Errorf("expected : '%v', observed : '%v'\n\t%s", expected, observed, strings.Join(msgs, "\n\t"))
 }
 
 // Initialise DB connection.
@@ -205,56 +207,114 @@ func TestFlowCreate(t *testing.T) {
 	})
 }
 
+// Entity listing.
+func TestFlowList(t *testing.T) {
+	gt = t
+	var res interface{}
+
+	t.Run("DocTypes", func(t *testing.T) {
+		var dts []*DocType
+		if res = error1(DocTypes.List(0, 0)); res == nil {
+			return
+		}
+		dts = res.([]*DocType)
+		assertEqual(2, len(dts))
+	})
+}
+
+// Retrieval of individual entities.
+func TestFlowGet(t *testing.T) {
+	gt = t
+	var res interface{}
+
+	t.Run("DocTypes", func(t *testing.T) {
+		var dt *DocType
+		if res = error1(DocTypes.GetByName("COMPUTE_REQ")); res == nil {
+			return
+		}
+		dt = res.(*DocType)
+		assertEqual("COMPUTE_REQ", dt.Name)
+
+		var dt2 *DocType
+		if res = error1(DocTypes.Get(dt.ID)); res == nil {
+			return
+		}
+		dt2 = res.(*DocType)
+		assertEqual("COMPUTE_REQ", dt2.Name)
+	})
+}
+
 // Entity update operations.
 func TestFlowUpdate(t *testing.T) {
 	gt = t
+	var res interface{}
 
 	t.Run("DocTypeRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(DocTypes.Rename(tx, dtID1, "STORAGE_REQ"))
+		if err := error0(DocTypes.Rename(tx, dtID1, "STORAGE_REQ")); err != nil {
+			return
+		}
 
 		fatal0(tx.Commit())
 
-		obj := error1(DocTypes.Get(dtID1)).(*DocType)
-		assertEqual("STORAGE_REQ", obj.Name, "")
+		if res = error1(DocTypes.Get(dtID1)); res == nil {
+			return
+		}
+		obj := res.(*DocType)
+		assertEqual("STORAGE_REQ", obj.Name)
 	})
 
 	t.Run("DocStateRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(DocStates.Rename(tx, dsID1, "DRAFT"))
+		if err := error0(DocStates.Rename(tx, dsID1, "DRAFT")); err != nil {
+			return
+		}
 
 		fatal0(tx.Commit())
 
-		obj := error1(DocStates.Get(dsID1)).(*DocState)
-		assertEqual("DRAFT", obj.Name, "")
+		if res = error1(DocStates.Get(dsID1)); res == nil {
+			return
+		}
+		obj := res.(*DocState)
+		assertEqual("DRAFT", obj.Name)
 	})
 
 	t.Run("DocActionRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(DocActions.Rename(tx, daID1, "LIST"))
+		if err := error0(DocActions.Rename(tx, daID1, "LIST")); err != nil {
+			return
+		}
 
 		fatal0(tx.Commit())
 
-		obj := error1(DocActions.Get(daID1)).(*DocAction)
-		assertEqual("LIST", obj.Name, "")
+		if res = error1(DocActions.Get(daID1)); res == 0 {
+			return
+		}
+		obj := res.(*DocAction)
+		assertEqual("LIST", obj.Name)
 	})
 
 	t.Run("GroupRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(Groups.Rename(tx, gID5, "Research Associates"))
+		if err := error0(Groups.Rename(tx, gID5, "Research Associates")); err != nil {
+			return
+		}
 
 		fatal0(tx.Commit())
 
-		obj := error1(Groups.Get(gID5)).(*Group)
-		assertEqual("Research Associates", obj.Name, "")
+		if res = error1(Groups.Get(gID5)); res == 0 {
+			return
+		}
+		obj := res.(*Group)
+		assertEqual("Research Associates", obj.Name)
 	})
 }
 
