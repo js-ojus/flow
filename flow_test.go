@@ -229,6 +229,15 @@ func TestFlowList(t *testing.T) {
 		dss = res.([]*DocState)
 		assertEqual(5, len(dss))
 	})
+
+	t.Run("DocActions", func(t *testing.T) {
+		var das []*DocAction
+		if res = error1(DocActions.List(0, 0)); res == nil {
+			return
+		}
+		das = res.([]*DocAction)
+		assertEqual(9, len(das))
+	})
 }
 
 // Retrieval of individual entities.
@@ -266,6 +275,22 @@ func TestFlowGet(t *testing.T) {
 		}
 		ds2 = res.(*DocState)
 		assertEqual("APPROVED", ds2.Name)
+	})
+
+	t.Run("DocActions", func(t *testing.T) {
+		var da *DocAction
+		if res = error1(DocActions.GetByName("REJECT")); res == nil {
+			return
+		}
+		da = res.(*DocAction)
+		assertEqual("REJECT", da.Name)
+
+		var da2 *DocAction
+		if res = error1(DocActions.Get(da.ID)); res == nil {
+			return
+		}
+		da2 = res.(*DocAction)
+		assertEqual("REJECT", da2.Name)
 	})
 }
 
