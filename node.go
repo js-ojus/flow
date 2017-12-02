@@ -151,7 +151,11 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		// Any node type having a single 'in'.
 
 		// Update the document to transition the state.
-		err = Documents.setState(otx, event.DocType, event.DocID, tstate, tnode.AccCtx)
+		tacid := tnode.AccCtx
+		if tacid == 0 {
+			tacid = doc.AccCtx.ID
+		}
+		err = Documents.setState(otx, event.DocType, event.DocID, tstate, tacid)
 		if err != nil {
 			return 0, err
 		}
@@ -164,11 +168,9 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 
 		// Post messages.
 		msg := n.nfunc(doc, event)
-		if len(recipients) == 0 {
-			recipients, err = tnode.determineRecipients(otx, event.Group)
-			if err != nil {
-				return 0, err
-			}
+		recipients, err = tnode.determineRecipients(otx, recipients, doc, event, tacid)
+		if err != nil {
+			return 0, err
 		}
 		// It is legal to not have any recipients, too.
 		if len(recipients) > 0 {
@@ -216,7 +218,8 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, stat
 // determineRecipients takes the document type and access context into
 // account, and determines the list of groups to which the
 // notification should be posted.
-func (n *Node) determineRecipients(otx *sql.Tx, group GroupID) ([]GroupID, error) {
+func (n *Node) determineRecipients(otx *sql.Tx, ary []GroupID, doc *Document, event *DocEvent, acid AccessContextID) ([]GroupID, error) {
+	// We have to notify reporting authorities.
 	q := `
 	SELECT reports_to
 	FROM wf_ac_group_hierarchy
@@ -225,13 +228,12 @@ func (n *Node) determineRecipients(otx *sql.Tx, group GroupID) ([]GroupID, error
 	ORDER BY group_id
 	LIMIT 1
 	`
-	rows, err := otx.Query(q, n.AccCtx, group)
+	rows, err := otx.Query(q, acid, event.Group)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	ary := make([]GroupID, 0, 4)
 	for rows.Next() {
 		var gid int64
 		err = rows.Scan(&gid)
@@ -243,6 +245,32 @@ func (n *Node) determineRecipients(otx *sql.Tx, group GroupID) ([]GroupID, error
 	if rows.Err() != nil {
 		return nil, err
 	}
+
+	// We also notify all participants in the thread.
+	q2 := `
+	SELECT DISTINCT (group_id)
+	FROM wf_docevents
+	WHERE doctype_id = ?
+	AND doc_id = ?
+	`
+	rows2, err := otx.Query(q2, doc.DocType.ID, doc.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows2.Close()
+
+	for rows2.Next() {
+		var gid int64
+		err = rows2.Scan(&gid)
+		if err != nil {
+			return nil, err
+		}
+		ary = append(ary, GroupID(gid))
+	}
+	if rows2.Err() != nil {
+		return nil, err
+	}
+
 	return ary, nil
 }
 
