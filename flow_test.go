@@ -220,6 +220,15 @@ func TestFlowList(t *testing.T) {
 		dts = res.([]*DocType)
 		assertEqual(2, len(dts))
 	})
+
+	t.Run("DocStates", func(t *testing.T) {
+		var dss []*DocState
+		if res = error1(DocStates.List(0, 0)); res == nil {
+			return
+		}
+		dss = res.([]*DocState)
+		assertEqual(5, len(dss))
+	})
 }
 
 // Retrieval of individual entities.
@@ -241,6 +250,22 @@ func TestFlowGet(t *testing.T) {
 		}
 		dt2 = res.(*DocType)
 		assertEqual("COMPUTE_REQ", dt2.Name)
+	})
+
+	t.Run("DocStates", func(t *testing.T) {
+		var ds *DocState
+		if res = error1(DocStates.GetByName("APPROVED")); res == nil {
+			return
+		}
+		ds = res.(*DocState)
+		assertEqual("APPROVED", ds.Name)
+
+		var ds2 *DocState
+		if res = error1(DocStates.Get(ds.ID)); res == nil {
+			return
+		}
+		ds2 = res.(*DocState)
+		assertEqual("APPROVED", ds2.Name)
 	})
 }
 
