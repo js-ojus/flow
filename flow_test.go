@@ -34,6 +34,7 @@ func error0(err error) error {
 func error1(val1 interface{}, err error) interface{} {
 	if err != nil {
 		gt.Errorf("%v", err)
+		return nil
 	}
 	return val1
 }
@@ -57,6 +58,16 @@ func fatal1(val1 interface{}, err error) interface{} {
 // a difference, it errors with the given message.
 func assertEqual(expected, observed interface{}, msgs ...string) {
 	if expected == observed {
+		return
+	}
+
+	gt.Errorf("expected : '%v', observed : '%v'\n\t%s", expected, observed, strings.Join(msgs, "\n\t"))
+}
+
+// assertNotEqual compares the two given values for inequality.  In
+// case of equality, it errors with the given message.
+func assertNotEqual(expected, observed interface{}, msgs ...string) {
+	if expected != observed {
 		return
 	}
 
@@ -238,6 +249,15 @@ func TestFlowList(t *testing.T) {
 		das = res.([]*DocAction)
 		assertEqual(9, len(das))
 	})
+
+	t.Run("Groups", func(t *testing.T) {
+		var gs []*Group
+		if res = error1(Groups.List(0, 0)); res == nil {
+			return
+		}
+		gs = res.([]*Group)
+		assertEqual(6, len(gs))
+	})
 }
 
 // Retrieval of individual entities.
@@ -291,6 +311,28 @@ func TestFlowGet(t *testing.T) {
 		}
 		da2 = res.(*DocAction)
 		assertEqual("REJECT", da2.Name)
+	})
+
+	t.Run("Groups", func(t *testing.T) {
+		var g *Group
+		if res = error1(Groups.Get(gID1)); res == nil {
+			return
+		}
+		g = res.(*Group)
+
+		var u *User
+		if res = error1(Groups.SingletonUser(gID1)); res == nil {
+			return
+		}
+		u = res.(*User)
+
+		assertEqual(u.Email, g.Name, "singleton group name should match corresponding user's e-mail")
+
+		if res = error1(Groups.HasUser(gID6, uID4)); res == nil {
+			return
+		}
+		ok := res.(bool)
+		assertEqual(true, ok)
 	})
 }
 
@@ -372,11 +414,21 @@ func TestFlowUpdate(t *testing.T) {
 func TestFlowDelete(t *testing.T) {
 	gt = t
 
+	t.Run("GroupsDelete", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		assertNotEqual(nil, Groups.Delete(tx, gID1), "it should not be possible to delete a singleton group")
+		assertEqual(nil, Groups.Delete(tx, gID6), "it should be possible to delete a general group")
+
+		fatal0(tx.Commit())
+	})
+
 	t.Run("GroupsDeleteUsers", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(Groups.RemoveUser(tx, gID6, uID2))
+		error0(Groups.RemoveUser(tx, gID5, uID3))
 
 		fatal0(tx.Commit())
 	})
