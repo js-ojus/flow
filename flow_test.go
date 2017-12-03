@@ -103,8 +103,8 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		dtID1 = fatal1(DocTypes.New(tx, "STOR_REQ")).(DocTypeID)
-		dtID2 = fatal1(DocTypes.New(tx, "COMPUTE_REQ")).(DocTypeID)
+		dtID1 = fatal1(DocTypes.New(tx, "Stor Request")).(DocTypeID)
+		dtID2 = fatal1(DocTypes.New(tx, "Compute Request")).(DocTypeID)
 
 		fatal0(tx.Commit())
 	})
@@ -113,11 +113,11 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		dsID1 = fatal1(DocStates.New(tx, "INITIAL")).(DocStateID)
-		dsID2 = fatal1(DocStates.New(tx, "PENDING_APPROVAL")).(DocStateID)
-		dsID3 = fatal1(DocStates.New(tx, "APPROVED")).(DocStateID)
-		dsID4 = fatal1(DocStates.New(tx, "REJECTED")).(DocStateID)
-		dsID5 = fatal1(DocStates.New(tx, "DISCARDED")).(DocStateID)
+		dsID1 = fatal1(DocStates.New(tx, "Initial")).(DocStateID)
+		dsID2 = fatal1(DocStates.New(tx, "Pending Approval")).(DocStateID)
+		dsID3 = fatal1(DocStates.New(tx, "Approved")).(DocStateID)
+		dsID4 = fatal1(DocStates.New(tx, "Rejected")).(DocStateID)
+		dsID5 = fatal1(DocStates.New(tx, "Discarded")).(DocStateID)
 
 		fatal0(tx.Commit())
 	})
@@ -126,15 +126,15 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		daID1 = fatal1(DocActions.New(tx, "INITIALISE")).(DocActionID)
-		daID2 = fatal1(DocActions.New(tx, "NEW")).(DocActionID)
-		daID3 = fatal1(DocActions.New(tx, "GET")).(DocActionID)
-		daID4 = fatal1(DocActions.New(tx, "UPDATE")).(DocActionID)
-		daID5 = fatal1(DocActions.New(tx, "DELETE")).(DocActionID)
-		daID6 = fatal1(DocActions.New(tx, "APPROVE")).(DocActionID)
-		daID7 = fatal1(DocActions.New(tx, "REJECT")).(DocActionID)
-		daID8 = fatal1(DocActions.New(tx, "RETURN")).(DocActionID)
-		daID9 = fatal1(DocActions.New(tx, "DISCARD")).(DocActionID)
+		daID1 = fatal1(DocActions.New(tx, "Initialise")).(DocActionID)
+		daID2 = fatal1(DocActions.New(tx, "New")).(DocActionID)
+		daID3 = fatal1(DocActions.New(tx, "Get")).(DocActionID)
+		daID4 = fatal1(DocActions.New(tx, "Update")).(DocActionID)
+		daID5 = fatal1(DocActions.New(tx, "Delete")).(DocActionID)
+		daID6 = fatal1(DocActions.New(tx, "Approve")).(DocActionID)
+		daID7 = fatal1(DocActions.New(tx, "Reject")).(DocActionID)
+		daID8 = fatal1(DocActions.New(tx, "Return")).(DocActionID)
+		daID9 = fatal1(DocActions.New(tx, "Discard")).(DocActionID)
 
 		fatal0(tx.Commit())
 	})
@@ -143,8 +143,8 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		roleID1 = fatal1(Roles.New(tx, "PRINCIPAL_INVESTIGATOR")).(RoleID)
-		roleID2 = fatal1(Roles.New(tx, "RESEARCH_ANALYST")).(RoleID)
+		roleID1 = fatal1(Roles.New(tx, "Manager")).(RoleID)
+		roleID2 = fatal1(Roles.New(tx, "Analyst")).(RoleID)
 
 		fatal0(tx.Commit())
 	})
@@ -196,8 +196,8 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		gID5 = fatal1(Groups.New(tx, "RAs", "G")).(GroupID)
-		gID6 = fatal1(Groups.New(tx, "PIs", "G")).(GroupID)
+		gID5 = fatal1(Groups.New(tx, "Analysts", "G")).(GroupID)
+		gID6 = fatal1(Groups.New(tx, "Managers", "G")).(GroupID)
 
 		fatal0(tx.Commit())
 	})
@@ -267,50 +267,50 @@ func TestFlowGet(t *testing.T) {
 
 	t.Run("DocTypes", func(t *testing.T) {
 		var dt *DocType
-		if res = error1(DocTypes.GetByName("COMPUTE_REQ")); res == nil {
+		if res = error1(DocTypes.GetByName("Compute Request")); res == nil {
 			return
 		}
 		dt = res.(*DocType)
-		assertEqual("COMPUTE_REQ", dt.Name)
+		assertEqual("Compute Request", dt.Name)
 
 		var dt2 *DocType
 		if res = error1(DocTypes.Get(dt.ID)); res == nil {
 			return
 		}
 		dt2 = res.(*DocType)
-		assertEqual("COMPUTE_REQ", dt2.Name)
+		assertEqual("Compute Request", dt2.Name)
 	})
 
 	t.Run("DocStates", func(t *testing.T) {
 		var ds *DocState
-		if res = error1(DocStates.GetByName("APPROVED")); res == nil {
+		if res = error1(DocStates.GetByName("Approved")); res == nil {
 			return
 		}
 		ds = res.(*DocState)
-		assertEqual("APPROVED", ds.Name)
+		assertEqual("Approved", ds.Name)
 
 		var ds2 *DocState
 		if res = error1(DocStates.Get(ds.ID)); res == nil {
 			return
 		}
 		ds2 = res.(*DocState)
-		assertEqual("APPROVED", ds2.Name)
+		assertEqual("Approved", ds2.Name)
 	})
 
 	t.Run("DocActions", func(t *testing.T) {
 		var da *DocAction
-		if res = error1(DocActions.GetByName("REJECT")); res == nil {
+		if res = error1(DocActions.GetByName("Reject")); res == nil {
 			return
 		}
 		da = res.(*DocAction)
-		assertEqual("REJECT", da.Name)
+		assertEqual("Reject", da.Name)
 
 		var da2 *DocAction
 		if res = error1(DocActions.Get(da.ID)); res == nil {
 			return
 		}
 		da2 = res.(*DocAction)
-		assertEqual("REJECT", da2.Name)
+		assertEqual("Reject", da2.Name)
 	})
 
 	t.Run("Groups", func(t *testing.T) {
@@ -345,7 +345,7 @@ func TestFlowUpdate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		if err := error0(DocTypes.Rename(tx, dtID1, "STORAGE_REQ")); err != nil {
+		if err := error0(DocTypes.Rename(tx, dtID1, "Storage Request")); err != nil {
 			return
 		}
 
@@ -355,14 +355,14 @@ func TestFlowUpdate(t *testing.T) {
 			return
 		}
 		obj := res.(*DocType)
-		assertEqual("STORAGE_REQ", obj.Name)
+		assertEqual("Storage Request", obj.Name)
 	})
 
 	t.Run("DocStateRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		if err := error0(DocStates.Rename(tx, dsID1, "DRAFT")); err != nil {
+		if err := error0(DocStates.Rename(tx, dsID1, "Draft")); err != nil {
 			return
 		}
 
@@ -372,14 +372,14 @@ func TestFlowUpdate(t *testing.T) {
 			return
 		}
 		obj := res.(*DocState)
-		assertEqual("DRAFT", obj.Name)
+		assertEqual("Draft", obj.Name)
 	})
 
 	t.Run("DocActionRename", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		if err := error0(DocActions.Rename(tx, daID1, "LIST")); err != nil {
+		if err := error0(DocActions.Rename(tx, daID1, "List")); err != nil {
 			return
 		}
 
@@ -389,7 +389,7 @@ func TestFlowUpdate(t *testing.T) {
 			return
 		}
 		obj := res.(*DocAction)
-		assertEqual("LIST", obj.Name)
+		assertEqual("List", obj.Name)
 	})
 
 	t.Run("GroupRename", func(t *testing.T) {
