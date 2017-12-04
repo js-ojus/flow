@@ -260,6 +260,20 @@ func TestFlowList(t *testing.T) {
 		assertEqual(9, len(das))
 	})
 
+	t.Run("Users", func(t *testing.T) {
+		if res = error1(Users.List("", 0, 0)); res == nil {
+			return
+		}
+		us := res.([]*User)
+		assertEqual(4, len(us))
+
+		if res = error1(Users.List("LN 4", 0, 0)); res == nil {
+			return
+		}
+		us = res.([]*User)
+		assertEqual(1, len(us))
+	})
+
 	t.Run("Groups", func(t *testing.T) {
 		var gs []*Group
 		if res = error1(Groups.List(0, 0)); res == nil {
