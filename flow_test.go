@@ -139,16 +139,6 @@ func TestFlowCreate(t *testing.T) {
 		fatal0(tx.Commit())
 	})
 
-	t.Run("Roles", func(t *testing.T) {
-		tx := fatal1(db.Begin()).(*sql.Tx)
-		defer tx.Rollback()
-
-		roleID1 = fatal1(Roles.New(tx, "Manager")).(RoleID)
-		roleID2 = fatal1(Roles.New(tx, "Analyst")).(RoleID)
-
-		fatal0(tx.Commit())
-	})
-
 	t.Run("Users", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
@@ -216,6 +206,26 @@ func TestFlowCreate(t *testing.T) {
 
 		fatal0(tx.Commit())
 	})
+
+	t.Run("Roles", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		roleID1 = fatal1(Roles.New(tx, "Research Analyst")).(RoleID)
+		roleID2 = fatal1(Roles.New(tx, "Manager")).(RoleID)
+
+		fatal0(tx.Commit())
+	})
+
+	t.Run("RolesAddPermissions", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		fatal0(Roles.AddPermissions(tx, roleID1, dtID1, []DocActionID{daID1, daID2, daID3, daID4, daID8, daID9}))
+		fatal0(Roles.AddPermissions(tx, roleID2, dtID1, []DocActionID{daID1, daID2, daID3, daID4, daID5, daID6, daID7, daID8, daID9}))
+
+		fatal0(tx.Commit())
+	})
 }
 
 // Entity listing.
@@ -257,6 +267,15 @@ func TestFlowList(t *testing.T) {
 		}
 		gs = res.([]*Group)
 		assertEqual(6, len(gs))
+	})
+
+	t.Run("Roles", func(t *testing.T) {
+		var rs []*Role
+		if res = error1(Roles.List(0, 0)); res == nil {
+			return
+		}
+		rs = res.([]*Role)
+		assertEqual(2, len(rs))
 	})
 }
 
@@ -334,6 +353,29 @@ func TestFlowGet(t *testing.T) {
 		ok := res.(bool)
 		assertEqual(true, ok)
 	})
+
+	t.Run("Roles", func(t *testing.T) {
+		var r *Role
+		if res = error1(Roles.Get(roleID1)); res == nil {
+			return
+		}
+		r = res.(*Role)
+
+		if res = error1(Roles.Permissions(roleID1)); res == nil {
+			return
+		}
+		perms := res.(map[string]struct {
+			DocTypeID
+			Actions []*DocAction
+		})
+		assertEqual(1, len(perms))
+		assertEqual(6, len(perms[r.Name].Actions))
+
+		if res = error1(Roles.HasPermission(roleID2, dtID1, daID6)); res == nil {
+			return
+		}
+		assertEqual(true, res.(bool))
+	})
 }
 
 // Entity update operations.
@@ -396,7 +438,7 @@ func TestFlowUpdate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		if err := error0(Groups.Rename(tx, gID5, "Research Associates")); err != nil {
+		if res = error0(Groups.Rename(tx, gID5, "Research Associates")); res != nil {
 			return
 		}
 
@@ -408,11 +450,60 @@ func TestFlowUpdate(t *testing.T) {
 		obj := res.(*Group)
 		assertEqual("Research Associates", obj.Name)
 	})
+
+	t.Run("GroupsDeleteUsers", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		error0(Groups.RemoveUser(tx, gID5, uID3))
+
+		fatal0(tx.Commit())
+
+		if res = error1(Groups.Users(gID5)); res == nil {
+			return
+		}
+		objs := res.([]*User)
+		assertEqual(2, len(objs))
+	})
+
+	t.Run("RolesRename", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		if err := error0(Roles.Rename(tx, roleID1, "Analyst")); err != nil {
+			return
+		}
+
+		fatal0(tx.Commit())
+
+		if res = error1(Roles.Get(roleID1)); res == 0 {
+			return
+		}
+		obj := res.(*Role)
+		assertEqual("Analyst", obj.Name)
+	})
+
+	t.Run("RolesDeletePerm", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		if err := error0(Roles.RemovePermissions(tx, roleID1, dtID1, []DocActionID{daID8})); err != nil {
+			return
+		}
+
+		fatal0(tx.Commit())
+
+		if res = error1(Roles.HasPermission(roleID1, dtID1, daID8)); res == nil {
+			return
+		}
+		assertEqual(false, res.(bool))
+	})
 }
 
 // Entity deletion operations.
 func TestFlowDelete(t *testing.T) {
 	gt = t
+	var res interface{}
 
 	t.Run("GroupsDelete", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
@@ -424,13 +515,19 @@ func TestFlowDelete(t *testing.T) {
 		fatal0(tx.Commit())
 	})
 
-	t.Run("GroupsDeleteUsers", func(t *testing.T) {
+	t.Run("RolesDelete", func(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		error0(Groups.RemoveUser(tx, gID5, uID3))
+		assertEqual(nil, Roles.Delete(tx, roleID1))
 
 		fatal0(tx.Commit())
+
+		if res = error1(Roles.List(0, 0)); res == nil {
+			return
+		}
+		objs := res.([]*Role)
+		assertEqual(1, len(objs))
 	})
 }
 
