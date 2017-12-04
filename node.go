@@ -167,14 +167,18 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 		}
 
 		// Post messages.
+		recv := make(map[GroupID]struct{})
+		for _, gid := range recipients {
+			recv[gid] = struct{}{}
+		}
 		msg := n.nfunc(doc, event)
-		recipients, err = tnode.determineRecipients(otx, recipients, doc, event, tacid)
+		recv, err = tnode.determineRecipients(otx, recv, doc, event, tacid)
 		if err != nil {
 			return 0, err
 		}
 		// It is legal to not have any recipients, too.
 		if len(recipients) > 0 {
-			err = n.postMessage(otx, msg, recipients)
+			err = n.postMessage(otx, msg, recv)
 			if err != nil {
 				return 0, err
 			}
@@ -218,7 +222,8 @@ func (n *Node) recordEvent(otx *sql.Tx, event *DocEvent, tstate DocStateID, stat
 // determineRecipients takes the document type and access context into
 // account, and determines the list of groups to which the
 // notification should be posted.
-func (n *Node) determineRecipients(otx *sql.Tx, ary []GroupID, doc *Document, event *DocEvent, acid AccessContextID) ([]GroupID, error) {
+func (n *Node) determineRecipients(otx *sql.Tx, recv map[GroupID]struct{}, doc *Document,
+	event *DocEvent, acid AccessContextID) (map[GroupID]struct{}, error) {
 	// We have to notify reporting authorities.
 	q := `
 	SELECT reports_to
@@ -240,7 +245,7 @@ func (n *Node) determineRecipients(otx *sql.Tx, ary []GroupID, doc *Document, ev
 		if err != nil {
 			return nil, err
 		}
-		ary = append(ary, GroupID(gid))
+		recv[GroupID(gid)] = struct{}{}
 	}
 	if rows.Err() != nil {
 		return nil, err
@@ -265,18 +270,18 @@ func (n *Node) determineRecipients(otx *sql.Tx, ary []GroupID, doc *Document, ev
 		if err != nil {
 			return nil, err
 		}
-		ary = append(ary, GroupID(gid))
+		recv[GroupID(gid)] = struct{}{}
 	}
 	if rows2.Err() != nil {
 		return nil, err
 	}
 
-	return ary, nil
+	return recv, nil
 }
 
 // postMessage posts the given message into the mailboxes of the
 // specified recipients.
-func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) error {
+func (n *Node) postMessage(otx *sql.Tx, msg *Message, recv map[GroupID]struct{}) error {
 	// Record the message.
 
 	q := `
@@ -298,7 +303,7 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recipients []GroupID) erro
 	INSERT INTO wf_mailboxes(group_id, message_id, unread)
 	VALUES(?, ?, 1)
 	`
-	for _, gid := range recipients {
+	for gid := range recv {
 		res, err = otx.Exec(q, gid, msgid)
 		if err != nil {
 			return err
