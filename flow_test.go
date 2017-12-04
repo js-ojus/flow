@@ -90,6 +90,7 @@ var gt *testing.T
 var dtID1, dtID2 DocTypeID
 var dsID1, dsID2, dsID3, dsID4, dsID5 DocStateID
 var daID1, daID2, daID3, daID4, daID5, daID6, daID7, daID8, daID9 DocActionID
+var wfID1, wfID2 WorkflowID
 
 var roleID1, roleID2 RoleID
 var uID1, uID2, uID3, uID4 UserID
@@ -135,6 +136,16 @@ func TestFlowCreate(t *testing.T) {
 		daID7 = fatal1(DocActions.New(tx, "Reject")).(DocActionID)
 		daID8 = fatal1(DocActions.New(tx, "Return")).(DocActionID)
 		daID9 = fatal1(DocActions.New(tx, "Discard")).(DocActionID)
+
+		fatal0(tx.Commit())
+	})
+
+	t.Run("Workflows", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		wfID1 = fatal1(Workflows.New(tx, "Storage Management", dtID1, dsID1)).(WorkflowID)
+		wfID2 = error1(Workflows.New(tx, "Compute Management", dtID2, dsID1)).(WorkflowID)
 
 		fatal0(tx.Commit())
 	})
@@ -260,6 +271,14 @@ func TestFlowList(t *testing.T) {
 		assertEqual(9, len(das))
 	})
 
+	t.Run("Workflows", func(t *testing.T) {
+		if res = error1(Workflows.List(0, 0)); res == nil {
+			return
+		}
+		wfs := res.([]*Workflow)
+		assertEqual(2, len(wfs))
+	})
+
 	t.Run("Users", func(t *testing.T) {
 		if res = error1(Users.List("", 0, 0)); res == nil {
 			return
@@ -344,6 +363,15 @@ func TestFlowGet(t *testing.T) {
 		}
 		da2 = res.(*DocAction)
 		assertEqual("Reject", da2.Name)
+	})
+
+	t.Run("Workflows", func(t *testing.T) {
+		if res = error1(Workflows.GetByDocType(dtID1)); res == nil {
+			return
+		}
+		wf := res.(*Workflow)
+		assertEqual("Storage Management", wf.Name)
+		assertEqual(wfID1, wf.ID)
 	})
 
 	t.Run("Groups", func(t *testing.T) {
@@ -435,7 +463,7 @@ func TestFlowUpdate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		if err := error0(DocActions.Rename(tx, daID1, "List")); err != nil {
+		if res = error0(DocActions.Rename(tx, daID1, "List")); res != nil {
 			return
 		}
 
@@ -446,6 +474,38 @@ func TestFlowUpdate(t *testing.T) {
 		}
 		obj := res.(*DocAction)
 		assertEqual("List", obj.Name)
+	})
+
+	t.Run("WorkflowsSetActive", func(t *testing.T) {
+		tx := fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		if res = error0(Workflows.SetActive(tx, wfID1, false)); res != nil {
+			return
+		}
+
+		fatal0(tx.Commit())
+
+		if res = error1(Workflows.Get(wfID1)); res == nil {
+			return
+		}
+		wf := res.(*Workflow)
+		assertEqual(false, wf.Active)
+
+		tx = fatal1(db.Begin()).(*sql.Tx)
+		defer tx.Rollback()
+
+		if res = error0(Workflows.SetActive(tx, wfID1, true)); res != nil {
+			return
+		}
+
+		fatal0(tx.Commit())
+
+		if res = error1(Workflows.Get(wfID1)); res == nil {
+			return
+		}
+		wf = res.(*Workflow)
+		assertEqual(true, wf.Active)
 	})
 
 	t.Run("GroupRename", func(t *testing.T) {
@@ -561,6 +621,8 @@ func TestFlowTearDown(t *testing.T) {
 	error1(tx.Exec(`DELETE FROM users_master`))
 	error1(tx.Exec(`DELETE FROM wf_roles_master WHERE id > 2`))
 
+	error1(tx.Exec(`DELETE FROM wf_workflow_nodes`))
+	error1(tx.Exec(`DELETE FROM wf_workflows WHERE id > 1`))
 	error1(tx.Exec(`DELETE FROM wf_docactions_master`))
 	error1(tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`))
 	error1(tx.Exec(`DELETE FROM wf_doctypes_master`))
