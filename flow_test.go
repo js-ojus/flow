@@ -259,7 +259,8 @@ func TestFlowList(t *testing.T) {
 			return
 		}
 		dss = res.([]*DocState)
-		assertEqual(5, len(dss))
+		// There is a pre-defined reserved state for children.
+		assertEqual(6, len(dss))
 	})
 
 	t.Run("DocActions", func(t *testing.T) {
@@ -308,7 +309,8 @@ func TestFlowList(t *testing.T) {
 			return
 		}
 		rs = res.([]*Role)
-		assertEqual(2, len(rs))
+		// There are two pre-defined roles for administrators.
+		assertEqual(4, len(rs))
 	})
 }
 
@@ -397,21 +399,21 @@ func TestFlowGet(t *testing.T) {
 	})
 
 	t.Run("Roles", func(t *testing.T) {
-		var r *Role
-		if res = error1(Roles.Get(roleID1)); res == nil {
+		var dt *DocType
+		if res = error1(DocTypes.Get(dtID1)); res == nil {
 			return
 		}
-		r = res.(*Role)
+		dt = res.(*DocType)
 
 		if res = error1(Roles.Permissions(roleID1)); res == nil {
 			return
 		}
 		perms := res.(map[string]struct {
-			DocTypeID
-			Actions []*DocAction
+			DocTypeID DocTypeID
+			Actions   []*DocAction
 		})
 		assertEqual(1, len(perms))
-		assertEqual(6, len(perms[r.Name].Actions))
+		assertEqual(6, len(perms[dt.Name].Actions))
 
 		if res = error1(Roles.HasPermission(roleID2, dtID1, daID6)); res == nil {
 			return
@@ -601,7 +603,8 @@ func TestFlowDelete(t *testing.T) {
 			return
 		}
 		objs := res.([]*Role)
-		assertEqual(1, len(objs))
+		// There are two pre-defined roles for administrators.
+		assertEqual(3, len(objs))
 	})
 }
 
@@ -619,10 +622,11 @@ func TestFlowTearDown(t *testing.T) {
 	error1(tx.Exec(`DELETE FROM wf_group_users`))
 	error1(tx.Exec(`DELETE FROM wf_groups_master`))
 	error1(tx.Exec(`DELETE FROM users_master`))
+	error1(tx.Exec(`DELETE FROM wf_role_docactions`))
 	error1(tx.Exec(`DELETE FROM wf_roles_master WHERE id > 2`))
 
 	error1(tx.Exec(`DELETE FROM wf_workflow_nodes`))
-	error1(tx.Exec(`DELETE FROM wf_workflows WHERE id > 1`))
+	error1(tx.Exec(`DELETE FROM wf_workflows`))
 	error1(tx.Exec(`DELETE FROM wf_docactions_master`))
 	error1(tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`))
 	error1(tx.Exec(`DELETE FROM wf_doctypes_master`))
