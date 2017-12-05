@@ -68,7 +68,7 @@ type AcGroupRoles struct {
 // reporting authority.
 type AcGroup struct {
 	Group     `json:"Group"` // An assigned user
-	ReportsTo GroupID        `json:"ReportsTo"` // Reporting authority of this user
+	ReportsTo Group          `json:"ReportsTo"` // Reporting authority of this user
 }
 
 // Unexported type, only for convenience methods.
@@ -494,9 +494,10 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (map[Grou
 	}
 
 	q := `
-	SELECT gm.id, gm.name, gm.group_type, auh.reports_to
+	SELECT gm.id, gm.name, gm.group_type, rep_to.id, rep_to.name, rep_to.group_type
 	FROM wf_groups_master gm
 	JOIN wf_ac_group_hierarchy auh ON auh.group_id = gm.id
+	JOIN wf_groups_master rep_to ON rep_to.id = auh.reports_to
 	WHERE auh.ac_id = ?
 	ORDER BY auh.group_id
 	LIMIT ? OFFSET ?
@@ -510,7 +511,7 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (map[Grou
 	gh := make(map[GroupID]*AcGroup)
 	for rows.Next() {
 		var g AcGroup
-		err = rows.Scan(&g.ID, &g.Name, &g.GroupType, &g.ReportsTo)
+		err = rows.Scan(&g.ID, &g.Name, &g.GroupType, &g.ReportsTo.ID, &g.ReportsTo.Name, &g.ReportsTo.GroupType)
 		if err != nil {
 			return nil, err
 		}
