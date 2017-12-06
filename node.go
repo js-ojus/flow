@@ -177,7 +177,7 @@ func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (D
 			return 0, err
 		}
 		// It is legal to not have any recipients, too.
-		if len(recipients) > 0 {
+		if len(recv) > 0 {
 			err = n.postMessage(otx, msg, recv)
 			if err != nil {
 				return 0, err
@@ -300,8 +300,8 @@ func (n *Node) postMessage(otx *sql.Tx, msg *Message, recv map[GroupID]struct{})
 	// Post it into applicable mailboxes.
 
 	q = `
-	INSERT INTO wf_mailboxes(group_id, message_id, unread)
-	VALUES(?, ?, 1)
+	INSERT INTO wf_mailboxes(group_id, message_id, unread, ctime)
+	VALUES(?, ?, 1, NOW())
 	`
 	for gid := range recv {
 		res, err = otx.Exec(q, gid, msgid)

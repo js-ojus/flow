@@ -14,6 +14,10 @@
 
 package flow
 
+import (
+	"time"
+)
+
 // MessageID is the type of unique identifiers of messages.
 type MessageID int64
 
@@ -41,4 +45,5 @@ type Notification struct {
 	GroupID `json:"Group"`   // The group whose mailbox this notification is in
 	Message `json:"Message"` // The underlying message
 	Unread  bool             `json:"Unread"` // Status flag reflecting if the message is still not read
+	Ctime   time.Time        `json:"Ctime"`  // Time when this notification was posted
 }
