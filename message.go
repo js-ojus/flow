@@ -17,8 +17,8 @@ package flow
 // MessageID is the type of unique identifiers of messages.
 type MessageID int64
 
-// Message is the notification sent by the workflow engine to possibly
-// multiple mailboxes.
+// Message is the content part of a notification sent by the workflow
+// engine to possibly multiple mailboxes.
 //
 // Messages can be informational or seek action.  Each message
 // contains a reference to the document that began the current
@@ -30,4 +30,15 @@ type Message struct {
 	Event   DocEventID       `json:"DocEvent"` // Event that triggered this message
 	Title   string           `json:"Title"`    // Subject of this message
 	Data    string           `json:"Data"`     // Body of this message
+}
+
+// Notification tracks the 'unread' status of a message in a mailbox.
+//
+// Since a single message can be delivered to multiple mailboxes, the
+// 'unread' status cannot be associated with a message.  Instead,
+// `Notification` is the entity that tracks it per mailbox.
+type Notification struct {
+	GroupID `json:"Group"`   // The group whose mailbox this notification is in
+	Message `json:"Message"` // The underlying message
+	Unread  bool             `json:"Unread"` // Status flag reflecting if the message is still not read
 }
