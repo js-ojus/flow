@@ -118,7 +118,7 @@ func (_Mailboxes) ListByUser(uid UserID, offset, limit int64, unread bool) ([]*N
 	}
 
 	q := `
-	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread
+	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
 	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
@@ -149,7 +149,7 @@ func (_Mailboxes) ListByUser(uid UserID, offset, limit int64, unread bool) ([]*N
 		var elem Notification
 		err = rows.Scan(&elem.GroupID, &elem.Message.ID, &elem.Message.DocType.ID,
 			&elem.Message.DocType.Name, &elem.Message.DocID, &elem.Message.Event,
-			&elem.Message.Title, &elem.Message.Data, &elem.Unread)
+			&elem.Message.Title, &elem.Message.Data, &elem.Unread, &elem.Ctime)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +180,7 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 	}
 
 	q := `
-	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread
+	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
 	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
@@ -205,7 +205,7 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 		var elem Notification
 		err = rows.Scan(&elem.GroupID, &elem.Message.ID, &elem.Message.DocType.ID,
 			&elem.Message.DocType.Name, &elem.Message.DocID, &elem.Message.Event,
-			&elem.Message.Title, &elem.Message.Data, &elem.Unread)
+			&elem.Message.Title, &elem.Message.Data, &elem.Unread, &elem.Ctime)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +226,7 @@ func (_Mailboxes) GetMessage(msgID MessageID) (*Notification, error) {
 	}
 
 	q := `
-	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread
+	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
 	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
@@ -236,7 +236,7 @@ func (_Mailboxes) GetMessage(msgID MessageID) (*Notification, error) {
 	var elem Notification
 	err := row.Scan(&elem.GroupID, &elem.Message.ID, &elem.Message.DocType.ID,
 		&elem.Message.DocType.Name, &elem.Message.DocID, &elem.Message.Event,
-		&elem.Message.Title, &elem.Message.Data, &elem.Unread)
+		&elem.Message.Title, &elem.Message.Data, &elem.Unread, &elem.Ctime)
 	if err != nil {
 		return nil, err
 	}
