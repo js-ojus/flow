@@ -367,7 +367,13 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 
 // GroupRoles retrieves the groups --> roles mapping for this access
 // context.
-func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit int64) (map[GroupID]*AcGroupRoles, error) {
+func (_AccessContexts) GroupRoles(id AccessContextID, gids []GroupID, offset, limit int64) (map[GroupID]*AcGroupRoles, error) {
+	if id <= 0 {
+		return nil, errors.New("access context ID should be a positive integer")
+	}
+	if len(gids) == 0 {
+		return nil, errors.New("list of group IDs should be non-empty")
+	}
 	if offset < 0 || limit < 0 {
 		return nil, errors.New("offset and limit should be non-negative integers")
 	}
@@ -375,17 +381,29 @@ func (_AccessContexts) GroupRoles(id AccessContextID, gid GroupID, offset, limit
 		limit = math.MaxInt64
 	}
 
+	args := make([]interface{}, 0, len(gids))
+	args = append(args, id)
+	for _, gid := range gids {
+		args = append(args, gid)
+	}
+	args = append(args, limit)
+	args = append(args, offset)
+
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
 	JOIN wf_groups_master gm ON gm.id = agrs.group_id
 	JOIN wf_roles_master rm ON rm.id = agrs.role_id
 	WHERE agrs.ac_id = ?
-	AND agrs.group_id = ?
+	AND agrs.group_id IN (?` + strings.Repeat(",?", len(gids)-1) + `)
 	ORDER BY agrs.group_id
 	LIMIT ? OFFSET ?
 	`
-	rows, err := db.Query(q, id, gid, limit, offset)
+	stmt, err := db.Prepare(q)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
