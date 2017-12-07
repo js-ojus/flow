@@ -499,7 +499,7 @@ func (_Documents) SetTitle(otx *sql.Tx, dtype DocTypeID, id DocumentID, title st
 		tx = otx
 	}
 
-	q = `UPDATE ` + tbl + ` SET title = ? WHERE id = ?`
+	q = `UPDATE ` + tbl + ` SET title = ?, ctime = NOW() WHERE id = ?`
 	_, err = tx.Exec(q, title, id)
 	if err != nil {
 		return err
@@ -533,7 +533,7 @@ func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data stri
 		tx = otx
 	}
 
-	q := `UPDATE ` + tbl + ` SET data = ? WHERE id = ?`
+	q := `UPDATE ` + tbl + ` SET data = ?, ctime = NOW() WHERE id = ?`
 	_, err := tx.Exec(q, data, id)
 	if err != nil {
 		return err
