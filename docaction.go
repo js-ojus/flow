@@ -42,8 +42,9 @@ type DocActionID int64
 //
 // N.B. All document actions must be defined as constant strings.
 type DocAction struct {
-	ID   DocActionID `json:"ID"`   // Unique identifier of this action
-	Name string      `json:"Name"` // Globally-unique name of this action
+	ID        DocActionID `json:"ID"`        // Unique identifier of this action
+	Name      string      `json:"Name"`      // Globally-unique name of this action
+	Reconfirm bool        `json:"Reconfirm"` // Should the user be prompted for a reconfirmation of this action?
 }
 
 // Unexported type, only for convenience methods.
@@ -54,7 +55,7 @@ type _DocActions struct{}
 var DocActions _DocActions
 
 // New creates and registers a new document action in the system.
-func (_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
+func (_DocActions) New(otx *sql.Tx, name string, reconfirm bool) (DocActionID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("document action cannot be empty")
@@ -71,7 +72,13 @@ func (_DocActions) New(otx *sql.Tx, name string) (DocActionID, error) {
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_docactions_master(name) VALUES(?)", name)
+	var res sql.Result
+	var err error
+	if reconfirm {
+		res, err = tx.Exec("INSERT INTO wf_docactions_master(name, reconfirm) VALUES(?, ?)", name, 1)
+	} else {
+		res, err = tx.Exec("INSERT INTO wf_docactions_master(name, reconfirm) VALUES(?, ?)", name, 0)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -106,7 +113,7 @@ func (_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 	}
 
 	q := `
-	SELECT *
+	SELECT id, name, reconfirm
 	FROM wf_docactions_master
 	ORDER BY id
 	LIMIT ? OFFSET ?
@@ -120,7 +127,7 @@ func (_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 	ary := make([]*DocAction, 0, 10)
 	for rows.Next() {
 		var elem DocAction
-		err = rows.Scan(&elem.ID, &elem.Name)
+		err = rows.Scan(&elem.ID, &elem.Name, &elem.Reconfirm)
 		if err != nil {
 			return nil, err
 		}
@@ -140,8 +147,8 @@ func (_DocActions) Get(id DocActionID) (*DocAction, error) {
 	}
 
 	var elem DocAction
-	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE id = ?", id)
-	err := row.Scan(&elem.ID, &elem.Name)
+	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions_master WHERE id = ?", id)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.Reconfirm)
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +165,8 @@ func (_DocActions) GetByName(name string) (*DocAction, error) {
 	}
 
 	var elem DocAction
-	row := db.QueryRow("SELECT id, name FROM wf_docactions_master WHERE name = ?", name)
-	err := row.Scan(&elem.ID, &elem.Name)
+	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions_master WHERE name = ?", name)
+	err := row.Scan(&elem.ID, &elem.Name, &elem.Reconfirm)
 	if err != nil {
 		return nil, err
 	}

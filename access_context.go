@@ -766,7 +766,7 @@ func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocT
 	}
 
 	q := `
-	SELECT acpv.doctype_id, acpv.docaction_id, dam.name
+	SELECT acpv.doctype_id, acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
 	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
@@ -782,7 +782,7 @@ func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocT
 	for rows.Next() {
 		var dtid int64
 		var da DocAction
-		err = rows.Scan(&dtid, &da.ID, &da.Name)
+		err = rows.Scan(&dtid, &da.ID, &da.Name, &da.Reconfirm)
 		if err != nil {
 			return nil, err
 		}
@@ -810,7 +810,7 @@ func (_AccessContexts) UserPermissionsByDocType(id AccessContextID, dtype DocTyp
 	}
 
 	q := `
-	SELECT acpv.docaction_id, dam.name
+	SELECT acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
 	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
@@ -826,7 +826,7 @@ func (_AccessContexts) UserPermissionsByDocType(id AccessContextID, dtype DocTyp
 	res := []DocAction{}
 	for rows.Next() {
 		var da DocAction
-		err = rows.Scan(&da.ID, &da.Name)
+		err = rows.Scan(&da.ID, &da.Name, &da.Reconfirm)
 		if err != nil {
 			return nil, err
 		}
@@ -848,7 +848,7 @@ func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[Do
 	}
 
 	q := `
-	SELECT acpv.doctype_id, acpv.docaction_id, dam.name
+	SELECT acpv.doctype_id, acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
 	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
@@ -864,7 +864,7 @@ func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[Do
 	for rows.Next() {
 		var dtid int64
 		var da DocAction
-		err = rows.Scan(&dtid, &da.ID, &da.Name)
+		err = rows.Scan(&dtid, &da.ID, &da.Name, &da.Reconfirm)
 		if err != nil {
 			return nil, err
 		}
@@ -892,7 +892,7 @@ func (_AccessContexts) GroupPermissionsByDocType(id AccessContextID, dtype DocTy
 	}
 
 	q := `
-	SELECT acpv.docaction_id, dam.name
+	SELECT acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
 	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
@@ -908,7 +908,7 @@ func (_AccessContexts) GroupPermissionsByDocType(id AccessContextID, dtype DocTy
 	res := []DocAction{}
 	for rows.Next() {
 		var da DocAction
-		err = rows.Scan(&da.ID, &da.Name)
+		err = rows.Scan(&da.ID, &da.Name, &da.Reconfirm)
 		if err != nil {
 			return nil, err
 		}

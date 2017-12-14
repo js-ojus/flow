@@ -312,7 +312,7 @@ func (_Roles) Permissions(rid RoleID) (map[string]struct {
 	Actions   []*DocAction
 }, error) {
 	q := `
-	SELECT dtm.id, dtm.name, dam.id, dam.name
+	SELECT dtm.id, dtm.name, dam.id, dam.name, dam.reconfirm
 	FROM wf_doctypes_master dtm
 	JOIN wf_role_docactions rdas ON dtm.id = rdas.doctype_id
 	JOIN wf_docactions_master dam ON dam.id = rdas.docaction_id
@@ -331,7 +331,7 @@ func (_Roles) Permissions(rid RoleID) (map[string]struct {
 	for rows.Next() {
 		var dt DocType
 		var da DocAction
-		err = rows.Scan(&dt.ID, &dt.Name, &da.ID, &da.Name)
+		err = rows.Scan(&dt.ID, &dt.Name, &da.ID, &da.Name, &da.Reconfirm)
 		if err != nil {
 			return nil, err
 		}
