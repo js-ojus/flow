@@ -255,7 +255,7 @@ type TransitionMap struct {
 // document currently in the given state can transition.
 func (_DocTypes) Transitions(dtype DocTypeID, from DocStateID) (map[DocStateID]*TransitionMap, error) {
 	q := `
-	SELECT dst.from_state_id, dsm1.name, dst.docaction_id, dam.name, dst.to_state_id, dsm2.name
+	SELECT dst.from_state_id, dsm1.name, dst.docaction_id, dam.name, dam.reconfirm, dst.to_state_id, dsm2.name
 	FROM wf_docstate_transitions dst
 	JOIN wf_docstates_master dsm1 ON dsm1.id = dst.from_state_id
 	JOIN wf_docstates_master dsm2 ON dsm2.id = dst.to_state_id
@@ -281,7 +281,7 @@ func (_DocTypes) Transitions(dtype DocTypeID, from DocStateID) (map[DocStateID]*
 	for rows.Next() {
 		var dsfrom DocState
 		var t Transition
-		err := rows.Scan(&dsfrom.ID, &dsfrom.Name, &t.Upon.ID, &t.Upon.Name, &t.To.ID, &t.To.Name)
+		err := rows.Scan(&dsfrom.ID, &dsfrom.Name, &t.Upon.ID, &t.Upon.Name, &t.Upon.Reconfirm, &t.To.ID, &t.To.Name)
 		if err != nil {
 			return nil, err
 		}
