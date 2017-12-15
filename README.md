@@ -15,6 +15,7 @@
 -->
 
 [![Build Status](https://travis-ci.org/js-ojus/flow.svg?branch=master)](https://travis-ci.org/js-ojus/flow)
+[![Go Report Card](https://goreportcard.com/badge/github.com/js-ojus/flow)](https://goreportcard.com/report/github.com/js-ojus/flow)
 
 ## STATUS
 
