@@ -19,6 +19,7 @@ _test
 
 /bin/
 /pkg/
+/vendor/
 
 # Architecture specific extensions/prefixes
 *.[568vqo]
@@ -41,6 +42,6 @@ _testmain.go
 *.orig
 core
 
-# Take care of MacOS weirdness; for potential contributors using it
+# Take care of macOS weirdness; for potential contributors using it
 .DS_Store
 ._*
