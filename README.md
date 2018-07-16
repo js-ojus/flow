@@ -20,7 +20,9 @@
 
 ## STATUS
 
-`flow` is inching towards a release, but is not yet usable!
+`flow` is usable in its current state, even though it hasn't acquired all the desired functionality.
+
+**N.B.** Those who intend to use `flow` should always use the most recent release.  DO NOT use `master`!
 
 ## `flow`
 
