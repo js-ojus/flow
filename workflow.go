@@ -368,7 +368,7 @@ func (_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 
 	q := `
 	INSERT INTO wf_workflow_nodes(doctype_id, docstate_id, ac_id, workflow_id, name, type)
-	VALUES(?, ?, ?, ?, ?)
+	VALUES(?, ?, ?, ?, ?, ?)
 	`
 	res, err := tx.Exec(q, dtype, state, ac, wid, name, string(ntype))
 	if err != nil {
