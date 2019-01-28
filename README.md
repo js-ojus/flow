@@ -140,3 +140,56 @@ Every defined user has a `Mailbox` of virtually no size limit.  Documents that t
 The actual content of a notification constitutes a `Message`.  The most essential details include the document reference, the `Node` in the workflow at which the document is, and the time at which the message was sent.
 
 Upon getting notified, users open the corresponding documents, and take appropriate actions.
+
+## Example Structure
+
+The following is a simple example structure.
+
+```
+Document Type : docType1
+Document States : [
+    docState1, docState2, docState3, docState4 // for example
+]
+Document Actions : [
+    docAction12, docAction23, docAction34 // for the above document states
+]
+Document Type State Transitions : [
+    docState1 --docAction12--> docState2,
+    docState2 --docAction23--> docState3,
+    docState3 --docAction34--> docState4,
+]
+
+Access Contexts : [
+    accCtx1, accCtx2 // for example
+]
+
+Workflow : {
+    Name : wFlow1,
+    Initial State : docState1
+}
+Nodes : [
+    node1: {
+        Document Type : docType1,
+        Workflow : wFlow1,
+        Node Type : NodeTypeBegin, // note this
+        From State : docState1,
+        Access Context : accCtx1,
+    },
+    node2: {
+        Document Type : docType1,
+        Workflow : wFlow1,
+        Node Type : NodeTypeLinear, // note this
+        From State : docState2,
+        Access Context : accCtx2, // a different context
+    },
+    node3: {
+        Document Type : docType1,
+        Workflow : wFlow1,
+        Node Type : NodeTypeEnd, // note this
+        From State : docState3,
+        Access Context : accCtx1,
+    },
+]
+```
+
+With the above setup, we can dispatch document events to the workflow appropriately.  With each event, the workflow moves along, as defined.
