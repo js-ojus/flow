@@ -66,6 +66,17 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 		return 0, err
 	}
 
+	var gt string
+	tq := `SELECT group_type FROM wf_groups_master WHERE id = ?`
+	row := db.QueryRow(tq, event.Group)
+	err = row.Scan(&gt)
+	if err != nil {
+		return 0, err
+	}
+	if gt != "S" {
+		return 0, errors.New("group must be singleton")
+	}
+
 	var tx *sql.Tx
 	if otx == nil {
 		tx, err := db.Begin()
