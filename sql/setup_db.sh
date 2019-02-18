@@ -16,19 +16,19 @@ else
 fi
 
 # Create document-related masters.
-mysql -u $user $db < ./sql/wf_doctypes_master.sql >> err.log 2>&1
-mysql -u $user $db < ./sql/wf_docstates_master.sql >> err.log 2>&1
-mysql -u $user $db < ./sql/wf_docactions_master.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_doctypes.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_docstates.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_docactions.sql >> err.log 2>&1
 
 # Create a local users master, if in test mode.
 if [ "$1" = "-t" ]; then
-    mysql -u $user $db < ./sql/users_master.sql >> err.log 2>&1
+    mysql -u $user $db < ./sql/users.sql >> err.log 2>&1
 fi
 
 # Users, groups, roles and permissions.
-mysql -u $user $db < ./sql/wf_users_master.sql >> err.log 2>&1
-mysql -u $user $db < ./sql/wf_groups_master.sql >> err.log 2>&1
-mysql -u $user $db < ./sql/wf_roles_master.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_users.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_groups.sql >> err.log 2>&1
+mysql -u $user $db < ./sql/wf_roles.sql >> err.log 2>&1
 mysql -u $user $db < ./sql/wf_group_users.sql >> err.log 2>&1
 mysql -u $user $db < ./sql/wf_role_docactions.sql >> err.log 2>&1
 mysql -u $user $db < ./sql/wf_access_contexts.sql >> err.log 2>&1
