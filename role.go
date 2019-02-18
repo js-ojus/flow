@@ -57,7 +57,7 @@ func (_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_roles_master(name) VALUES(?)", name)
+	res, err := tx.Exec("INSERT INTO wf_roles(name) VALUES(?)", name)
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +92,7 @@ func (_Roles) List(offset, limit int64) ([]*Role, error) {
 
 	q := `
 	SELECT id, name
-	FROM wf_roles_master
+	FROM wf_roles
 	ORDER BY id
 	LIMIT ? OFFSET ?
 	`
@@ -126,7 +126,7 @@ func (_Roles) Get(id RoleID) (*Role, error) {
 	}
 
 	var elem Role
-	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE id = ?", id)
+	row := db.QueryRow("SELECT id, name FROM wf_roles WHERE id = ?", id)
 	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (_Roles) GetByName(name string) (*Role, error) {
 	}
 
 	var elem Role
-	row := db.QueryRow("SELECT id, name FROM wf_roles_master WHERE name = ?", name)
+	row := db.QueryRow("SELECT id, name FROM wf_roles WHERE name = ?", name)
 	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, id)
+	_, err := tx.Exec("UPDATE wf_roles SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (_Roles) Delete(otx *sql.Tx, id RoleID) error {
 	if err != nil {
 		return err
 	}
-	res, err := tx.Exec("DELETE FROM wf_roles_master WHERE id = ?", id)
+	res, err := tx.Exec("DELETE FROM wf_roles WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -313,9 +313,9 @@ func (_Roles) Permissions(rid RoleID) (map[string]struct {
 }, error) {
 	q := `
 	SELECT dtm.id, dtm.name, dam.id, dam.name, dam.reconfirm
-	FROM wf_doctypes_master dtm
+	FROM wf_doctypes dtm
 	JOIN wf_role_docactions rdas ON dtm.id = rdas.doctype_id
-	JOIN wf_docactions_master dam ON dam.id = rdas.docaction_id
+	JOIN wf_docactions dam ON dam.id = rdas.docaction_id
 	WHERE rdas.role_id = ?
 	`
 	rows, err := db.Query(q, rid)
@@ -355,8 +355,8 @@ func (_Roles) Permissions(rid RoleID) (map[string]struct {
 func (_Roles) HasPermission(rid RoleID, dtype DocTypeID, action DocActionID) (bool, error) {
 	q := `
 	SELECT rdas.id FROM wf_role_docactions rdas
-	JOIN wf_doctypes_master dtm ON rdas.doctype_id = dtm.id
-	JOIN wf_docactions_master dam ON rdas.docaction_id = dam.id
+	JOIN wf_doctypes dtm ON rdas.doctype_id = dtm.id
+	JOIN wf_docactions dam ON rdas.docaction_id = dam.id
 	WHERE rdas.role_id = ?
 	AND dtm.id = ?
 	AND dam.id = ?

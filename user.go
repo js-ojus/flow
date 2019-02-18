@@ -66,7 +66,7 @@ func (_Users) List(prefix string, offset, limit int64) ([]*User, error) {
 	if prefix == "" {
 		q = `
 		SELECT id, first_name, last_name, email, active
-		FROM wf_users_master
+		FROM wf_users
 		ORDER BY id
 		LIMIT ? OFFSET ?
 		`
@@ -74,11 +74,11 @@ func (_Users) List(prefix string, offset, limit int64) ([]*User, error) {
 	} else {
 		q = `
 		SELECT id, first_name, last_name, email, active
-		FROM wf_users_master
+		FROM wf_users
 		WHERE first_name LIKE ?
 		UNION
 		SELECT id, first_name, last_name, email, active
-		FROM wf_users_master
+		FROM wf_users
 		WHERE last_name LIKE ?
 		ORDER BY id
 		LIMIT ? OFFSET ?
@@ -113,7 +113,7 @@ func (_Users) Get(uid UserID) (*User, error) {
 	}
 
 	var elem User
-	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users_master WHERE id = ?", uid)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users WHERE id = ?", uid)
 	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (_Users) GetByEmail(email string) (*User, error) {
 	}
 
 	var elem User
-	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users_master WHERE email = ?", email)
+	row := db.QueryRow("SELECT id, first_name, last_name, email, active FROM wf_users WHERE email = ?", email)
 	err := row.Scan(&elem.ID, &elem.FirstName, &elem.LastName, &elem.Email, &elem.Active)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (_Users) GetByEmail(email string) (*User, error) {
 
 // IsActive answers `true` if the given user's account is enabled.
 func (_Users) IsActive(uid UserID) (bool, error) {
-	row := db.QueryRow("SELECT active FROM wf_users_master WHERE id = ?", uid)
+	row := db.QueryRow("SELECT active FROM wf_users WHERE id = ?", uid)
 	var active bool
 	err := row.Scan(&active)
 	if err != nil {
@@ -157,9 +157,9 @@ func (_Users) IsActive(uid UserID) (bool, error) {
 func (_Users) GroupsOf(uid UserID) ([]*Group, error) {
 	q := `
 	SELECT gm.id, gm.name, gm.group_type
-	FROM wf_groups_master gm
+	FROM wf_groups gm
 	JOIN wf_group_users gus ON gus.group_id = gm.id
-	JOIN wf_users_master um ON um.id = gus.user_id
+	JOIN wf_users um ON um.id = gus.user_id
 	WHERE um.id = ?
 	`
 	rows, err := db.Query(q, uid)
@@ -190,7 +190,7 @@ func (_Users) GroupsOf(uid UserID) ([]*Group, error) {
 func (_Users) SingletonGroupOf(uid UserID) (*Group, error) {
 	q := `
 	SELECT gm.id, gm.name, gm.group_type
-	FROM wf_groups_master gm
+	FROM wf_groups gm
 	JOIN wf_group_users gu ON gu.group_id = gm.id
 	WHERE gu.user_id = ?
 	AND gm.group_type = 'S'

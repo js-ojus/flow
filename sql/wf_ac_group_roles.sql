@@ -9,6 +9,6 @@ CREATE TABLE wf_ac_group_roles (
     role_id INT NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
-    FOREIGN KEY (group_id) REFERENCES wf_groups_master(id),
-    FOREIGN KEY (role_id) REFERENCES wf_roles_master(id)
+    FOREIGN KEY (group_id) REFERENCES wf_groups(id),
+    FOREIGN KEY (role_id) REFERENCES wf_roles(id)
 );

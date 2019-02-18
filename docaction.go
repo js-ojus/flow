@@ -75,9 +75,9 @@ func (_DocActions) New(otx *sql.Tx, name string, reconfirm bool) (DocActionID, e
 	var res sql.Result
 	var err error
 	if reconfirm {
-		res, err = tx.Exec("INSERT INTO wf_docactions_master(name, reconfirm) VALUES(?, ?)", name, 1)
+		res, err = tx.Exec("INSERT INTO wf_docactions(name, reconfirm) VALUES(?, ?)", name, 1)
 	} else {
-		res, err = tx.Exec("INSERT INTO wf_docactions_master(name, reconfirm) VALUES(?, ?)", name, 0)
+		res, err = tx.Exec("INSERT INTO wf_docactions(name, reconfirm) VALUES(?, ?)", name, 0)
 	}
 	if err != nil {
 		return 0, err
@@ -114,7 +114,7 @@ func (_DocActions) List(offset, limit int64) ([]*DocAction, error) {
 
 	q := `
 	SELECT id, name, reconfirm
-	FROM wf_docactions_master
+	FROM wf_docactions
 	ORDER BY id
 	LIMIT ? OFFSET ?
 	`
@@ -147,7 +147,7 @@ func (_DocActions) Get(id DocActionID) (*DocAction, error) {
 	}
 
 	var elem DocAction
-	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions_master WHERE id = ?", id)
+	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions WHERE id = ?", id)
 	err := row.Scan(&elem.ID, &elem.Name, &elem.Reconfirm)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (_DocActions) GetByName(name string) (*DocAction, error) {
 	}
 
 	var elem DocAction
-	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions_master WHERE name = ?", name)
+	row := db.QueryRow("SELECT id, name, reconfirm FROM wf_docactions WHERE name = ?", name)
 	err := row.Scan(&elem.ID, &elem.Name, &elem.Reconfirm)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func (_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, id)
+	_, err := tx.Exec("UPDATE wf_docactions SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}

@@ -10,8 +10,8 @@ CREATE TABLE wf_docevent_application (
     docevent_id INT NOT NULL,
     to_state_id INT NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
-    FOREIGN KEY (from_state_id) REFERENCES wf_docstates_master(id),
+    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes(id),
+    FOREIGN KEY (from_state_id) REFERENCES wf_docstates(id),
     FOREIGN KEY (docevent_id) REFERENCES wf_docevents(id),
-    FOREIGN KEY (to_state_id) REFERENCES wf_docstates_master(id)
+    FOREIGN KEY (to_state_id) REFERENCES wf_docstates(id)
 );

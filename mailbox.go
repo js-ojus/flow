@@ -53,7 +53,7 @@ func (_Mailboxes) CountByUser(uid UserID, unread bool) (int64, error) {
 	FROM wf_mailboxes
 	WHERE group_id = (
 		SELECT gm.id
-		FROM wf_groups_master gm
+		FROM wf_groups gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
 		AND gm.group_type = 'S'
@@ -121,10 +121,10 @@ func (_Mailboxes) ListByUser(uid UserID, offset, limit int64, unread bool) ([]*N
 	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
-	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
+	JOIN wf_doctypes dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.group_id = (
 		SELECT gm.id
-		FROM wf_groups_master gm
+		FROM wf_groups gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
 		AND gm.group_type = 'S'
@@ -183,7 +183,7 @@ func (_Mailboxes) ListByGroup(gid GroupID, offset, limit int64, unread bool) ([]
 	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
-	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
+	JOIN wf_doctypes dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.group_id = ?
 	`
 	if unread {
@@ -229,7 +229,7 @@ func (_Mailboxes) GetMessage(msgID MessageID) (*Notification, error) {
 	SELECT mbs.group_id, msgs.id, msgs.doctype_id, dtm.name, msgs.doc_id, msgs.docevent_id, msgs.title, msgs.data, mbs.unread, mbs.ctime
 	FROM wf_messages msgs
 	JOIN wf_mailboxes mbs ON mbs.message_id = msgs.id
-	JOIN wf_doctypes_master dtm ON dtm.id = msgs.doctype_id
+	JOIN wf_doctypes dtm ON dtm.id = msgs.doctype_id
 	WHERE mbs.id = ?
 	`
 	row := db.QueryRow(q, msgID)
@@ -308,7 +308,7 @@ func (_Mailboxes) SetStatusByUser(otx *sql.Tx, uid UserID, msgID MessageID, stat
 	UPDATE wf_mailboxes SET unread = ?
 	WHERE group_id = (
 		SELECT gm.id
-		FROM wf_groups_master gm
+		FROM wf_groups gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
 		AND gm.group_type = 'S'

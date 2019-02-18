@@ -9,8 +9,8 @@
 --     data TEXT NOT NULL,
 --     PRIMARY KEY (id),
 --     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
---     FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
---     FOREIGN KEY (group_id) REFERENCES wf_groups_master(id)
+--     FOREIGN KEY (docstate_id) REFERENCES wf_docstates(id),
+--     FOREIGN KEY (group_id) REFERENCES wf_groups(id)
 -- );
 
 --
@@ -24,8 +24,8 @@ CREATE TABLE wf_document_children (
     child_doctype_id INT NOT NULL,
     child_id INT NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (parent_doctype_id) REFERENCES wf_doctypes_master(id),
-    FOREIGN KEY (child_doctype_id) REFERENCES wf_doctypes_master(id),
+    FOREIGN KEY (parent_doctype_id) REFERENCES wf_doctypes(id),
+    FOREIGN KEY (child_doctype_id) REFERENCES wf_doctypes(id),
     UNIQUE (parent_doctype_id, parent_id, child_doctype_id, child_id)
 );
 
@@ -41,7 +41,7 @@ CREATE TABLE wf_document_blobs (
     name TEXT NOT NULL,
     path TEXT NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
+    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes(id),
     UNIQUE (doctype_id, doc_id, sha1sum)
 );
 
@@ -55,6 +55,6 @@ CREATE TABLE wf_document_tags (
     doc_id INT NOT NULL,
     tag VARCHAR(50) NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes_master(id),
+    FOREIGN KEY (doctype_id) REFERENCES wf_doctypes(id),
     UNIQUE (doctype_id, doc_id, tag)
 );

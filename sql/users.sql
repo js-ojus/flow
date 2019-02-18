@@ -1,8 +1,8 @@
-DROP TABLE IF EXISTS users_master;
+DROP TABLE IF EXISTS users;
 
 --
 
-CREATE TABLE users_master (
+CREATE TABLE users (
     id INT NOT NULL AUTO_INCREMENT,
     first_name VARCHAR(30) NOT NULL,
     last_name VARCHAR(30) NOT NULL,

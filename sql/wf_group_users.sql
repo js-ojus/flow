@@ -7,6 +7,6 @@ CREATE TABLE wf_group_users (
     group_id INT NOT NULL,
     user_id INT NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (group_id) REFERENCES wf_groups_master(id),
+    FOREIGN KEY (group_id) REFERENCES wf_groups(id),
     UNIQUE (group_id, user_id)
 );

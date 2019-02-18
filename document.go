@@ -296,8 +296,8 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 	q := `
 	SELECT docs.id, docs.path, docs.ac_id, docs.group_id, gm.name, docs.docstate_id, dsm.name, docs.ctime, docs.title
 	FROM ` + tbl + ` docs
-	JOIN wf_groups_master gm ON gm.id = docs.group_id
-	JOIN wf_docstates_master dsm ON dsm.id = docs.docstate_id
+	JOIN wf_groups gm ON gm.id = docs.group_id
+	JOIN wf_docstates dsm ON dsm.id = docs.docstate_id
 	`
 
 	// Process input specification.
@@ -364,7 +364,7 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 		}
 
 		elem.DocType.ID = input.DocTypeID
-		q2 := `SELECT name FROM wf_doctypes_master WHERE id = ?`
+		q2 := `SELECT name FROM wf_doctypes WHERE id = ?`
 		row2 := db.QueryRow(q2, input.DocTypeID)
 		err = row2.Scan(&elem.DocType.Name)
 		if err != nil {
@@ -394,8 +394,8 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	q := `
 	SELECT docs.path, docs.ac_id, docs.group_id, gm.name, docs.ctime, docs.title, docs.data, docs.docstate_id, dsm.name
 	FROM ` + tbl + ` AS docs
-	JOIN wf_groups_master gm ON gm.id = docs.group_id
-	JOIN wf_docstates_master dsm ON docs.docstate_id = dsm.id
+	JOIN wf_groups gm ON gm.id = docs.group_id
+	JOIN wf_docstates dsm ON docs.docstate_id = dsm.id
 	WHERE docs.id = ?
 	`
 
@@ -409,7 +409,7 @@ func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, e
 	if err != nil {
 		return nil, err
 	}
-	q = `SELECT name FROM wf_doctypes_master WHERE id = ?`
+	q = `SELECT name FROM wf_doctypes WHERE id = ?`
 	row = db.QueryRow(q, dtype)
 	err = row.Scan(&elem.DocType.Name)
 	if err != nil {

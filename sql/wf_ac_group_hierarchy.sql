@@ -9,7 +9,7 @@ CREATE TABLE wf_ac_group_hierarchy (
     reports_to INT NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
-    FOREIGN KEY (group_id) REFERENCES wf_groups_master(id),
-    FOREIGN KEY (reports_to) REFERENCES wf_groups_master(id),
+    FOREIGN KEY (group_id) REFERENCES wf_groups(id),
+    FOREIGN KEY (reports_to) REFERENCES wf_groups(id),
     UNIQUE (ac_id, group_id)
 );

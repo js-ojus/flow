@@ -9,7 +9,7 @@ CREATE TABLE wf_mailboxes (
     unread TINYINT(1) NOT NULL,
     ctime TIMESTAMP NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (group_id) REFERENCES wf_groups_master(id),
+    FOREIGN KEY (group_id) REFERENCES wf_groups(id),
     FOREIGN KEY (message_id) REFERENCES wf_messages(id),
     UNIQUE (group_id, message_id)
 );

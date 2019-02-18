@@ -67,7 +67,7 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 	}
 
 	var gt string
-	tq := `SELECT group_type FROM wf_groups_master WHERE id = ?`
+	tq := `SELECT group_type FROM wf_groups WHERE id = ?`
 	row := db.QueryRow(tq, event.Group)
 	err = row.Scan(&gt)
 	if err != nil {
@@ -179,8 +179,8 @@ func (_Workflows) List(offset, limit int64) ([]*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
-	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
-	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
+	JOIN wf_doctypes dtm ON wf.doctype_id = dtm.id
+	JOIN wf_docstates dsm ON wf.docstate_id = dsm.id
 	ORDER BY wf.id
 	LIMIT ? OFFSET ?
 	`
@@ -217,8 +217,8 @@ func (_Workflows) Get(id WorkflowID) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
-	JOIN wf_doctypes_master dtm ON dtm.id = wf.doctype_id
-	JOIN wf_docstates_master dsm ON dsm.id = wf.docstate_id
+	JOIN wf_doctypes dtm ON dtm.id = wf.doctype_id
+	JOIN wf_docstates dsm ON dsm.id = wf.docstate_id
 	WHERE wf.id = ?
 	`
 	row := db.QueryRow(q, id)
@@ -242,8 +242,8 @@ func (_Workflows) GetByDocType(dtid DocTypeID) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
-	JOIN wf_doctypes_master dtm ON dtm.id = wf.doctype_id
-	JOIN wf_docstates_master dsm ON dsm.id = wf.docstate_id
+	JOIN wf_doctypes dtm ON dtm.id = wf.doctype_id
+	JOIN wf_docstates dsm ON dsm.id = wf.docstate_id
 	WHERE wf.doctype_id = ?
 	`
 	row := db.QueryRow(q, dtid)
@@ -267,8 +267,8 @@ func (_Workflows) GetByName(name string) (*Workflow, error) {
 	q := `
 	SELECT wf.id, wf.name, dtm.id, dtm.name, dsm.id, dsm.name, wf.active
 	FROM wf_workflows wf
-	JOIN wf_doctypes_master dtm ON wf.doctype_id = dtm.id
-	JOIN wf_docstates_master dsm ON wf.docstate_id = dsm.id
+	JOIN wf_doctypes dtm ON wf.doctype_id = dtm.id
+	JOIN wf_docstates dsm ON wf.docstate_id = dsm.id
 	WHERE wf.name = ?
 	`
 	row := db.QueryRow(q, name)

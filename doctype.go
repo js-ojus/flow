@@ -81,7 +81,7 @@ func (_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		tx = otx
 	}
 
-	res, err := tx.Exec("INSERT INTO wf_doctypes_master(name) VALUES(?)", name)
+	res, err := tx.Exec("INSERT INTO wf_doctypes(name) VALUES(?)", name)
 	if err != nil {
 		return 0, err
 	}
@@ -109,8 +109,8 @@ func (_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 		data TEXT NOT NULL,
 		PRIMARY KEY (id),
 		FOREIGN KEY (ac_id) REFERENCES wf_access_contexts(id),
-		FOREIGN KEY (docstate_id) REFERENCES wf_docstates_master(id),
-		FOREIGN KEY (group_id) REFERENCES wf_groups_master(id)
+		FOREIGN KEY (docstate_id) REFERENCES wf_docstates(id),
+		FOREIGN KEY (group_id) REFERENCES wf_groups(id)
 	)
 	`
 	res, err = tx.Exec(q)
@@ -143,7 +143,7 @@ func (_DocTypes) List(offset, limit int64) ([]*DocType, error) {
 
 	q := `
 	SELECT id, name
-	FROM wf_doctypes_master
+	FROM wf_doctypes
 	ORDER BY id
 	LIMIT ? OFFSET ?
 	`
@@ -176,7 +176,7 @@ func (_DocTypes) Get(id DocTypeID) (*DocType, error) {
 	}
 
 	var elem DocType
-	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE id = ?", id)
+	row := db.QueryRow("SELECT id, name FROM wf_doctypes WHERE id = ?", id)
 	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func (_DocTypes) GetByName(name string) (*DocType, error) {
 	}
 
 	var elem DocType
-	row := db.QueryRow("SELECT id, name FROM wf_doctypes_master WHERE name = ?", name)
+	row := db.QueryRow("SELECT id, name FROM wf_doctypes WHERE name = ?", name)
 	err := row.Scan(&elem.ID, &elem.Name)
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, id)
+	_, err := tx.Exec("UPDATE wf_doctypes SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -257,9 +257,9 @@ func (_DocTypes) Transitions(dtype DocTypeID, from DocStateID) (map[DocStateID]*
 	q := `
 	SELECT dst.from_state_id, dsm1.name, dst.docaction_id, dam.name, dam.reconfirm, dst.to_state_id, dsm2.name
 	FROM wf_docstate_transitions dst
-	JOIN wf_docstates_master dsm1 ON dsm1.id = dst.from_state_id
-	JOIN wf_docstates_master dsm2 ON dsm2.id = dst.to_state_id
-	JOIN wf_docactions_master dam ON dam.id = dst.docaction_id
+	JOIN wf_docstates dsm1 ON dsm1.id = dst.from_state_id
+	JOIN wf_docstates dsm2 ON dsm2.id = dst.to_state_id
+	JOIN wf_docactions dam ON dam.id = dst.docaction_id
 	WHERE dst.doctype_id = ?
 	`
 	var rows *sql.Rows

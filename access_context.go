@@ -239,7 +239,7 @@ func (_AccessContexts) ListByUser(uid UserID, offset, limit int64) ([]*AccessCon
 	JOIN wf_ac_group_hierarchy agh ON agh.ac_id = ac.id
 	WHERE agh.group_id = (
 		SELECT gm.id
-		FROM wf_groups_master gm
+		FROM wf_groups gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
 		AND gm.group_type = 'S'
@@ -392,8 +392,8 @@ func (_AccessContexts) GroupRoles(id AccessContextID, gids []GroupID, offset, li
 	q := `
 	SELECT agrs.group_id, gm.name, agrs.role_id, rm.name
 	FROM wf_ac_group_roles agrs
-	JOIN wf_groups_master gm ON gm.id = agrs.group_id
-	JOIN wf_roles_master rm ON rm.id = agrs.role_id
+	JOIN wf_groups gm ON gm.id = agrs.group_id
+	JOIN wf_roles rm ON rm.id = agrs.role_id
 	WHERE agrs.ac_id = ?
 	AND agrs.group_id IN (?` + strings.Repeat(",?", len(gids)-1) + `)
 	ORDER BY agrs.group_id
@@ -513,9 +513,9 @@ func (_AccessContexts) Groups(id AccessContextID, offset, limit int64) (map[Grou
 
 	q := `
 	SELECT gm.id, gm.name, gm.group_type, rep_to.id, rep_to.name, rep_to.group_type
-	FROM wf_groups_master gm
+	FROM wf_groups gm
 	JOIN wf_ac_group_hierarchy auh ON auh.group_id = gm.id
-	JOIN wf_groups_master rep_to ON rep_to.id = auh.reports_to
+	JOIN wf_groups rep_to ON rep_to.id = auh.reports_to
 	WHERE auh.ac_id = ?
 	ORDER BY auh.group_id
 	LIMIT ? OFFSET ?
@@ -739,7 +739,7 @@ func (_AccessContexts) IncludesUser(id AccessContextID, uid UserID) (bool, error
 	WHERE agh.ac_id = ?
 	AND agh.group_id IN (
 		SELECT gm.id
-		FROM wf_groups_master gm
+		FROM wf_groups gm
 		JOIN wf_group_users gu ON gu.group_id = gm.id
 		WHERE gu.user_id = ?
 	)
@@ -768,7 +768,7 @@ func (_AccessContexts) UserPermissions(id AccessContextID, uid UserID) (map[DocT
 	q := `
 	SELECT acpv.doctype_id, acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
-	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	JOIN wf_docactions dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
 	AND acpv.user_id = ?
 	`
@@ -812,7 +812,7 @@ func (_AccessContexts) UserPermissionsByDocType(id AccessContextID, dtype DocTyp
 	q := `
 	SELECT acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
-	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	JOIN wf_docactions dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
 	AND acpv.doctype_id = ?
 	AND acpv.user_id = ?
@@ -850,7 +850,7 @@ func (_AccessContexts) GroupPermissions(id AccessContextID, gid GroupID) (map[Do
 	q := `
 	SELECT acpv.doctype_id, acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
-	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	JOIN wf_docactions dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
 	AND acpv.group_id = ?
 	`
@@ -894,7 +894,7 @@ func (_AccessContexts) GroupPermissionsByDocType(id AccessContextID, dtype DocTy
 	q := `
 	SELECT acpv.docaction_id, dam.name, dam.reconfirm
 	FROM wf_ac_perms_v acpv
-	JOIN wf_docactions_master dam ON dam.id = acpv.docaction_id
+	JOIN wf_docactions dam ON dam.id = acpv.docaction_id
 	WHERE acpv.ac_id = ?
 	AND acpv.doctype_id = ?
 	AND acpv.group_id = ?

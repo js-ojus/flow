@@ -154,7 +154,7 @@ func TestFlowCreate(t *testing.T) {
 		tx := fatal1(db.Begin()).(*sql.Tx)
 		defer tx.Rollback()
 
-		res, err := tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
+		res, err := tx.Exec(`INSERT INTO users(first_name, last_name, email, active)
 			VALUES('FN 1', 'LN 1', 'email1@example.com', 1)`)
 		if err != nil {
 			t.Fatalf("%v\n", err)
@@ -163,7 +163,7 @@ func TestFlowCreate(t *testing.T) {
 		uID1 = UserID(uid)
 		gID1 = fatal1(Groups.NewSingleton(tx, uID1)).(GroupID)
 
-		res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
+		res, err = tx.Exec(`INSERT INTO users(first_name, last_name, email, active)
 			VALUES('FN 2', 'LN 2', 'email2@example.com', 1)`)
 		if err != nil {
 			t.Fatalf("%v\n", err)
@@ -172,7 +172,7 @@ func TestFlowCreate(t *testing.T) {
 		uID2 = UserID(uid)
 		gID2 = fatal1(Groups.NewSingleton(tx, uID2)).(GroupID)
 
-		res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
+		res, err = tx.Exec(`INSERT INTO users(first_name, last_name, email, active)
 			VALUES('FN 3', 'LN 3', 'email3@example.com', 1)`)
 		if err != nil {
 			t.Errorf("%v\n", err)
@@ -181,7 +181,7 @@ func TestFlowCreate(t *testing.T) {
 		uID3 = UserID(uid)
 		gID3 = fatal1(Groups.NewSingleton(tx, uID3)).(GroupID)
 
-		res, err = tx.Exec(`INSERT INTO users_master(first_name, last_name, email, active)
+		res, err = tx.Exec(`INSERT INTO users(first_name, last_name, email, active)
 			VALUES('FN 4', 'LN 4', 'email4@example.com', 1)`)
 		if err != nil {
 			t.Fatalf("%v\n", err)
@@ -620,16 +620,16 @@ func TestFlowTearDown(t *testing.T) {
 	error1(tx.Exec(`DELETE FROM wf_access_contexts`))
 
 	error1(tx.Exec(`DELETE FROM wf_group_users`))
-	error1(tx.Exec(`DELETE FROM wf_groups_master`))
-	error1(tx.Exec(`DELETE FROM users_master`))
+	error1(tx.Exec(`DELETE FROM wf_groups`))
+	error1(tx.Exec(`DELETE FROM users`))
 	error1(tx.Exec(`DELETE FROM wf_role_docactions`))
-	error1(tx.Exec(`DELETE FROM wf_roles_master WHERE id > 2`))
+	error1(tx.Exec(`DELETE FROM wf_roles WHERE id > 2`))
 
 	error1(tx.Exec(`DELETE FROM wf_workflow_nodes`))
 	error1(tx.Exec(`DELETE FROM wf_workflows`))
-	error1(tx.Exec(`DELETE FROM wf_docactions_master`))
-	error1(tx.Exec(`DELETE FROM wf_docstates_master WHERE id > 1`))
-	error1(tx.Exec(`DELETE FROM wf_doctypes_master`))
+	error1(tx.Exec(`DELETE FROM wf_docactions`))
+	error1(tx.Exec(`DELETE FROM wf_docstates WHERE id > 1`))
+	error1(tx.Exec(`DELETE FROM wf_doctypes`))
 
 	fatal0(tx.Commit())
 }
