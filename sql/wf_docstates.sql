@@ -11,7 +11,7 @@ CREATE TABLE wf_docstates (
 
 --
 
--- This reserved state has ID `1`.  This is used as the only legal
--- state for children documents.
+-- This reserved state has ID `1`.  This is used as the initial state of
+-- documents that are created without an explicit state.
 INSERT INTO wf_docstates(name)
-VALUES('__RESERVED_CHILD_STATE__');
+VALUES('__INITIAL__');
