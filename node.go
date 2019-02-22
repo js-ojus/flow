@@ -95,7 +95,7 @@ func (n *Node) Func() NodeFunc {
 	return n.nfunc
 }
 
-// applyEvent checks to see if the given event can be applied
+// applyEvent first checks to see if the given event can be applied
 // successfully.  Accordingly, it prepares a message by utilising the
 // registered node function, and posts it to applicable mailboxes.
 func (n *Node) applyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID) (DocStateID, error) {

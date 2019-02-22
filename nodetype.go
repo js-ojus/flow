@@ -17,9 +17,9 @@ package flow
 // NodeType enumerates the possible types of workflow nodes.
 type NodeType string
 
-// The following constants are represented **identically** as part of
-// an enumeration in the database.  DO NOT ALTER THESE WITHOUT ALSO
-// ALTERING THE DATABASE; ELSE DATA COULD GET CORRUPTED!
+// The following constants are represented **identically** in the
+// database.  DO NOT ALTER THESE WITHOUT ALSO ALTERING THE DATABASE;
+// ELSE DATA COULD GET CORRUPTED!
 const (
 	// NodeTypeBegin : none incoming, one outgoing
 	NodeTypeBegin NodeType = "begin"
