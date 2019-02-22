@@ -15,14 +15,10 @@
 package flow
 
 import (
-	"crypto/sha1"
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"math"
-	"os"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -104,15 +100,6 @@ func (p *DocPath) Append(dtid DocTypeID, did DocumentID) error {
 	return nil
 }
 
-// Blob is a simple data holder for information concerning the
-// user-supplied name of the binary object, the path of the stored
-// binary object, and its SHA1 checksum.
-type Blob struct {
-	Name    string `json:"Name"`           // User-given name to the binary object
-	Path    string `json:"Path,omitempty"` // Path to the stored binary object
-	SHA1Sum string `json:"SHA1sum"`        // SHA1 checksum of the binary object
-}
-
 // DocumentID is the type of unique document identifiers.
 type DocumentID int64
 
@@ -175,8 +162,8 @@ type DocumentsNewInput struct {
 // determined in the scope of the access context applicable to the
 // current state of the document.
 //
-// N.B. Blobs, tags and children documents have to be associated with
-// this document, if needed, through appropriate separate calls.
+// N.B. Tags and children documents have to be associated with this
+// document, if needed, through appropriate separate calls.
 func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error) {
 	if input.DocTypeID <= 0 || input.AccessContextID <= 0 || input.GroupID <= 0 {
 		return 0, errors.New("all identifiers should be positive integers")
@@ -386,8 +373,8 @@ func (_Documents) List(input *DocumentsListInput, offset, limit int64) ([]*Docum
 // Get initialises a document by reading from the database.
 //
 // N.B. This retrieves the primary data of the document.  Other
-// information viz. blobs, tags and children documents have to be
-// fetched separately.
+// information viz. tags and children documents have to be fetched
+// separately.
 func (_Documents) Get(otx *sql.Tx, dtype DocTypeID, id DocumentID) (*Document, error) {
 	tbl := DocTypes.docStorName(dtype)
 	var elem Document
@@ -545,226 +532,6 @@ func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data stri
 			return err
 		}
 	}
-	return nil
-}
-
-// Blobs answers a list of this document's enclosures (as names, not
-// the actual blobs).
-func (_Documents) Blobs(dtype DocTypeID, id DocumentID) ([]*Blob, error) {
-	bs := make([]*Blob, 0, 1)
-	q := `
-	SELECT name, sha1sum
-	FROM wf_document_blobs
-	WHERE doctype_id = ?
-	AND doc_id = ?
-	`
-	rows, err := db.Query(q, dtype, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var b Blob
-		err = rows.Scan(&b.Name, &b.SHA1Sum)
-		if err != nil {
-			return nil, err
-		}
-		bs = append(bs, &b)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return bs, nil
-}
-
-// GetBlob retrieves the requested blob from the specified document,
-// if one such exists.  Lookup happens based on the given blob name.
-// The retrieved blob is copied into the specified path.
-func (_Documents) GetBlob(dtype DocTypeID, id DocumentID, blob *Blob) error {
-	if blob == nil {
-		return errors.New("blob should be non-nil")
-	}
-
-	q := `
-	SELECT name, path
-	FROM wf_document_blobs
-	WHERE doctype_id = ?
-	AND doc_id = ?
-	AND sha1sum = ?
-	`
-	row := db.QueryRow(q, dtype, id, blob.SHA1Sum)
-	var b Blob
-	err := row.Scan(&b.Name, &b.Path)
-	if err != nil {
-		return err
-	}
-	b.SHA1Sum = blob.SHA1Sum
-
-	// Copy the blob into the destination path given.
-
-	inf, err := os.Open(b.Path)
-	if err != nil {
-		return err
-	}
-	defer inf.Close()
-	outf, err := os.Create(blob.Path)
-	if err != nil {
-		return err
-	}
-	defer outf.Close()
-	_, err = io.Copy(outf, inf)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AddBlob adds the path to an enclosure to this document.
-func (_Documents) AddBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, blob *Blob) error {
-	if blob == nil {
-		return errors.New("blob should be non-nil")
-	}
-
-	// Verify the given checksum.
-	f, err := os.Open(blob.Path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	h := sha1.New()
-	_, err = io.Copy(h, f)
-	if err != nil {
-		return err
-	}
-	csum := fmt.Sprintf("%x", h.Sum(nil))
-	if blob.SHA1Sum != csum {
-		return fmt.Errorf("checksum mismatch -- given SHA1 sum : %s, computed SHA1 sum : %s", blob.SHA1Sum, csum)
-	}
-
-	// Store the blob in the appropriate path.
-
-	success := false
-	bpath := path.Join(blobsDir, csum[0:2], csum)
-	err = os.Rename(blob.Path, bpath)
-	if err != nil {
-		return err
-	}
-	// Clean-up in case of any error.  However, this mechanism is not
-	// adequate if this method runs in the scope of an outer
-	// transaction.  The moved file will be orphaned, should the outer
-	// transaction abort later.
-	//
-	// TODO(js): Implement a better solution.
-	defer func() {
-		if !success {
-			os.Remove(bpath)
-		}
-	}()
-
-	var tx *sql.Tx
-	if otx == nil {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	} else {
-		tx = otx
-	}
-
-	// Now write the database entry.
-
-	q := `
-	INSERT INTO wf_document_blobs(doctype_id, doc_id, name, path, sha1sum)
-	VALUES(?, ?, ?, ?, ?)
-	`
-	_, err = tx.Exec(q, dtype, id, blob.Name, bpath, csum)
-	if err != nil {
-		return err
-	}
-
-	if otx == nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-	}
-
-	success = true
-	return nil
-}
-
-// DeleteBlob deletes the given blob from the specified document.
-func (_Documents) DeleteBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, sha1 string) error {
-	if sha1 == "" {
-		return errors.New("SHA1 sum should be non-empty")
-	}
-
-	var tx *sql.Tx
-	if otx == nil {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	} else {
-		tx = otx
-	}
-
-	q := `
-	SELECT COUNT(*)
-	FROM wf_document_blobs
-	WHERE sha1sum = ?
-	`
-	var count int64
-	row := tx.QueryRow(q, sha1)
-	err := row.Scan(&count)
-	if err != nil {
-		return err
-	}
-	if count == 1 {
-		q = `
-		SELECT path
-		FROM wf_document_blobs
-		WHERE doctype_id = ?
-		AND doc_id = ?
-		AND sha1sum = ?
-		`
-		var path string
-		row = tx.QueryRow(q, dtype, id, sha1)
-		err = row.Scan(&path)
-		if err != nil {
-			return err
-		}
-
-		err = os.Remove(path)
-		if err != nil {
-			return err
-		}
-	}
-
-	q = `
-	DELETE FROM wf_document_blobs
-	WHERE doctype_id = ?
-	AND doc_id = ?
-	AND sha1sum = ?
-	`
-	_, err = tx.Exec(q, dtype, id, sha1)
-	if err != nil {
-		return err
-	}
-
-	if otx == nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 

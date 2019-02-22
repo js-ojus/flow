@@ -27,7 +27,6 @@ const (
 )
 
 var db *sql.DB
-var blobsDir string
 
 // RegisterDB provides an already initialised database handle to `flow`.
 //
@@ -37,25 +36,6 @@ func RegisterDB(sdb *sql.DB) error {
 		log.Fatalln("given database handle is `nil`")
 	}
 	db = sdb
-
-	return nil
-}
-
-// SetBlobsDir specifies the base directory inside which blob files
-// should be stored.
-//
-// Inside this base directory, 256 subdirectories are created as hex
-// `00` through `ff`.  A blob is stored in the subdirectory whose name
-// matches the first two hex digits of its SHA1 sum.
-//
-// N.B. Once set, this MUST NOT change between runs.  Doing so will
-// result in loss of all previously stored blobs.  In addition,
-// corresponding documents get corrupted.
-func SetBlobsDir(base string) error {
-	if base == "" {
-		log.Fatalln("given base directory path is empty")
-	}
-	blobsDir = base
 
 	return nil
 }
