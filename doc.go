@@ -18,8 +18,6 @@ package flow
 import (
 	"database/sql"
 	"log"
-
-	U "github.com/js-ojus/goutils"
 )
 
 const (
@@ -34,9 +32,9 @@ var blobsDir string
 // RegisterDB provides an already initialised database handle to `flow`.
 //
 // N.B. This method **MUST** be called before anything else in `flow`.
-func RegisterDB(sdb *sql.DB) *U.Error {
+func RegisterDB(sdb *sql.DB) error {
 	if sdb == nil {
-		log.Fatal("given database handle is `nil`")
+		log.Fatalln("given database handle is `nil`")
 	}
 	db = sdb
 
@@ -53,9 +51,9 @@ func RegisterDB(sdb *sql.DB) *U.Error {
 // N.B. Once set, this MUST NOT change between runs.  Doing so will
 // result in loss of all previously stored blobs.  In addition,
 // corresponding documents get corrupted.
-func SetBlobsDir(base string) *U.Error {
+func SetBlobsDir(base string) error {
 	if base == "" {
-		log.Fatal("given base directory path is empty")
+		log.Fatalln("given base directory path is empty")
 	}
 	blobsDir = base
 
