@@ -47,8 +47,9 @@ func (_Roles) New(otx *sql.Tx, name string) (RoleID, error) {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -161,8 +162,9 @@ func (_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -171,7 +173,7 @@ func (_Roles) Rename(otx *sql.Tx, id RoleID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, id)
+	_, err = tx.Exec("UPDATE wf_roles_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -202,7 +204,7 @@ func (_Roles) Delete(otx *sql.Tx, id RoleID) error {
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -238,8 +240,9 @@ func (_Roles) Delete(otx *sql.Tx, id RoleID) error {
 // document type.
 func (_Roles) AddPermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions []DocActionID) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -253,14 +256,14 @@ func (_Roles) AddPermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions [
 	VALUES(?, ?, ?)
 	`
 	for _, action := range actions {
-		_, err := tx.Exec(q, rid, dtype, action)
+		_, err = tx.Exec(q, rid, dtype, action)
 		if err != nil {
 			return err
 		}
 	}
 
 	if otx == nil {
-		err := tx.Commit()
+		err = tx.Commit()
 		if err != nil {
 			return err
 		}
@@ -272,8 +275,9 @@ func (_Roles) AddPermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions [
 // given document type.
 func (_Roles) RemovePermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, actions []DocActionID) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -289,14 +293,14 @@ func (_Roles) RemovePermissions(otx *sql.Tx, rid RoleID, dtype DocTypeID, action
 	AND docaction_id = ?
 	`
 	for _, action := range actions {
-		_, err := tx.Exec(q, rid, dtype, action)
+		_, err = tx.Exec(q, rid, dtype, action)
 		if err != nil {
 			return err
 		}
 	}
 
 	if otx == nil {
-		err := tx.Commit()
+		err = tx.Commit()
 		if err != nil {
 			return err
 		}

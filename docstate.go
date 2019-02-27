@@ -57,8 +57,9 @@ func (_DocStates) New(otx *sql.Tx, name string) (DocStateID, error) {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -177,8 +178,9 @@ func (_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -187,7 +189,7 @@ func (_DocStates) Rename(otx *sql.Tx, id DocStateID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, id)
+	_, err = tx.Exec("UPDATE wf_docstates_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}

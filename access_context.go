@@ -87,8 +87,9 @@ func (_AccessContexts) New(otx *sql.Tx, name string) (AccessContextID, error) {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -296,8 +297,9 @@ func (_AccessContexts) Rename(otx *sql.Tx, id AccessContextID, name string) erro
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -311,7 +313,7 @@ func (_AccessContexts) Rename(otx *sql.Tx, id AccessContextID, name string) erro
 	SET name = ?
 	WHERE id = ?
 	`
-	_, err := tx.Exec(q, name, id)
+	_, err = tx.Exec(q, name, id)
 	if err != nil {
 		return err
 	}
@@ -335,8 +337,9 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -350,7 +353,7 @@ func (_AccessContexts) SetActive(otx *sql.Tx, id AccessContextID, active bool) e
 	SET active = ?
 	WHERE id = ?
 	`
-	_, err := tx.Exec(q, act, id)
+	_, err = tx.Exec(q, act, id)
 	if err != nil {
 		return err
 	}
@@ -445,8 +448,9 @@ func (_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -455,7 +459,7 @@ func (_AccessContexts) AddGroupRole(otx *sql.Tx, id AccessContextID, gid GroupID
 		tx = otx
 	}
 
-	_, err := tx.Exec(`INSERT INTO wf_ac_group_roles(ac_id, group_id, role_id) VALUES(?, ?, ?)`, id, gid, rid)
+	_, err = tx.Exec(`INSERT INTO wf_ac_group_roles(ac_id, group_id, role_id) VALUES(?, ?, ?)`, id, gid, rid)
 	if err != nil {
 		return err
 	}
@@ -477,8 +481,9 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -487,7 +492,7 @@ func (_AccessContexts) RemoveGroupRole(otx *sql.Tx, id AccessContextID, gid Grou
 		tx = otx
 	}
 
-	_, err := tx.Exec(`DELETE FROM wf_ac_group_roles WHERE ac_id = ? AND group_id = ? AND role_id = ?`, id, gid, rid)
+	_, err = tx.Exec(`DELETE FROM wf_ac_group_roles WHERE ac_id = ? AND group_id = ? AND role_id = ?`, id, gid, rid)
 	if err != nil {
 		return err
 	}
@@ -552,8 +557,9 @@ func (_AccessContexts) AddGroup(otx *sql.Tx, id AccessContextID, gid, reportsTo 
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -563,7 +569,7 @@ func (_AccessContexts) AddGroup(otx *sql.Tx, id AccessContextID, gid, reportsTo 
 	}
 
 	q := `INSERT INTO wf_ac_group_hierarchy(ac_id, group_id, reports_to) VALUES (?, ?, ?)`
-	_, err := tx.Exec(q, id, gid, reportsTo)
+	_, err = tx.Exec(q, id, gid, reportsTo)
 	if err != nil {
 		return err
 	}
@@ -585,8 +591,9 @@ func (_AccessContexts) DeleteGroup(otx *sql.Tx, id AccessContextID, gid GroupID)
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -596,7 +603,7 @@ func (_AccessContexts) DeleteGroup(otx *sql.Tx, id AccessContextID, gid GroupID)
 	}
 
 	q := `DELETE FROM wf_ac_group_hierarchy WHERE ac_id = ? AND group_id = ?`
-	_, err := tx.Exec(q, id, gid)
+	_, err = tx.Exec(q, id, gid)
 	if err != nil {
 		return err
 	}
@@ -669,8 +676,9 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, gid, rep
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -685,7 +693,7 @@ func (_AccessContexts) ChangeReporting(otx *sql.Tx, id AccessContextID, gid, rep
 	WHERE ac_id = ?
 	AND group_id = ?
 	`
-	_, err := tx.Exec(q, reportsTo, id, gid)
+	_, err = tx.Exec(q, reportsTo, id, gid)
 	if err != nil {
 		return err
 	}

@@ -71,8 +71,9 @@ func (_DocTypes) New(otx *sql.Tx, name string) (DocTypeID, error) {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -211,8 +212,9 @@ func (_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -221,7 +223,7 @@ func (_DocTypes) Rename(otx *sql.Tx, id DocTypeID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, id)
+	_, err = tx.Exec("UPDATE wf_doctypes_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
@@ -342,8 +344,9 @@ func (_DocTypes) _Transitions(dtype DocTypeID, state DocStateID) (map[DocActionI
 func (_DocTypes) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	action DocActionID, toState DocStateID) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -356,7 +359,7 @@ func (_DocTypes) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	INSERT INTO wf_docstate_transitions(doctype_id, from_state_id, docaction_id, to_state_id)
 	VALUES(?, ?, ?, ?)
 	`
-	_, err := tx.Exec(q, dtype, state, action, toState)
+	_, err = tx.Exec(q, dtype, state, action, toState)
 	if err != nil {
 		return err
 	}
@@ -375,8 +378,9 @@ func (_DocTypes) AddTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 // document action performed on documents in the given current state.
 func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID, action DocActionID) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -391,7 +395,7 @@ func (_DocTypes) RemoveTransition(otx *sql.Tx, dtype DocTypeID, state DocStateID
 	AND from_state_id =?
 	AND docaction_id = ?
 	`
-	_, err := tx.Exec(q, dtype, state, action)
+	_, err = tx.Exec(q, dtype, state, action)
 	if err != nil {
 		return err
 	}

@@ -79,7 +79,7 @@ func (w *Workflow) ApplyEvent(otx *sql.Tx, event *DocEvent, recipients []GroupID
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -129,8 +129,9 @@ func (_Workflows) New(otx *sql.Tx, name string, dtype DocTypeID, state DocStateI
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -290,8 +291,9 @@ func (_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -304,7 +306,7 @@ func (_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
 	UPDATE wf_workflows SET name = ?
 	WHERE id = ?
 	`
-	_, err := tx.Exec(q, name, id)
+	_, err = tx.Exec(q, name, id)
 	if err != nil {
 		return err
 	}
@@ -323,8 +325,9 @@ func (_Workflows) Rename(otx *sql.Tx, id WorkflowID, name string) error {
 // inactive, helping in workflow management and deprecation.
 func (_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -341,7 +344,7 @@ func (_Workflows) SetActive(otx *sql.Tx, id WorkflowID, active bool) error {
 	UPDATE wf_workflows SET active = ?
 	WHERE id = ?
 	`
-	_, err := tx.Exec(q, flag, id)
+	_, err = tx.Exec(q, flag, id)
 	if err != nil {
 		return err
 	}
@@ -367,8 +370,9 @@ func (_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -405,8 +409,9 @@ func (_Workflows) AddNode(otx *sql.Tx, dtype DocTypeID, state DocStateID,
 // transition of the system.
 func (_Workflows) RemoveNode(otx *sql.Tx, wid WorkflowID, nid NodeID) error {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -420,7 +425,7 @@ func (_Workflows) RemoveNode(otx *sql.Tx, wid WorkflowID, nid NodeID) error {
 	WHERE workflow_id = ?
 	AND id = ?
 	`
-	_, err := tx.Exec(q, wid, nid)
+	_, err = tx.Exec(q, wid, nid)
 	if err != nil {
 		return err
 	}

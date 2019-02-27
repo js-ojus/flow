@@ -62,8 +62,9 @@ func (_DocActions) New(otx *sql.Tx, name string, reconfirm bool) (DocActionID, e
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -73,7 +74,6 @@ func (_DocActions) New(otx *sql.Tx, name string, reconfirm bool) (DocActionID, e
 	}
 
 	var res sql.Result
-	var err error
 	if reconfirm {
 		res, err = tx.Exec("INSERT INTO wf_docactions_master(name, reconfirm) VALUES(?, ?)", name, 1)
 	} else {
@@ -182,8 +182,9 @@ func (_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -192,7 +193,7 @@ func (_DocActions) Rename(otx *sql.Tx, id DocActionID, name string) error {
 		tx = otx
 	}
 
-	_, err := tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, id)
+	_, err = tx.Exec("UPDATE wf_docactions_master SET name = ? WHERE id = ?", name, id)
 	if err != nil {
 		return err
 	}
