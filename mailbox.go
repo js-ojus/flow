@@ -256,8 +256,9 @@ func (_Mailboxes) ReassignMessage(otx *sql.Tx, fgid, tgid GroupID, msgID Message
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -271,7 +272,7 @@ func (_Mailboxes) ReassignMessage(otx *sql.Tx, fgid, tgid GroupID, msgID Message
 	WHERE group_id = ?
 	AND message_id = ?
 	`
-	_, err := tx.Exec(q, tgid, fgid, msgID)
+	_, err = tx.Exec(q, tgid, fgid, msgID)
 	if err != nil {
 		return err
 	}
@@ -294,8 +295,9 @@ func (_Mailboxes) SetStatusByUser(otx *sql.Tx, uid UserID, msgID MessageID, stat
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -315,7 +317,7 @@ func (_Mailboxes) SetStatusByUser(otx *sql.Tx, uid UserID, msgID MessageID, stat
 	)
 	AND message_id = ?
 	`
-	_, err := tx.Exec(q, status, uid, msgID)
+	_, err = tx.Exec(q, status, uid, msgID)
 	if err != nil {
 		return err
 	}
@@ -338,8 +340,9 @@ func (_Mailboxes) SetStatusByGroup(otx *sql.Tx, gid GroupID, msgID MessageID, st
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -353,7 +356,7 @@ func (_Mailboxes) SetStatusByGroup(otx *sql.Tx, gid GroupID, msgID MessageID, st
 	WHERE group_id = ?
 	AND message_id = ?
 	`
-	_, err := tx.Exec(q, status, gid, msgID)
+	_, err = tx.Exec(q, status, gid, msgID)
 	if err != nil {
 		return err
 	}

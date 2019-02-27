@@ -108,8 +108,9 @@ func (_DocEvents) New(otx *sql.Tx, input *DocEventsNewInput) (DocEventID, error)
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}

@@ -44,8 +44,9 @@ var Groups _Groups
 // group.  This serves as the linking identifier.
 func (_Groups) NewSingleton(otx *sql.Tx, uid UserID) (GroupID, error) {
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -105,8 +106,9 @@ func (_Groups) New(otx *sql.Tx, name string, gtype string) (GroupID, error) {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -212,7 +214,7 @@ func (_Groups) Rename(otx *sql.Tx, id GroupID, name string) error {
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -262,7 +264,7 @@ func (_Groups) Delete(otx *sql.Tx, id GroupID) error {
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -382,8 +384,9 @@ func (_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -394,7 +397,7 @@ func (_Groups) AddUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 
 	var gtype string
 	row := tx.QueryRow("SELECT group_type FROM wf_groups_master WHERE id = ?", gid)
-	err := row.Scan(&gtype)
+	err = row.Scan(&gtype)
 	if err != nil {
 		return err
 	}
@@ -424,8 +427,9 @@ func (_Groups) RemoveUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -436,7 +440,7 @@ func (_Groups) RemoveUser(otx *sql.Tx, gid GroupID, uid UserID) error {
 
 	var gtype string
 	row := tx.QueryRow("SELECT group_type FROM wf_groups_master WHERE id = ?", gid)
-	err := row.Scan(&gtype)
+	err = row.Scan(&gtype)
 	if err != nil {
 		return err
 	}

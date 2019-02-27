@@ -220,7 +220,7 @@ func (_Documents) New(otx *sql.Tx, input *DocumentsNewInput) (DocumentID, error)
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return 0, err
 		}
@@ -490,7 +490,7 @@ func (_Documents) SetTitle(otx *sql.Tx, dtype DocTypeID, id DocumentID, title st
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -523,8 +523,9 @@ func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data stri
 	tbl := DocTypes.docStorName(dtype)
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -534,7 +535,7 @@ func (_Documents) SetData(otx *sql.Tx, dtype DocTypeID, id DocumentID, data stri
 	}
 
 	q := `UPDATE ` + tbl + ` SET data = ?, ctime = NOW() WHERE id = ?`
-	_, err := tx.Exec(q, data, id)
+	_, err = tx.Exec(q, data, id)
 	if err != nil {
 		return err
 	}
@@ -667,7 +668,7 @@ func (_Documents) AddBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, blob *Blo
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -705,8 +706,9 @@ func (_Documents) DeleteBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, sha1 s
 	}
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -722,7 +724,7 @@ func (_Documents) DeleteBlob(otx *sql.Tx, dtype DocTypeID, id DocumentID, sha1 s
 	`
 	var count int64
 	row := tx.QueryRow(q, sha1)
-	err := row.Scan(&count)
+	err = row.Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -826,7 +828,7 @@ func (_Documents) AddTags(otx *sql.Tx, dtype DocTypeID, id DocumentID, tags ...s
 
 	var tx *sql.Tx
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -869,8 +871,9 @@ func (_Documents) RemoveTag(otx *sql.Tx, dtype DocTypeID, id DocumentID, tag str
 	tag = strings.ToLower(tag)
 
 	var tx *sql.Tx
+	var err error
 	if otx == nil {
-		tx, err := db.Begin()
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
@@ -886,7 +889,7 @@ func (_Documents) RemoveTag(otx *sql.Tx, dtype DocTypeID, id DocumentID, tag str
 	AND doc_id = ?
 	AND tag = ?
 	`
-	_, err := tx.Exec(q, dtype, id, tag)
+	_, err = tx.Exec(q, dtype, id, tag)
 	if err != nil {
 		return err
 	}
