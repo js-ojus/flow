@@ -43,7 +43,7 @@ As a workflow engine, `flow` intends to help in defining and driving "front offi
 
 ### What `flow` is not
 
-`flow` is a library, not a full-stack solution.  Accordingly, it cannot be downloaded and deployed as a reday-to-use service.  It has to be used by an application that programs workflow definitions and processing.  The only "programming in the small" language supported is Go!  Of course, you could employ `flow` in a microservice architecture by wrapping it in a thin service.  That can enable you to use your favourite programming language to drive `flow`.
+`flow` is a library, not a full-stack solution.  Accordingly, it cannot be downloaded and deployed as a ready-to-use service.  It has to be used by an application that programs workflow definitions and processing.  The only "programming in the small" language supported is Go!  Of course, you could employ `flow` in a microservice architecture by wrapping it in a thin service.  That can enable you to use your favourite programming language to drive `flow`.
 
 ### Express non-goals
 
